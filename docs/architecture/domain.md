@@ -18,7 +18,9 @@ this file in the same PR.
 3. **Let my agent plan with my network.** "I'm free Tuesday afternoon, what are
    my connections going to?" "Find a gap where I can meet Priya."
 4. **Show off my week.** Post a picture of my schedule on LinkedIn with a link
-   that opens the live page, and subscribe to it in my calendar.
+   that opens the live page, and subscribe to it in my calendar. Tell people
+   which sessions I'm going to: the week, a day or chosen ones, posted from
+   Hallway or taken there by hand (ADR 0026).
 5. **Click through to the real thing.** Every session links to its page on the
    re:Invent site, where reserving happens. Hallway never reserves.
 6. **Control who sees it.** Public, connections only, or private; hide any
@@ -117,7 +119,16 @@ We store UTC instants and the event timezone, and render in the event timezone
     through `shareableEntries`: the visible entries, minus hidden ones even
     when the viewer is the owner, who is about to show it to others. A link
     preview is always the anonymous view, since everyone a link is posted to
-    sees the card (ADR 0012).
+    sees the card (ADR 0012). So is `/og/{handle}.png`, whoever asks: the
+    owner's own picture has its own address, so no URL is ever both (#70,
+    ADR 0026).
+- **A post says where I'll be and nothing else.** `postText` prefills a post
+  from the selected sessions' title, code, day and time (Las Vegas time) and
+  venue, and my page's link, within LinkedIn's 3,000 characters ("and N
+  more"); never an abstract. A selection (`selectEntries`: week, day, or
+  sessions) takes only shareable entries, so a hidden one is never offered.
+  Posting needs a person at the keyboard, my linked LinkedIn account, and a
+  fresh consent each time; LinkedIn's token is never stored (ADR 0026).
 - **A handle is ASCII, made from the name.** It is a link people paste into
   LinkedIn posts, where a percent-encoded URL reads as broken. On first
   sign-in `handleFromName` folds Latin Extended letters to base letters
@@ -231,6 +242,8 @@ what they are told (hunt F10).
 | `ConnectViaShareLink` | signed-in viewer of `/@handle?invite=<token>` | with the owner's current invite token, connection formed at once (rule above); otherwise `forbidden`. Connecting to yourself is refused |
 | `RotateInvite` | me, signed in as a person (not an agent token) | a new invite token; old links stop connecting, connections stay |
 | `RemoveConnection` | either side | |
+| `BeginLinkedInPost` | me, signed in as a person, with LinkedIn linked | holds `{ text, selection }` for ten minutes under the hash of a new OAuth state and answers LinkedIn's consent page for `w_member_social` (`POST /api/me/share/post`) |
+| `CompleteLinkedInPost` | the same person, back from LinkedIn | takes the draft once, checks LinkedIn's member is the linked one, uploads the picture of the selection, creates the post, drops the token (`GET /api/me/share/post/callback`) |
 
 ## Queries
 
@@ -249,9 +262,11 @@ what they are told (hunt F10).
 | `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day of the event (`from`/`to` as `HH:MM`, `to` up to `24:00`, default the whole day) that my connections plan to attend, with who and their intent |
 | `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. `to` may be `24:00`. All-day sessions (the expo and the like) do not block a gap, nor do sessions with a start and no length, which are returned as `unplacedSessions` (mine, and theirs I may see) so the asker can decide |
 | `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule (`GET /cal/{token}.ics`); a rotated token finds no one |
-| `ShareImage(handle, day?)` | a PNG of the schedule as the asker may see it, hidden entries left out, for posting (`GET /og/{handle}.png`, 1200 by 627) |
+| `ShareImage(handle, day?)` | the link preview's PNG, always as an anonymous visitor sees it, hidden entries left out (`GET /og/{handle}.png`, 1200 by 627) |
+| `GetMyShareImage(selection)` | my own picture of my week, a day or chosen sessions, hidden ones left out; to me signed in as a person, never cached (`GET /api/me/share-image.png`) |
+| `ComposePost(selection)` | the composer's draft: the sessions I may share, the selected ones, the suggested text, my picture's URL, whether the link preview shows my week, and whether Hallway can post for me (`GET /api/me/share/post`) |
 | `LinkPreview(handle)` | `/@handle`'s Open Graph and Twitter tags, always as an anonymous visitor sees it; `og:image` is the share image with a version that changes when what it shows changes |
-| `GetShareLinks` | my page, my share image and, to me signed in as a person, my calendar feed and my invite link (`GET /api/me/share`) |
+| `GetShareLinks` | my page, the link preview's card and, to me signed in as a person, my own picture, my calendar feed and my invite link (`GET /api/me/share`) |
 
 ## Who calls what
 
