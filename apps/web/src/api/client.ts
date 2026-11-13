@@ -24,6 +24,7 @@ import {
   Following,
   GitHubRoundTrip,
   Event,
+  Venues,
   IdentityList,
   IssuedAgentToken,
   Invite,
@@ -122,6 +123,7 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
 
   return {
     getEvent: (eventId: string) => request("GET", `/api/events/${encodeURIComponent(eventId)}`, Event),
+    getVenues: (eventId: string) => request("GET", `/api/events/${encodeURIComponent(eventId)}/venues`, Venues),
 
     /** Which ways to sign in the server offers: dev sign-in, and the configured providers in their order. */
     signInOptions: () => request("GET", "/api/auth/options", SignInOptions),

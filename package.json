@@ -23,6 +23,7 @@
     "fake:linkedin": "node scripts/fake-linkedin.mjs",
     "db:generate": "node scripts/generate-migration.mjs",
     "test:e2e": "vitest run --config e2e/vitest.config.ts",
+    "tiles": "node scripts/venues/cut-tiles.mjs",
     "notes": "node scripts/notes.mjs",
     "check:no-toolbar": "node scripts/check-no-toolbar.mjs"
   },
@@ -32,6 +33,7 @@
     "agentation-mcp": "1.3.2",
     "dependency-cruiser": "18.7.0",
     "esbuild": "0.28.2",
+    "pmtiles": "4.5.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.1.0",

@@ -1,7 +1,8 @@
 // My week (docs/design/my-week.html): my schedule one day at a time, in Las
 // Vegas time, said once under the title. The chosen day is in the URL
 // (?day=2026-12-01) so a reload or a shared link keeps it. The same week can
-// be drawn as a calendar instead (?view=calendar, WeekCalendar.tsx).
+// be drawn as a calendar instead (?view=calendar, WeekCalendar.tsx) or as a
+// campus map of one day (?view=map, WeekMap.tsx).
 import type { Event, MySchedule, Person, PlanEntry } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useSearchParams } from "react-router";
@@ -14,6 +15,7 @@ import { EntryCell } from "../schedule/EntryCell.tsx";
 import { Going } from "../schedule/Going.tsx";
 import { whoIsGoing } from "../schedule/going.ts";
 import { WeekCalendar, type GoingNote } from "../schedule/WeekCalendar.tsx";
+import { WeekMap } from "../schedule/WeekMap.tsx";
 import { useWeekView, WeekViewToggle } from "../schedule/WeekView.tsx";
 import { ShareSheet } from "../share/ShareSheet.tsx";
 import { Empty } from "../shell/Empty.tsx";
@@ -102,7 +104,6 @@ export function MyWeek() {
   if (view === "calendar") {
     return (
       <Screen title="My week" sub={sub} action={share}>
-        {toggle}
         <WeekCalendar
           entries={schedule.entries}
           dates={dates}
@@ -110,7 +111,16 @@ export function MyWeek() {
           going={(entry) => goingNote(entry, going)}
           cell={(entry) => cell(entry, clashing, going)}
           foot={synced}
+          toggle={toggle}
         />
+      </Screen>
+    );
+  }
+
+  if (view === "map") {
+    return (
+      <Screen title="My week" sub={sub} action={share}>
+        <WeekMap entries={schedule.entries} dates={dates} toggle={toggle} cell={(entry) => cell(entry, clashing, going)} foot={synced} />
       </Screen>
     );
   }
@@ -123,13 +133,15 @@ export function MyWeek() {
 
   return (
     <Screen title="My week" sub={sub} action={share}>
-      {toggle}
       <DayChips dates={dates} chosen={chosen} />
 
       <section className="section">
-        <h2 className="ghead big">
-          {formatDate(chosen)} <small>{count(entries.length)}</small>
-        </h2>
+        <div className="day-head">
+          <h2 className="ghead big">
+            <span className="day-name">{formatDate(chosen)}</span> <small>{count(entries.length)}</small>
+          </h2>
+          {toggle}
+        </div>
         {slot !== null && (
           <p className="gfoot slot-note">
             On from {formatMinute(slot)} to {formatMinute(slot + slotMinutes)}.{" "}

@@ -1,13 +1,19 @@
 // Domain values to contract resources, and the checks every schedule handler
-// shares. The one place a session gains its `url` (domain.md "Session link").
+// shares. The one place a session gains its `url` (domain.md "Session link")
+// and its `venueId` (issue #93).
 import type { PlanEntry as PlanEntryResource, Session as SessionResource } from "@hallway/contracts";
-import { sessionUrl, type PlanEntry } from "@hallway/domain";
+import { sessionUrl, venueOf, type PlanEntry } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import { fail, type Outcome } from "../outcome.ts";
 import type { CatalogSession } from "./schedule-repository.ts";
 
 export function sessionResource(session: CatalogSession, urlTemplate: string): SessionResource {
-  return session.code === undefined ? { ...session } : { ...session, url: sessionUrl(session.code, urlTemplate) };
+  const venueId = venueOf(session.venue);
+  return {
+    ...session,
+    ...(venueId === undefined ? {} : { venueId }),
+    ...(session.code === undefined ? {} : { url: sessionUrl(session.code, urlTemplate) }),
+  };
 }
 
 export function planEntryResource(entry: PlanEntry, session: CatalogSession, urlTemplate: string): PlanEntryResource {

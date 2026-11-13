@@ -3,6 +3,7 @@
 import {
   connectionsGoing,
   getEvent,
+  getVenues,
   identityHandlers,
   invitePathOf,
   networkHandlers,
@@ -101,6 +102,7 @@ function handlersFor(env: Env): Handlers {
   };
   return {
     getEvent: getEvent(events),
+    getVenues: getVenues(events),
     identity: identityHandlers({
       attendees,
       agentTokens: agentTokensOnD1(db),

@@ -7,7 +7,7 @@
 // Durable Object or session store is needed. JSON responses rather than an SSE
 // stream, since no tool here streams progress.
 import type { Actor } from "@hallway/application";
-import { GetEventInput, Event } from "@hallway/contracts";
+import { GetEventInput, Event, Venues } from "@hallway/contracts";
 import { Me } from "@hallway/contracts";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -49,6 +49,18 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (input) => toolResult(() => handlers.getEvent(actor, input)),
+  );
+  server.registerTool(
+    "get_venues",
+    {
+      title: "Get an event's venues and walking times",
+      description:
+        "The buildings re:Invent sessions are in (a session's `venueId` names one), each with its OpenStreetMap outline, and the walking time and distance between every two, measured center to center on OpenStreetMap footways. Use it to tell whether two sessions in a row leave time to walk between them. Walking inside a venue to the room is not counted. Campus shuttles also run between most venues.",
+      inputSchema: GetEventInput,
+      outputSchema: asToolOutput(Venues),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (input) => toolResult(() => handlers.getVenues(actor, input)),
   );
   server.registerTool(
     "whoami",
