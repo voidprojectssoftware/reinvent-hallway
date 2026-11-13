@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Session · Hallway design</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <script src="theme.js"></script>
+  </head>
+  <body class="app">
+    <!-- GetSession(sessionId): the snapshot, my entry, and which of my
+         connections are going. No abstract: AWS's text is read on re:Invent.
+         Sample data, made up. -->
+    <header class="nav">
+      <div class="col gutter nav-row">
+        <div class="nav-side">
+          <a class="navbtn" href="my-week.html"><svg class="back" aria-hidden="true"><use href="icons.svg#i-back" /></svg>My week</a>
+        </div>
+        <div class="nav-title">AIM3315</div>
+        <div class="nav-side right"></div>
+      </div>
+    </header>
+
+    <main class="col gutter">
+      <div class="large">
+        <h1 class="long">Build production agents with Amazon Bedrock AgentCore</h1>
+        <p class="large-sub"><span class="code">AIM3315</span> · Breakout session · 300 Advanced</p>
+      </div>
+
+      <section class="section">
+        <ul class="group">
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico"><svg aria-hidden="true"><use href="icons.svg#i-clock" /></svg></span>
+              <div class="cellmain">
+                <span class="info-k">When, Las Vegas time (PST)</span>
+                <span class="info-v">Tuesday 1 December, 11:30 AM to 12:30 PM</span>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico"><svg aria-hidden="true"><use href="icons.svg#i-pin" /></svg></span>
+              <div class="cellmain">
+                <span class="info-k">Where</span>
+                <span class="info-v">MGM Grand, Level 1, Grand 122</span>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico"><svg aria-hidden="true"><use href="icons.svg#i-mic" /></svg></span>
+              <div class="cellmain">
+                <span class="info-k">Speakers</span>
+                <span class="info-v">Rachel Nguyen, Daniel Ostrowski</span>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico"><svg aria-hidden="true"><use href="icons.svg#i-tag" /></svg></span>
+              <div class="cellmain">
+                <span class="info-k">Topics</span>
+                <span class="info-v">Artificial intelligence, Agents, Serverless</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <a class="btn block" href="#" rel="noopener">Open on re:Invent <svg aria-hidden="true"><use href="icons.svg#i-out" /></svg></a>
+        <p class="gfoot">The description, seats and reservations are on the re:Invent site.</p>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">On your week</h2>
+        <ul class="group">
+          <li>
+            <div class="cell">
+              <div class="cellmain">
+                <span>You have a seat</span>
+                <span class="cellsub">Reserved on re:Invent, synced by your agent 12 minutes ago</span>
+              </div>
+              <span class="badge reserved"><svg aria-hidden="true"><use href="icons.svg#i-check" /></svg>Reserved</span>
+            </div>
+          </li>
+          <li>
+            <label class="cell">
+              <div class="cellmain">
+                <span>Hide from others</span>
+              </div>
+              <input class="switch" type="checkbox" role="switch" />
+            </label>
+          </li>
+        </ul>
+        <p class="gfoot">A hidden session stays on your week and calendar, and no one else sees it or counts it.</p>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">Your connections going <span>3</span></h2>
+        <ul class="group">
+          <li>
+            <a class="cell lead-av" href="person.html">
+              <span class="av" data-c="1">PR</span>
+              <div class="cellmain">
+                <span class="celltitle">Priya Raman</span>
+                <span class="cellsub">Principal Engineer, Northwind Health</span>
+              </div>
+              <span class="badge reserved"><svg aria-hidden="true"><use href="icons.svg#i-check" /></svg>Reserved</span>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-av" href="person.html">
+              <span class="av" data-c="3">MW</span>
+              <div class="cellmain">
+                <span class="celltitle">Marcus Webb</span>
+                <span class="cellsub">Cloud Architect, Fabrikam</span>
+              </div>
+              <span class="badge">Interested</span>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-av" href="person.html">
+              <span class="av" data-c="6">AK</span>
+              <div class="cellmain">
+                <span class="celltitle">Aisha Khan</span>
+                <span class="cellsub">Staff SRE, Contoso Bank</span>
+              </div>
+              <span class="badge">Interested</span>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Hallway">
+      <span class="brand">Hallway</span>
+      <a href="my-week.html" aria-current="page"><svg aria-hidden="true"><use href="icons.svg#i-week" /></svg><span>My week</span></a>
+      <a href="network.html"><svg aria-hidden="true"><use href="icons.svg#i-people" /></svg><span>Network</span><span class="badge-n" aria-label="2 requests">2</span></a>
+      <a href="connect-agent.html"><svg aria-hidden="true"><use href="icons.svg#i-agent" /></svg><span>Agent</span></a>
+      <a href="settings.html"><svg aria-hidden="true"><use href="icons.svg#i-gear" /></svg><span>Settings</span></a>
+    </nav>
+  </body>
+</html>

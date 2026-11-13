@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Settings · Hallway design</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <script src="theme.js"></script>
+  </head>
+  <body class="app">
+    <!-- Not asked for by issue #10; drawn because the tab bar needs a fourth
+         tab and ADR 0005 lists a settings page. SetVisibility (the segmented
+         control), the calendar feed, agent tokens, the contact import.
+         Sample data, made up. -->
+    <header class="nav">
+      <div class="col gutter nav-row">
+        <div class="nav-side"></div>
+        <div class="nav-title">Settings</div>
+        <div class="nav-side right"></div>
+      </div>
+    </header>
+
+    <main class="col gutter">
+      <div class="large">
+        <h1>Settings</h1>
+      </div>
+
+      <section class="section">
+        <ul class="group">
+          <li>
+            <a class="cell lead-av" href="#">
+              <span class="av" data-c="8">SO</span>
+              <div class="cellmain">
+                <span class="celltitle">Sam Okafor</span>
+                <span class="cellsub">@sam · Platform Engineer, Adatum</span>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">Who can see my week</h2>
+        <div class="seg" role="group" aria-label="Who can see my week">
+          <button aria-pressed="false">Anyone</button>
+          <button aria-pressed="true">Connections</button>
+          <button aria-pressed="false">Only me</button>
+        </div>
+        <p class="gfoot">Your connections see your sessions and you in "who is going". Hidden sessions stay yours alone.</p>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">Calendar</h2>
+        <ul class="group">
+          <li>
+            <button class="cell lead-ico">
+              <span class="ico"><svg aria-hidden="true"><use href="icons.svg#i-cal" /></svg></span>
+              <span class="cellmain">Copy calendar link</span>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </button>
+          </li>
+          <li>
+            <button class="cell action danger">Reset calendar link</button>
+          </li>
+        </ul>
+        <p class="gfoot">Subscribe in Apple Calendar, Google or Outlook. Anyone with the link sees what it shows, so reset it if it gets out.</p>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">Agent tokens</h2>
+        <ul class="group">
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico gray"><svg aria-hidden="true"><use href="icons.svg#i-key" /></svg></span>
+              <div class="cellmain">
+                <span>Claude Code on laptop</span>
+                <span class="cellsub">hw_7Kq2… · used 12 minutes ago</span>
+              </div>
+              <button class="minibtn">Revoke</button>
+            </div>
+          </li>
+          <li>
+            <a class="cell action lead" href="connect-agent.html">New token</a>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2 class="ghead">LinkedIn connections</h2>
+        <ul class="group">
+          <li>
+            <div class="cell lead-ico">
+              <span class="ico blue"><svg aria-hidden="true"><use href="icons.svg#i-doc" /></svg></span>
+              <div class="cellmain">
+                <span>Connections.csv</span>
+                <span class="cellsub">612 contacts, imported 9 November</span>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="cell action lead">Import a new file</button>
+          </li>
+        </ul>
+        <p class="gfoot">From LinkedIn: Settings, Data privacy, Get a copy of your data, Connections. Hallway keeps each contact's profile link, name and a one-way hash of the email, to find them here, and drops the rest.</p>
+      </section>
+
+      <section class="section">
+        <ul class="group">
+          <li><button class="cell action danger">Sign out</button></li>
+        </ul>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Hallway">
+      <span class="brand">Hallway</span>
+      <a href="my-week.html"><svg aria-hidden="true"><use href="icons.svg#i-week" /></svg><span>My week</span></a>
+      <a href="network.html"><svg aria-hidden="true"><use href="icons.svg#i-people" /></svg><span>Network</span><span class="badge-n" aria-label="2 requests">2</span></a>
+      <a href="connect-agent.html"><svg aria-hidden="true"><use href="icons.svg#i-agent" /></svg><span>Agent</span></a>
+      <a href="settings.html" aria-current="page"><svg aria-hidden="true"><use href="icons.svg#i-gear" /></svg><span>Settings</span></a>
+    </nav>
+  </body>
+</html>
