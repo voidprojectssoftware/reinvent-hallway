@@ -9,6 +9,7 @@
 // (ADR 0003), and no resource below has an abstract to carry.
 import { z } from "zod";
 import { EventId } from "./event.ts";
+import { Person } from "./identity.ts";
 
 export const SessionId = z
   .string()
@@ -63,6 +64,17 @@ export const AwsSession = z
   .meta({ description: "A session exactly as the AWS Events API gives it." });
 export type AwsSession = z.infer<typeof AwsSession>;
 
+/** How many faces a session carries beside its count. */
+export const goingFacesShown = 5;
+
+export const ConnectionsGoing = z
+  .object({
+    count: z.int().min(0).meta({ description: "How many of my connections plan this session and let me see it." }),
+    people: z.array(Person).max(goingFacesShown).meta({ description: `Up to ${goingFacesShown} of them, by display name, for avatars.` }),
+  })
+  .meta({ id: "ConnectionsGoing", description: "My connections going to a session, as their visibility lets me see." });
+export type ConnectionsGoing = z.infer<typeof ConnectionsGoing>;
+
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
 
 export const Session = z
@@ -84,6 +96,9 @@ export const Session = z
       .url()
       .optional()
       .meta({ description: "The session on the re:Invent site, where reading and reserving happen. Absent without a code." }),
+    connectionsGoing: ConnectionsGoing.optional().meta({
+      description: "On search and get, to a signed-in asker: how many of my connections are going, with a few faces.",
+    }),
     lastSeenAt: instant.meta({ description: "When an agent last sent this session." }),
   })
   .meta({

@@ -14,7 +14,10 @@ import type {
 
 const copy = <T>(value: T | undefined): T | undefined => value && structuredClone(value);
 
-export function attendeesInMemory(seed: readonly AttendeeRecord[] = []): AttendeeRepository {
+/** Beside the port, `all()`: the network fake reads every attendee, as D1 joins the table. */
+export function attendeesInMemory(
+  seed: readonly AttendeeRecord[] = [],
+): AttendeeRepository & { all(): Promise<AttendeeRecord[]> } {
   const byId = new Map(seed.map((attendee) => [attendee.id, structuredClone(attendee)]));
   const find = (match: (attendee: AttendeeRecord) => boolean) => copy([...byId.values()].find(match));
   const assertUnique = (attendee: AttendeeRecord) => {
@@ -26,6 +29,7 @@ export function attendeesInMemory(seed: readonly AttendeeRecord[] = []): Attende
   };
   return {
     byId: async (id) => copy(byId.get(id)),
+    all: async () => [...byId.values()].map((attendee) => structuredClone(attendee)),
     byHandle: async (handle) => find((attendee) => attendee.handle === handle),
     byLinkedinSub: async (sub) => find((attendee) => attendee.linkedinSub === sub),
     async create(attendee) {

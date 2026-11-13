@@ -3,13 +3,12 @@
 // and editing over REST, and the two agreeing.
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers } from "@hallway/application";
 import type { MySchedule, SyncResult } from "@hallway/contracts";
-import { eventsInMemory, identityInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
 import { syncMyScheduleDescription } from "./mcp/schedule-tools.ts";
+import { inMemoryHandlers, noPng } from "./testing/in-memory-handlers.ts";
 
 interface Fixture {
   schedule: { reserved: string[]; favorites: string[] };
@@ -31,28 +30,8 @@ const origin = "http://127.0.0.1:8787";
 let call: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 beforeEach(() => {
-  const events = eventsInMemory([reinvent2026]);
-  const schedule = scheduleInMemory();
-  const identity = identityHandlers(identityInMemory());
-  const app = createApp<typeof bindings>({
-    handlers: () => ({
-      getEvent: getEvent(events),
-      identity,
-      ...scheduleHandlers({
-        events,
-        schedule,
-        sessionUrlTemplate: "https://example.test/catalog?search={code}",
-        now: () => new Date("2026-11-13T12:00:00.000Z"),
-      }),
-      sharing: sharingHandlers({
-        ...identityInMemory(),
-        events,
-        schedule,
-        sessionUrlTemplate: "https://example.test/catalog?search={code}",
-      }),
-    }),
-    renderPng: async () => new Uint8Array(),
-  });
+  const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
+  const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: noPng });
   // Handlers are built per request; the fake store under them lives for the test.
   call = async (input, init) => app.fetch(new Request(input, init), bindings);
 });

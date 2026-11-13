@@ -1,12 +1,22 @@
 // The Worker's composition root (ADR 0002): the one place adapters are chosen.
 // Each request gets its handlers over D1 from its own bindings.
-import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers, type AreConnected } from "@hallway/application";
+import {
+  connectionsGoing,
+  getEvent,
+  identityHandlers,
+  invitePathOf,
+  networkHandlers,
+  scheduleHandlers,
+  sharingHandlers,
+  type AreConnected,
+} from "@hallway/application";
 import {
   agentTokensOnD1,
   attendeesOnD1,
   calendarFeedsOnD1,
   eventsOnD1,
   linkedInOidc,
+  networkOnD1,
   openDatabase,
   scheduleOnD1,
   webSessionsOnD1,
@@ -21,9 +31,12 @@ function handlersFor(env: Env): Handlers {
   const attendees = attendeesOnD1(db);
   const calendarFeeds = calendarFeedsOnD1(db);
   const schedule = scheduleOnD1(db);
-  // No connections exist until the network slice lands; it replaces this
-  // with its repository's answer.
-  const areConnected: AreConnected = async () => false;
+  const network = networkOnD1(db);
+  const now = () => new Date();
+  // The one answer to "are these two connected" for every read path that
+  // asks the visibility rule: identity's card, sharing's page, feed and
+  // image, and the network reads (which use the same repository).
+  const areConnected: AreConnected = (a, b) => network.areConnected(a, b);
   return {
     getEvent: getEvent(events),
     identity: identityHandlers({
@@ -42,7 +55,16 @@ function handlersFor(env: Env): Handlers {
       events,
       schedule,
       sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
-      now: () => new Date(),
+      now,
+      connectionsGoing: connectionsGoing(network),
+    }),
+    network: networkHandlers({
+      attendees,
+      network,
+      events,
+      schedule,
+      sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
+      now,
     }),
     sharing: sharingHandlers({
       attendees,
@@ -51,6 +73,7 @@ function handlersFor(env: Env): Handlers {
       schedule,
       areConnected,
       sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
+      invitePath: invitePathOf(network, now),
     }),
   };
 }

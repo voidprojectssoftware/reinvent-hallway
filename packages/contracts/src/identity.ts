@@ -123,3 +123,14 @@ export const CalendarFeed = z
   })
   .meta({ id: "CalendarFeed", description: "My secret iCalendar URL." });
 export type CalendarFeed = z.infer<typeof CalendarFeed>;
+
+export const Person = z
+  .object({
+    id: z.string(),
+    handle: Handle,
+    displayName: z.string().meta({ example: "Priya Raman" }),
+    headline: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  })
+  .meta({ id: "Person", description: "Someone on Hallway, as anyone may see them. Their page is `/@handle`." });
+export type Person = z.infer<typeof Person>;

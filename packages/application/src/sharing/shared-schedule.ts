@@ -24,6 +24,11 @@ export interface SharingDependencies {
   areConnected: AreConnected;
   /** SESSION_URL_TEMPLATE, for each session's link out. */
   sessionUrlTemplate: string;
+  /**
+   * The attendee's invite link path (`/@handle?invite=<token>`), made on
+   * first ask. The network slice answers it (`invitePathOf`).
+   */
+  invitePath: (attendee: AttendeeRecord) => Promise<string>;
 }
 
 export interface SharedEntry {
@@ -87,10 +92,12 @@ export function sharingHandlers(dependencies: SharingDependencies): SharingHandl
         pageUrl: new URL(`/@${me.handle}`, origin).href,
         imageUrl: new URL(shareImagePath(me.handle, mine.value.version), origin).href,
       };
-      // The feed URL is a credential: only for a person signed in (ADR 0008).
+      // The feed URL and the invite link are credentials: only for a person
+      // signed in (ADR 0008), never for an agent token.
       const person = personAtKeyboard(actor);
       const feed = person.ok ? await dependencies.calendarFeeds.get(person.value) : undefined;
       if (feed) links.calendarUrl = new URL(calendarFeedPath(feed.token), origin).href;
+      if (person.ok) links.inviteUrl = new URL(await dependencies.invitePath(me), origin).href;
       return ok(links);
     },
   };

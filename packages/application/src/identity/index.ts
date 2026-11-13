@@ -14,3 +14,4 @@ export type {
   WebSessionRepository,
 } from "./ports.ts";
 export { sessionLifetimeDays, type SignedIn } from "./sign-in.ts";
+export { claimedProfileUrlPrefix } from "./profile.ts";

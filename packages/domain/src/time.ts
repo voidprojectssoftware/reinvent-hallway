@@ -114,3 +114,23 @@ export function dayBounds(date: string, timezone: string): { from: string; to: s
   if (from === undefined || to === undefined) return undefined;
   return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
 }
+
+/**
+ * The UTC instants between event-local `from` and `to` ("HH:MM", "24:00" for
+ * the end of the day) on `date`, as ISO strings, or undefined if the date or
+ * a time is not real or the window is empty.
+ */
+export function localWindow(
+  date: string,
+  from: string,
+  to: string,
+  timezone: string,
+): { from: string; to: string } | undefined {
+  const minutes = (time: string) => (time.trim() === "24:00" ? 24 * 60 : parseLocalTime(time));
+  const [start, end] = [minutes(from), minutes(to)];
+  if (start === undefined || end === undefined || start >= end) return undefined;
+  const startMs = localToEpoch(date, start, timezone);
+  const endMs = localToEpoch(date, end, timezone);
+  if (startMs === undefined || endMs === undefined) return undefined;
+  return { from: new Date(startMs).toISOString(), to: new Date(endMs).toISOString() };
+}

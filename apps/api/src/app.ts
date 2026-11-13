@@ -3,7 +3,7 @@
 // tools both reach the same handlers through `c.var.handlers` (ADR 0002).
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Actor, GetEvent, IdentityHandlers } from "@hallway/application";
-import type { ScheduleHandlers } from "@hallway/application";
+import type { NetworkHandlers, ScheduleHandlers } from "@hallway/application";
 import type { SharingHandlers } from "@hallway/application";
 import type { ApiError } from "@hallway/contracts";
 import { readSessionCookie } from "./auth/cookies.ts";
@@ -13,6 +13,7 @@ import { registerMcp } from "./mcp/server.ts";
 import { httpStatus } from "./outcome-http.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerIdentityRoutes } from "./routes/identity.ts";
+import { registerNetworkRoutes } from "./routes/network.ts";
 import { registerScheduleRoutes } from "./routes/schedule.ts";
 import { registerSharingRoutes } from "./routes/sharing.ts";
 import type { RenderPng } from "./sharing/png.ts";
@@ -21,6 +22,7 @@ import type { RenderPng } from "./sharing/png.ts";
 export interface Handlers extends ScheduleHandlers {
   getEvent: GetEvent;
   identity: IdentityHandlers;
+  network: NetworkHandlers;
   sharing: SharingHandlers;
 }
 
@@ -63,6 +65,7 @@ export function createApp<Bindings extends DevSignInBindings>(
   registerEventRoutes(app);
   registerIdentityRoutes(app);
   registerScheduleRoutes(app);
+  registerNetworkRoutes(app);
   registerSharingRoutes(app, dependencies.renderPng);
   registerMcp(app);
 

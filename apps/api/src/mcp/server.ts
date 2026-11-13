@@ -14,6 +14,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ApiApp, Handlers } from "../app.ts";
 import { toolResult } from "./outcome-mcp.ts";
+import { registerNetworkTools } from "./network-tools.ts";
 import { registerScheduleTools } from "./schedule-tools.ts";
 
 export const serverInfo = { name: "hallway", version: "0.0.0" } as const;
@@ -61,5 +62,6 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
     async () => toolResult(await handlers.identity.getMe(actor)),
   );
   registerScheduleTools(server, handlers, actor);
+  registerNetworkTools(server, handlers, actor);
   return server;
 }
