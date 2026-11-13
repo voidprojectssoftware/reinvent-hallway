@@ -1,6 +1,6 @@
-import type { PlanEntry, Session } from "@hallway/domain";
+import type { PlanEntry, Session, SessionReport, SyncedSession } from "@hallway/domain";
 
-/** A session as the catalog keeps it: the domain's snapshot, plus when an agent last sent it. */
+/** A session as the catalog keeps it: the reporters' consensus, plus when an agent last sent it. */
 export interface CatalogSession extends Session {
   lastSeenAt: string;
 }
@@ -12,7 +12,7 @@ export interface ScheduledEntry {
 }
 
 export interface SessionFilter {
-  /** Matched, ignoring ASCII case, against the code, title and speakers. */
+  /** Matched against the code, title and speakers, both sides through the domain's `foldText` (case and accents ignored). */
   q?: string;
   /** Sessions starting at or after this instant (ISO, UTC). */
   startsFrom?: string;
@@ -32,17 +32,27 @@ export interface LastSync {
   missingSessions: number;
 }
 
-/** Everything one sync writes. Applied all or nothing. */
+/**
+ * Everything one sync writes. Applied all or nothing, and from this alone,
+ * never from rows read before it (ADR 0016): two syncs at once end as one of
+ * them, never as their union.
+ */
 export interface SyncWrite {
   attendeeId: string;
   eventId: string;
-  /** Whole session rows, already merged forward: each replaces its stored row. */
-  sessions: CatalogSession[];
-  add: PlanEntry[];
-  /** Session ids whose entries go. */
-  remove: string[];
-  /** Entries whose intent changed; only `intent` is written. */
-  update: PlanEntry[];
+  /**
+   * The attendee's reports, already merged forward over their own previous
+   * report. Each replaces that attendee's report of its session, and the
+   * session's catalog row becomes the domain's `consensus` of all its reports.
+   */
+  reports: SessionReport[];
+  /**
+   * Everything the sync sent (`syncedSessions`). After the write the
+   * attendee's `agent-sync` entries for the event are exactly these, new ones
+   * added at `at`, and each `manual` entry is `manualAfterSync` of its session.
+   */
+  synced: SyncedSession[];
+  at: string;
   /** Replaces the attendee's last sync for the event, in the same write, so it never tells of a sync that did not land. */
   lastSync: LastSync;
 }
@@ -60,6 +70,8 @@ export interface ScheduleRepository {
   /** The ones of these ids the catalog has, in any order. */
   sessions(eventId: string, sessionIds: readonly string[]): Promise<CatalogSession[]>;
   searchSessions(eventId: string, filter: SessionFilter): Promise<CatalogSession[]>;
+  /** The attendee's own reports of these sessions, those there are, in any order. */
+  reports(attendeeId: string, eventId: string, sessionIds: readonly string[]): Promise<SessionReport[]>;
 
   entry(attendeeId: string, eventId: string, sessionId: string): Promise<PlanEntry | undefined>;
   entries(attendeeId: string, eventId: string): Promise<PlanEntry[]>;
@@ -71,7 +83,13 @@ export interface ScheduleRepository {
 
   /** One atomic write: either all of it lands or none of it does. */
   applySync(write: SyncWrite): Promise<void>;
+  /** Adds the entry unless the attendee already has one for the session, which is then kept as it is. */
   addEntry(eventId: string, entry: PlanEntry): Promise<void>;
   removeEntry(attendeeId: string, eventId: string, sessionId: string): Promise<void>;
+  /**
+   * Puts the session in, or takes it out of, the attendee's hidden set for
+   * the event. Entries are not touched: an entry is hidden while its session
+   * is in the set, whenever it is on the schedule.
+   */
   setHidden(attendeeId: string, eventId: string, sessionId: string, hidden: boolean): Promise<void>;
 }

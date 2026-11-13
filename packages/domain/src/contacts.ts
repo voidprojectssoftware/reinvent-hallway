@@ -1,16 +1,14 @@
 import { parseCsv } from "./csv";
+import { foldText } from "./sessions";
 import type { Attendee, ImportedContact } from "./types";
 
 /**
- * Case, accents and spacing only: NFKD, combining marks removed, lowercased,
- * runs of whitespace made one space. Nothing fuzzier, because a false match
+ * Case, accents and spacing only: `foldText` (NFKD, combining marks removed,
+ * lowercased), runs of whitespace made one space. Nothing fuzzier, because a false match
  * shows someone a stranger.
  */
 export function normalizeName(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
+  return foldText(name)
     .replace(/\s+/gu, " ")
     .trim();
 }

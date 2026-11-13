@@ -17,6 +17,9 @@
     "boundaries": "depcruise apps packages",
     "test": "vitest run",
     "dev": "node apps/api/scripts/dev.mjs",
+    "aspire": "node scripts/aspire.mjs",
+    "aspire:stop": "node scripts/aspire.mjs stop",
+    "seed:demo": "node scripts/seed-demo.mjs",
     "db:generate": "node scripts/generate-migration.mjs",
     "test:e2e": "vitest run --config e2e/vitest.config.ts"
   },
@@ -25,7 +28,9 @@
     "@types/node": "22.20.5",
     "dependency-cruiser": "18.7.0",
     "esbuild": "0.28.2",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "vscode-jsonrpc": "8.2.1"
   }
 }

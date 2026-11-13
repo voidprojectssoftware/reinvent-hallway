@@ -1,7 +1,24 @@
 export type * from "./types";
 export { canViewSchedule, visibleEntries, shareableEntries, type ViewerId } from "./visibility";
-export { planSync, type SyncInput, type SyncPlan } from "./sync";
-export { toSession, mergeSnapshot, sessionUrl, type AwsSession } from "./sessions";
+export {
+  planSync,
+  syncedSessions,
+  manualAfterSync,
+  manualIntent,
+  type SyncInput,
+  type SyncPlan,
+  type SyncedSession,
+} from "./sync";
+export {
+  toSession,
+  mergeSnapshot,
+  consensus,
+  foldText,
+  foldSpeakers,
+  sessionUrl,
+  type AwsSession,
+  type SessionReport,
+} from "./sessions";
 export { toLocal, dayBounds, localWindow } from "./time";
 export {
   parseConnectionsCsv,

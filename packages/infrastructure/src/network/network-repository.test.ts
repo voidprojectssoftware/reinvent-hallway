@@ -6,11 +6,10 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type {
   AttendeeRecord,
   AttendeeRepository,
-  CatalogSession,
   NetworkRepository,
   ScheduleRepository,
 } from "@hallway/application";
-import { connectionBetween, hashEmail, parseConnectionsCsv, type PlanEntry } from "@hallway/domain";
+import { connectionBetween, hashEmail, parseConnectionsCsv, type SessionReport } from "@hallway/domain";
 import { attendeesOnD1 } from "../identity/d1-identity-repositories.ts";
 import { attendeesInMemory } from "../identity/in-memory-identity-repositories.ts";
 import { openDatabase } from "../persistence/d1/database.ts";
@@ -74,21 +73,15 @@ async function person(world: World, name: string, extra: Partial<AttendeeRecord>
   return attendee;
 }
 
-const session = (sessionId: string, startsAt: string): CatalogSession => ({
+const report = (attendeeId: string, sessionId: string, startsAt: string): SessionReport => ({
   sessionId,
   eventId: event,
   startsAt,
   endsAt: new Date(Date.parse(startsAt) + 3_600_000).toISOString(),
-  lastSeenAt: at,
-});
-const entry = (attendeeId: string, sessionId: string, hidden = false): PlanEntry => ({
   attendeeId,
-  sessionId,
-  intent: "interested",
-  source: "agent-sync",
-  hidden,
-  addedAt: at,
+  reportedAt: at,
 });
+const favorite = (sessionId: string) => ({ sessionId, intent: "interested" as const, invited: false });
 
 describe.each(implementations)("NetworkRepository %s", (_, make) => {
   it("keeps a pair once whichever side forms it, and answers for either spelling", async () => {
@@ -188,19 +181,21 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
     await world.schedule.applySync({
       attendeeId: friend.id,
       eventId: event,
-      sessions: [session(morning, "2026-12-01T17:00:00.000Z"), session(afternoon, "2026-12-01T22:00:00.000Z")],
-      add: [entry(friend.id, morning), entry(friend.id, afternoon, true)],
-      remove: [],
-      update: [],
+      reports: [
+        report(friend.id, morning, "2026-12-01T17:00:00.000Z"),
+        report(friend.id, afternoon, "2026-12-01T22:00:00.000Z"),
+      ],
+      synced: [favorite(morning), favorite(afternoon)],
+      at,
       lastSync: { syncedAt: at, added: 2, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
     });
+    await world.schedule.setHidden(friend.id, event, afternoon, true);
     await world.schedule.applySync({
       attendeeId: stranger.id,
       eventId: event,
-      sessions: [],
-      add: [entry(stranger.id, morning)],
-      remove: [],
-      update: [],
+      reports: [],
+      synced: [favorite(morning)],
+      at,
       lastSync: { syncedAt: at, added: 1, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
     });
 
