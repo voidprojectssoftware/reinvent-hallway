@@ -100,11 +100,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ],
     { cwd: api, stdio: "inherit" },
   );
+  // --no-emptyOutDir: wrangler is already serving apps/web/dist, and a build
+  // that empties it first leaves a moment with no index.html, when /@handle
+  // answers 500 (issue #32). That happened on the watcher's own first build
+  // and again on every rebuild. Built over in place, the new index.html
+  // replaces the old one, and the old hashed assets linger until the next
+  // `npm run dev`, whose first build (buildWeb) still empties the directory.
   // --logLevel warn: the watcher's rebuild lines would bury wrangler's output.
-  const watch = spawn(process.execPath, [vite, "build", "--watch", "--logLevel", "warn"], {
-    cwd: web,
-    stdio: "inherit",
-  });
+  const watch = spawn(
+    process.execPath,
+    [vite, "build", "--watch", "--no-emptyOutDir", "--logLevel", "warn"],
+    { cwd: web, stdio: "inherit" },
+  );
   for (const signal of ["SIGINT", "SIGTERM"]) {
     process.on(signal, () => {
       watch.kill(signal);

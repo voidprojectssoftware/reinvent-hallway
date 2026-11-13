@@ -8,5 +8,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  // `npm run dev` overrides this for its watcher (--no-emptyOutDir), since
+  // wrangler serves this directory while it rebuilds (apps/api/scripts/dev.mjs).
   build: { outDir: "dist", emptyOutDir: true },
 });
