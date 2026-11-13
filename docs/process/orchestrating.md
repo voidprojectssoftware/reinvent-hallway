@@ -50,3 +50,13 @@ payments have failed"). The ruleset requires `checks`, so nothing can merge to
   Never `pkill -f` a pattern: it matched the reviewing shell itself once.
 - Review on the merge result in the landing worktree, on a fixed review port
   (24601) no builder's path hashes to by accident.
+
+## Keep logs, pid files and evidence inside your own worktree
+
+Observed 2026-11-13 building #78: two builders wrote dev-server logs and pid
+files to the same shared scratch directory. One read the other's server URL
+from its log, and seeded and signed in to that other worktree's local D1.
+Harmless that time, but it is how one agent's evidence ends up in another's
+database. Briefs now say: logs, pid files and screenshots live under your own
+worktree (a git-ignored path such as `.wrangler/` or `.bodies/`), and a dev
+server runs on a port you chose and checked was free.
