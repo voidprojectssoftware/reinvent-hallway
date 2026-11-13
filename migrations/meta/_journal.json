@@ -29,6 +29,13 @@
       "when": 1794596545163,
       "tag": "0003_create_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794597306273,
+      "tag": "0004_add_network",
+      "breakpoints": true
     }
   ]
 }

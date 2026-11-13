@@ -18,7 +18,14 @@ import { fail, ok, type Outcome } from "../outcome.ts";
 import type { AreConnected, AttendeeRecord, AttendeeRepository } from "./ports.ts";
 import { toCard, toMe } from "./views.ts";
 
-export type GetMe = (actor: Actor) => Promise<Outcome<Me>>;
+/**
+ * A claimed LinkedIn URL is stored as this followed by `normalizeProfileUrl`'s
+ * `linkedin.com/in/<slug>`, so the contact matching in storage can compare an
+ * imported contact's normalized URL with it exactly.
+ */
+export const claimedProfileUrlPrefix = "https://www.";
+
+export type GetMe =(actor: Actor) => Promise<Outcome<Me>>;
 export type UpdateProfile = (actor: Actor, input: UpdateProfileInput) => Promise<Outcome<Me>>;
 export type SetVisibility = (actor: Actor, input: SetVisibilityInput) => Promise<Outcome<Me>>;
 export type GetAttendee = (actor: Actor, input: GetAttendeeInput) => Promise<Outcome<AttendeeCard>>;
@@ -63,7 +70,7 @@ export function updateProfile(attendees: AttendeeRepository): UpdateProfile {
       if (url === undefined) {
         return fail("invalid", "That is not a LinkedIn profile URL (linkedin.com/in/...).");
       }
-      next = withOptional(next, "linkedinProfileUrl", url && `https://www.${url}`);
+      next = withOptional(next, "linkedinProfileUrl", url && `${claimedProfileUrlPrefix}${url}`);
     }
 
     await attendees.save(next);

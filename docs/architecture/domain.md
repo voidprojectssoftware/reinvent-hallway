@@ -137,7 +137,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SetEntryHidden` | me | hide or show one entry |
 | `IssueAgentToken` / `RevokeAgentToken` | me, signed in as a person (not an agent token) | |
 | `RotateCalendarFeed` | me, signed in as a person (not an agent token) | |
-| `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows, replace my previous import |
+| `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows (exact duplicates folded), replace my previous import, all or nothing (ADR 0011) |
 | `RequestConnection` / `WithdrawRequest` | me | |
 | `AcceptRequest` / `DeclineRequest` | the recipient | |
 | `ConnectViaShareLink` | signed-in viewer of `/@handle` | connection formed at once (rule above) |
@@ -151,13 +151,13 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
 | `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
-| `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" |
-| `ListConnections` / `ListRequests` / `ListSuggestions` | |
-| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. The connection counts, `from` and `to` come with the network |
-| `GetSession(eventId, sessionId)` | the session, and which of my connections are going (the connections part comes with the network) |
-| `WhoIsGoing(sessionIds[])` | per session, my connections going (respecting visibility and hidden) |
-| `NetworkAgenda(eventId, from, to)` | sessions in a window that my connections plan to attend, with who |
-| `FindMeetingGaps(handle, day)` | windows on a day, in event time, when neither I nor that connection has a visible entry. All-day sessions (the expo and the like) do not block a gap |
+| `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
+| `ListConnections` / `ListRequests` / `ListSuggestions` | my connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
+| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
+| `GetSession(eventId, sessionId)` | the session, and to a signed-in caller `connectionsGoing` as in search |
+| `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), up to 200 sessions in one read |
+| `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who |
+| `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. All-day sessions (the expo and the like) do not block a gap |
 | `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule |
 | `ShareImage(handle, day?)` | a PNG of the visible schedule, for posting |
 

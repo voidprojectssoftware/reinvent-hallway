@@ -1,12 +1,13 @@
 // The Worker's composition root (ADR 0002): the one place adapters are chosen.
 // Each request gets its handlers over D1 from its own bindings.
-import { getEvent, identityHandlers, scheduleHandlers } from "@hallway/application";
+import { connectionsGoing, getEvent, identityHandlers, networkHandlers, scheduleHandlers } from "@hallway/application";
 import {
   agentTokensOnD1,
   attendeesOnD1,
   calendarFeedsOnD1,
   eventsOnD1,
   linkedInOidc,
+  networkOnD1,
   openDatabase,
   scheduleOnD1,
   webSessionsOnD1,
@@ -18,16 +19,20 @@ const app = createApp<Env>({
   handlers: (env) => {
     const db = openDatabase(env.DB);
     const events = eventsOnD1(db);
+    const attendees = attendeesOnD1(db);
+    const schedule = scheduleOnD1(db);
+    const network = networkOnD1(db);
+    const now = () => new Date();
     return {
       getEvent: getEvent(events),
       identity: identityHandlers({
-        attendees: attendeesOnD1(db),
+        attendees,
         agentTokens: agentTokensOnD1(db),
         webSessions: webSessionsOnD1(db),
         calendarFeeds: calendarFeedsOnD1(db),
-        // No connections exist until the network slice lands; it replaces this
-        // with its repository's answer.
-        areConnected: async () => false,
+        // The one answer to "are these two connected" for every read path
+        // that asks the visibility rule (the attendee card among them).
+        areConnected: (a, b) => network.areConnected(a, b),
         // LinkedIn sign-in is off until the owner's LinkedIn app supplies these.
         linkedIn:
           env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET
@@ -36,9 +41,18 @@ const app = createApp<Env>({
       }),
       ...scheduleHandlers({
         events,
-        schedule: scheduleOnD1(db),
+        schedule,
         sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
-        now: () => new Date(),
+        now,
+        connectionsGoing: connectionsGoing(network),
+      }),
+      network: networkHandlers({
+        attendees,
+        network,
+        events,
+        schedule,
+        sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
+        now,
       }),
     };
   },

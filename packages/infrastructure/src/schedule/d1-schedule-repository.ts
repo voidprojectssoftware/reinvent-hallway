@@ -27,7 +27,7 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
 type SessionRow = typeof sessions.$inferSelect;
 type EntryRow = typeof planEntries.$inferSelect;
 
-function fromSessionRow(row: SessionRow): CatalogSession {
+export function fromSessionRow(row: SessionRow): CatalogSession {
   const session: CatalogSession = { sessionId: row.sessionId, eventId: row.eventId, lastSeenAt: row.lastSeenAt };
   if (row.code !== null) session.code = row.code;
   if (row.title !== null) session.title = row.title;
@@ -62,7 +62,7 @@ function toSessionRow(session: CatalogSession): SessionRow {
   };
 }
 
-const fromEntryRow = (row: EntryRow): PlanEntry => ({
+export const fromEntryRow = (row: EntryRow): PlanEntry => ({
   attendeeId: row.attendeeId,
   sessionId: row.sessionId,
   intent: row.intent,
