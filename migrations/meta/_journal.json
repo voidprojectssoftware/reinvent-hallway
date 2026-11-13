@@ -92,13 +92,6 @@
       "when": 1794604468684,
       "tag": "0012_add_follows_and_network_visibility",
       "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "6",
-      "when": 1794604800256,
-      "tag": "0013_add_linkedin_post_drafts",
-      "breakpoints": true
     }
   ]
 }
