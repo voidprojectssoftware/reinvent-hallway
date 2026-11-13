@@ -11,9 +11,10 @@ import {
 import { getSession, searchSessions, type GetSession, type SearchSessions } from "./sessions.ts";
 import { syncSchedule, type SyncSchedule } from "./sync-schedule.ts";
 
-export type { ScheduleDependencies } from "./dependencies.ts";
+export type { ConnectionsGoingLookup, ScheduleDependencies } from "./dependencies.ts";
 export type {
   CatalogSession,
+  LastSync,
   ScheduledEntry,
   ScheduleRepository,
   SessionFilter,

@@ -9,6 +9,7 @@
 // (ADR 0003), and no resource below has an abstract to carry.
 import { z } from "zod";
 import { EventId } from "./event.ts";
+import { Person } from "./identity.ts";
 
 export const SessionId = z
   .string()
@@ -63,6 +64,17 @@ export const AwsSession = z
   .meta({ description: "A session exactly as the AWS Events API gives it." });
 export type AwsSession = z.infer<typeof AwsSession>;
 
+/** How many faces a session carries beside its count. */
+export const goingFacesShown = 5;
+
+export const ConnectionsGoing = z
+  .object({
+    count: z.int().min(0).meta({ description: "How many of my connections plan this session and let me see it." }),
+    people: z.array(Person).max(goingFacesShown).meta({ description: `Up to ${goingFacesShown} of them, by display name, for avatars.` }),
+  })
+  .meta({ id: "ConnectionsGoing", description: "My connections going to a session, as their visibility lets me see." });
+export type ConnectionsGoing = z.infer<typeof ConnectionsGoing>;
+
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
 
 export const Session = z
@@ -84,6 +96,9 @@ export const Session = z
       .url()
       .optional()
       .meta({ description: "The session on the re:Invent site, where reading and reserving happen. Absent without a code." }),
+    connectionsGoing: ConnectionsGoing.optional().meta({
+      description: "On search and get, to a signed-in asker: how many of my connections are going, with a few faces.",
+    }),
     lastSeenAt: instant.meta({ description: "When an agent last sent this session." }),
   })
   .meta({
@@ -112,11 +127,26 @@ export const PlanEntry = z
   .meta({ id: "PlanEntry", description: "One session on my schedule." });
 export type PlanEntry = z.infer<typeof PlanEntry>;
 
+const count = z.int().min(0);
+
+export const LastSync = z
+  .object({
+    syncedAt: instant.meta({ description: "When the sync landed." }),
+    added: count.meta({ description: "Sessions it put on the schedule." }),
+    removed: count.meta({ description: "Synced sessions it took off." }),
+    changed: count.meta({ description: "Entries whose intent it changed." }),
+    unchanged: count.meta({ description: "Sent sessions already on the schedule as they should be." }),
+    missingSessions: count.meta({ description: "Listed ids it skipped for want of a session object." }),
+  })
+  .meta({ id: "LastSync", description: "What my agent's last sync for this event did, and when." });
+export type LastSync = z.infer<typeof LastSync>;
+
 export const MySchedule = z
   .object({
     eventId: EventId,
     timezone: z.string().meta({ description: "The event's IANA timezone, to show times in.", example: "America/Los_Angeles" }),
     entries: z.array(PlanEntry),
+    lastSync: LastSync.optional().meta({ description: "Absent until my agent first syncs this event." }),
   })
   .meta({ id: "MySchedule", description: "My entries for one event, hidden ones included, in start order." });
 export type MySchedule = z.infer<typeof MySchedule>;
@@ -147,8 +177,6 @@ export type SyncScheduleBody = z.infer<typeof SyncScheduleBody>;
 /** `PUT /api/events/{eventId}/my-schedule` is EventScope plus this body; `sync_my_schedule` takes both at once. */
 export const SyncScheduleInput = EventScope.extend(SyncScheduleBody.shape);
 export type SyncScheduleInput = z.infer<typeof SyncScheduleInput>;
-
-const count = z.int().min(0);
 
 export const SyncResult = z
   .object({

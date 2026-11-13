@@ -2,31 +2,16 @@
 // with plain requests, MCP with the SDK's own client. The point of the
 // skeleton is that both reach one handler, so both must give the same data.
 import { describe, expect, it } from "vitest";
-import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers } from "@hallway/application";
-import { eventsInMemory, identityInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
+import { reinvent2026 } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
+import { inMemoryHandlers, noPng } from "./testing/in-memory-handlers.ts";
 
 const bindings = { DEV_SIGN_IN: "1" };
 const app = createApp<typeof bindings>({
-  handlers: () => ({
-    getEvent: getEvent(eventsInMemory([reinvent2026])),
-    identity: identityHandlers(identityInMemory()),
-    ...scheduleHandlers({
-      events: eventsInMemory([reinvent2026]),
-      schedule: scheduleInMemory(),
-      sessionUrlTemplate: "https://example.test/catalog?search={code}",
-      now: () => new Date(),
-    }),
-    sharing: sharingHandlers({
-      ...identityInMemory(),
-      events: eventsInMemory([reinvent2026]),
-      schedule: scheduleInMemory(),
-      sessionUrlTemplate: "https://example.test/catalog?search={code}",
-    }),
-  }),
-  renderPng: async () => new Uint8Array(),
+  handlers: () => inMemoryHandlers().handlers,
+  renderPng: noPng,
 });
 const origin = "http://127.0.0.1:8787";
 const call = async (input: string | URL | Request, init?: RequestInit) =>

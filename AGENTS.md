@@ -42,7 +42,18 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
 - **Layer boundaries (ADR 0002).** _Held by:_ `npm run boundaries`
   (dependency-cruiser, `.dependency-cruiser.mjs`) in `npm run verify`;
   `scripts/boundaries.test.mjs` proves each rule fails on a violation.
-- **One visibility rule for every read path (domain.md).** _Held by:_ nothing yet.
+- **One visibility rule for every read path (domain.md).** _Held by:_
+  every read of another attendee's entries filters them through the domain's
+  `visibleEntries` (`packages/application/src/network/schedules.ts`), with
+  `areConnected` from the one network repository wired in `apps/api/src/index.ts`;
+  and `apps/api/src/network.test.ts` ("every read of someone else's schedule
+  goes through the visibility rule"), which runs each REST and MCP read path
+  (person schedule, attendee card, who is going, network agenda, session
+  search and get, meeting gaps) against a private attendee, a non-connection
+  and a hidden entry. A new read path adds its case there. What leaves
+  Hallway (calendar feed, share image, link preview) goes through
+  `shareableEntries` with the same `areConnected`, held by
+  `apps/api/src/sharing.test.ts` and `person-page.test.ts` (ADR 0012).
 - **No session abstract is stored or served (ADR 0003).** _Held by:_ the
   sessions table has no column for it and `toSession` never reads it;
   `schedule-repository.test.ts` fails on an abstract-like column, and

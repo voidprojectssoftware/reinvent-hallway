@@ -70,6 +70,7 @@ function setup(visibility: Visibility) {
     schedule,
     areConnected: async (a, b) => connections.has([a, b].sort().join("|")),
     sessionUrlTemplate: "https://example.test/catalog?search={code}",
+    invitePath: async (attendee) => `/@${attendee.handle}?invite=inv-1`,
   });
   return { owner, entries, sessions, feeds, connections, handlers };
 }
@@ -147,7 +148,7 @@ describe("exportCalendar", () => {
 });
 
 describe("getShareLinks", () => {
-  it("gives the page, the versioned image and, to a person signed in, the feed", async () => {
+  it("gives the page, the versioned image and, to a person signed in, the feed and the invite link", async () => {
     const { handlers, feeds } = setup("connections");
     feeds.set("a-owner", "tok-1");
     const links = await handlers.getShareLinks(attendee("a-owner"), { origin: "https://hallway.example" });
@@ -155,16 +156,19 @@ describe("getShareLinks", () => {
       pageUrl: "https://hallway.example/@sam",
       imageUrl: expect.stringMatching(/^https:\/\/hallway\.example\/og\/sam\.png\?v=[0-9a-f]{16}$/),
       calendarUrl: "https://hallway.example/cal/tok-1.ics",
+      inviteUrl: "https://hallway.example/@sam?invite=inv-1",
     });
   });
 
-  it("leaves the feed out for an agent token, and when there is no feed yet", async () => {
+  it("leaves the feed and the invite link out for an agent token, and the feed when there is none yet", async () => {
     const { handlers, feeds } = setup("public");
     const none = await handlers.getShareLinks(attendee("a-owner"), { origin: "https://hallway.example" });
     expect(none.ok && none.value.calendarUrl).toBeUndefined();
     feeds.set("a-owner", "tok-1");
     const agent = await handlers.getShareLinks(attendee("a-owner", "agent-token"), { origin: "https://hallway.example" });
     expect(agent.ok && agent.value.calendarUrl).toBeUndefined();
+    expect(agent.ok && agent.value.inviteUrl).toBeUndefined();
+    expect(agent.ok && agent.value.pageUrl).toBe("https://hallway.example/@sam");
   });
 
   it("asks an anonymous caller to sign in", async () => {

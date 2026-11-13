@@ -2,40 +2,19 @@
 // fake LinkedIn: a browser (cookies, redirects) and an agent (bearer token,
 // MCP with the SDK's own client) both reach the same handlers.
 import { describe, expect, it } from "vitest";
-import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers } from "@hallway/application";
-import {
-  eventsInMemory,
-  fakeLinkedIn,
-  identityInMemory,
-  linkedInOidc,
-  reinvent2026,
-  scheduleInMemory,
-} from "@hallway/infrastructure";
+import { identityHandlers } from "@hallway/application";
+import { fakeLinkedIn, identityInMemory, linkedInOidc } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { AgentTokenList, CalendarFeed, IssuedAgentToken, Me } from "@hallway/contracts";
 import { createApp } from "../app.ts";
+import { inMemoryHandlers } from "../testing/in-memory-handlers.ts";
 
 const origin = "http://127.0.0.1:8787";
 
 /** The handlers this file does not exercise, so the app has every one it needs. */
 function otherHandlers() {
-  const events = eventsInMemory([reinvent2026]);
-  return {
-    getEvent: getEvent(events),
-    ...scheduleHandlers({
-      events,
-      schedule: scheduleInMemory(),
-      sessionUrlTemplate: "https://example.test/catalog?search={code}",
-      now: () => new Date(),
-    }),
-    sharing: sharingHandlers({
-      ...identityInMemory(),
-      events,
-      schedule: scheduleInMemory(),
-      sessionUrlTemplate: "https://example.test/catalog?search={code}",
-    }),
-  };
+  return inMemoryHandlers().handlers;
 }
 /** No share cards are drawn in this file. */
 const renderPng = async () => new Uint8Array();

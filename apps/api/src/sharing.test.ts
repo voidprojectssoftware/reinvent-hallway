@@ -4,15 +4,15 @@
 // the calendar feed, each through the one visibility rule.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers } from "@hallway/application";
 import type { Me, ShareLinks } from "@hallway/contracts";
-import { eventsInMemory, identityInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
+import { reinvent2026 } from "@hallway/infrastructure";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.ts";
 import { escapeText, foldLine } from "./sharing/ical.ts";
 import { fallbacksFor, fallbackSubsets } from "./sharing/fallback-fonts.ts";
 import { cardRenderer } from "./sharing/png.ts";
 import { cardTexts, shareCard } from "./sharing/share-card.ts";
+import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
 
 const require = createRequire(import.meta.url);
 const file = (specifier: string) => new Uint8Array(readFileSync(require.resolve(specifier)));
@@ -52,19 +52,8 @@ const origin = "http://127.0.0.1:8787";
 let call: (path: string, init?: RequestInit & { as?: string }) => Promise<Response>;
 
 beforeEach(() => {
-  const events = eventsInMemory([reinvent2026]);
-  const schedule = scheduleInMemory();
-  const identityPorts = identityInMemory();
-  const sessionUrlTemplate = "https://example.test/catalog?search={code}";
-  const app = createApp<typeof bindings>({
-    handlers: () => ({
-      getEvent: getEvent(events),
-      identity: identityHandlers(identityPorts),
-      ...scheduleHandlers({ events, schedule, sessionUrlTemplate, now: () => new Date("2026-11-13T12:00:00.000Z") }),
-      sharing: sharingHandlers({ ...identityPorts, events, schedule, sessionUrlTemplate }),
-    }),
-    renderPng: renderer.png,
-  });
+  const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
+  const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: renderer.png });
   call = async (path, { as, ...init } = {}) => {
     const headers = new Headers(init.headers);
     headers.set("content-type", "application/json");

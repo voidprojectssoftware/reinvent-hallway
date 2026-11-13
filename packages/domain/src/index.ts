@@ -2,7 +2,7 @@ export type * from "./types";
 export { canViewSchedule, visibleEntries, shareableEntries, type ViewerId } from "./visibility";
 export { planSync, type SyncInput, type SyncPlan } from "./sync";
 export { toSession, mergeSnapshot, sessionUrl, type AwsSession } from "./sessions";
-export { toLocal, dayBounds } from "./time";
+export { toLocal, dayBounds, localWindow } from "./time";
 export {
   parseConnectionsCsv,
   normalizeProfileUrl,
