@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayChip, eventDate, eventDates, formatAgo, formatDate, formatDay, formatTime, zoneAbbreviation } from "./time.ts";
+import { dayChip, eventDate, eventDates, formatAgo, formatDate, formatDay, formatMinute, formatTime, formatTimeRange, minuteOfDay, zoneAbbreviation } from "./time.ts";
 
 describe("the event's days", () => {
   it("lists every date of re:Invent from the event's own offset dates", () => {
@@ -49,5 +49,21 @@ describe("Las Vegas time", () => {
 
   it("names the zone for the week of the event", () => {
     expect(zoneAbbreviation("2026-12-01T16:00:00Z")).toBe("PST");
+  });
+
+  it("places an instant on the calendar's grid by the Las Vegas clock", () => {
+    expect(minuteOfDay("2026-12-01T16:30:00Z")).toBe(8 * 60 + 30);
+    expect(minuteOfDay("2026-12-02T08:00:00Z")).toBe(0);
+  });
+
+  it("says a range with its meridiem once when both ends share it", () => {
+    expect(formatTimeRange("2026-12-01T16:30:00Z", "2026-12-01T17:30:00Z")).toBe("8:30 to 9:30 AM");
+    expect(formatTimeRange("2026-12-01T19:30:00Z", "2026-12-01T20:30:00Z")).toBe("11:30 AM to 12:30 PM");
+  });
+
+  it("names a time on the grid, with minutes only when it is not on the hour", () => {
+    expect(formatMinute(8 * 60)).toBe("8 AM");
+    expect(formatMinute(12 * 60 + 30)).toBe("12:30 PM");
+    expect(formatMinute(0)).toBe("12 AM");
   });
 });

@@ -11,13 +11,16 @@
 // signing in and is brought back here to use it.
 import type { AttendeeCard, MySchedule, Person as PersonFace, PersonEntry } from "@hallway/contracts";
 import { useState, type ReactNode } from "react";
-import { Link, replace, useLoaderData, useNavigate, useRevalidator } from "react-router";
+import { Link, replace, useLoaderData, useNavigate, useRevalidator, useSearchParams } from "react-router";
 import { api, ApiFailure } from "../api/client.ts";
 import { EVENT_ID } from "../event.ts";
 import { handleFromSegment } from "../handle.ts";
 import { dropInvite, heldInvite, holdInviteFrom } from "../invite.ts";
+import { inSlot, parseSlot, slotMinutes } from "../schedule/calendar.ts";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { firstName as firstWord } from "../schedule/going.ts";
+import { WeekCalendar } from "../schedule/WeekCalendar.tsx";
+import { useWeekView, WeekViewToggle } from "../schedule/WeekView.tsx";
 import { useMe } from "../shell/AppLayout.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
@@ -25,7 +28,7 @@ import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
-import { eventDate, formatDate, zoneAbbreviation } from "../time.ts";
+import { eventDate, eventDates, formatDate, formatMinute, zoneAbbreviation } from "../time.ts";
 import { NotFound } from "./NotFound.tsx";
 
 /** How the viewer stands with this person. */
@@ -295,7 +298,9 @@ interface WeekProps {
 }
 
 function Week({ card, entries, mine, own, me }: WeekProps) {
-  const first = entries.find((entry) => entry.session.startsAt)?.session.startsAt;
+  const [search] = useSearchParams();
+  const [view, setView] = useWeekView();
+  const first =entries.find((entry) => entry.session.startsAt)?.session.startsAt;
   if (entries.length === 0) {
     return (
       <Empty icon="week" title="Nothing on this week yet">
@@ -305,30 +310,67 @@ function Week({ card, entries, mine, own, me }: WeekProps) {
       </Empty>
     );
   }
+  const you = me && !own ? [{ id: me.id, handle: "", displayName: me.displayName, avatarUrl: me.avatarUrl }] : [];
+  const cell = (entry: PersonEntry) => (
+    <EntryCell
+      key={entry.sessionId}
+      session={entry.session}
+      intent={entry.intent}
+      going={you.length > 0 && mine.has(entry.sessionId) && <YouToo you={you} />}
+    />
+  );
+  const note = (
+    <p className="large-sub week-note">
+      {entries.length === 1 ? "1 session" : `${entries.length} sessions`} · times are Las Vegas time
+      {first && ` (${zoneAbbreviation(first)})`}
+    </p>
+  );
+  const toggle = <WeekViewToggle view={view} onChange={setView} />;
+
+  if (view === "calendar") {
+    // Their days, first to last: the page has no event to read the week's dates from.
+    const dated = entries.flatMap((entry) => (entry.session.startsAt ? [eventDate(entry.session.startsAt)] : [])).sort();
+    const [firstDay] = dated;
+    const lastDay = dated.at(-1);
+    const dates = firstDay && lastDay ? eventDates(firstDay, lastDay) : [];
+    return (
+      <>
+        {note}
+        {toggle}
+        <WeekCalendar
+          entries={entries}
+          dates={dates}
+          going={(entry) => (you.length > 0 && mine.has(entry.sessionId) ? { short: "You", spoken: "you're going too" } : undefined)}
+          cell={cell}
+        />
+      </>
+    );
+  }
+
+  // A calendar slot's "+N more" opens the list at that half hour.
+  const slotDay = search.get("day");
+  const slot = parseSlot(search.get("at"));
+  const listed = slot === null || !slotDay ? entries : entries.filter((entry) => inSlot(entry.session, slotDay, slot));
   const days = new Map<string, PersonEntry[]>();
-  for (const entry of entries) {
+  for (const entry of listed) {
     const key = entry.session.startsAt ? eventDate(entry.session.startsAt) : "later";
     days.set(key, [...(days.get(key) ?? []), entry]);
   }
-  const you = me && !own ? [{ id: me.id, handle: "", displayName: me.displayName, avatarUrl: me.avatarUrl }] : [];
   return (
     <>
-      <p className="large-sub week-note">
-        {entries.length === 1 ? "1 session" : `${entries.length} sessions`} · times are Las Vegas time
-        {first && ` (${zoneAbbreviation(first)})`}
-      </p>
+      {note}
+      {toggle}
+      {slot !== null && slotDay && (
+        <p className="gfoot slot-note">
+          On {formatDate(slotDay)} from {formatMinute(slot)} to {formatMinute(slot + slotMinutes)}.{" "}
+          <Link to={{ search: "?view=list" }}>Show the whole week</Link>
+        </p>
+      )}
       {[...days].map(([date, dayEntries]) => (
         <section className="section" key={date}>
           <h2 className="ghead">{date === "later" ? "Time not announced yet" : formatDate(date)}</h2>
           <ul className="group">
-            {dayEntries.map((entry) => (
-              <EntryCell
-                key={entry.sessionId}
-                session={entry.session}
-                intent={entry.intent}
-                going={you.length > 0 && mine.has(entry.sessionId) && <YouToo you={you} />}
-              />
-            ))}
+            {dayEntries.map(cell)}
           </ul>
         </section>
       ))}

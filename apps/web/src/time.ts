@@ -35,6 +35,29 @@ export function eventDate(instant: Instant): string {
   return isoDay.format(at(instant));
 }
 
+const hourMinute = new Intl.DateTimeFormat("en-US", { timeZone: EVENT_TIME_ZONE, hour: "numeric", minute: "numeric", hourCycle: "h23" });
+
+/** Minutes after Las Vegas midnight: 510 for 8:30 AM. Places a session on the calendar's grid. */
+export function minuteOfDay(instant: Instant): number {
+  return Number(part(hourMinute, instant, "hour")) * 60 + Number(part(hourMinute, instant, "minute"));
+}
+
+/** "8 AM", "9:30 AM": a time on the calendar's grid, from minutes after midnight (no instant, so no zone). */
+export function formatMinute(minute: number): string {
+  const hour = Math.floor(minute / 60) % 24;
+  const past = minute % 60;
+  return `${hour % 12 || 12}${past ? `:${String(past).padStart(2, "0")}` : ""} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+const meridiem = /\s*([AP]M)$/;
+
+/** "8:30 to 9:30 AM", "11:30 AM to 12:30 PM": the meridiem said once when both ends share it. */
+export function formatTimeRange(start: Instant, end: Instant): string {
+  const from = formatTime(start);
+  const to = formatTime(end);
+  return from.match(meridiem)?.[1] === to.match(meridiem)?.[1] ? `${from.replace(meridiem, "")} to ${to}` : `${from} to ${to}`;
+}
+
 // A date alone ("2026-12-01") names a day, not an instant, so it is read and
 // written at noon UTC in UTC, where no zone moves it to another day.
 const dateOnly = (date: string) => new Date(`${date}T12:00:00Z`);

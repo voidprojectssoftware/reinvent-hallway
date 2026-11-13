@@ -1,21 +1,26 @@
 // My week (docs/design/my-week.html): my schedule one day at a time, in Las
 // Vegas time, said once under the title. The chosen day is in the URL
-// (?day=2026-12-01) so a reload or a shared link keeps it.
+// (?day=2026-12-01) so a reload or a shared link keeps it. The same week can
+// be drawn as a calendar instead (?view=calendar, WeekCalendar.tsx).
 import type { Event, MySchedule, Person, PlanEntry } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useSearchParams } from "react-router";
 import { api } from "../api/client.ts";
 import { clashes, clashLabel } from "../clash.ts";
 import { EVENT_ID } from "../event.ts";
+import { inSlot, parseSlot, slotMinutes } from "../schedule/calendar.ts";
+import { DayChips, pickDate } from "../schedule/DayChips.tsx";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { Going } from "../schedule/Going.tsx";
 import { whoIsGoing } from "../schedule/going.ts";
+import { WeekCalendar, type GoingNote } from "../schedule/WeekCalendar.tsx";
+import { useWeekView, WeekViewToggle } from "../schedule/WeekView.tsx";
 import { ShareSheet } from "../share/ShareSheet.tsx";
 import { Empty } from "../shell/Empty.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
-import { dayChip, eventDate, eventDates, formatAgo, formatDate, zoneAbbreviation } from "../time.ts";
+import { eventDate, eventDates, formatAgo, formatDate, formatMinute, zoneAbbreviation } from "../time.ts";
 import { WhyLink } from "../why/WhySheet.tsx";
 
 type GoingBySession = Map<string, Person[]>;
@@ -29,7 +34,8 @@ export async function myWeekLoader({ request }: { request: Request }): Promise<{
 
 export function MyWeek() {
   const { event, schedule, going } = useLoaderData<typeof myWeekLoader>();
-  const [search, setSearch] = useSearchParams();
+  const [search] = useSearchParams();
+  const [view, setView] = useWeekView();
   const [sharing, setSharing] = useState(false);
   const sub = `${event.name} · times are Las Vegas time (${zoneAbbreviation(event.startDate)})`;
   const share = (
@@ -84,38 +90,52 @@ export function MyWeek() {
 
   const byDate = groupByDate(schedule.entries);
   const dates = [...new Set([...eventDates(event.startDate, event.endDate), ...byDate.keys()])].sort();
-  const chosen = pickDate(search.get("day"), dates, byDate);
-  const today = eventDate(new Date());
-  const entries = byDate.get(chosen) ?? [];
-  const untimed = schedule.entries.filter((entry) => !entry.session.startsAt);
   const clashing = clashes(schedule.entries);
+  const toggle = <WeekViewToggle view={view} onChange={setView} />;
+  const synced = (
+    <p className="gfoot">
+      {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
+      Reserving happens on re:Invent; Hallway shows what you reserved there. <WhyLink section="schedule" />
+    </p>
+  );
+
+  if (view === "calendar") {
+    return (
+      <Screen title="My week" sub={sub} action={share}>
+        {toggle}
+        <WeekCalendar
+          entries={schedule.entries}
+          dates={dates}
+          clashing={clashing}
+          going={(entry) => goingNote(entry, going)}
+          cell={(entry) => cell(entry, clashing, going)}
+          foot={synced}
+        />
+      </Screen>
+    );
+  }
+
+  const chosen = pickDate(search.get("day"), dates, (date) => byDate.has(date));
+  // A calendar slot's "+N more" opens the list at that half hour (?at=09:30).
+  const slot = parseSlot(search.get("at"));
+  const entries = (byDate.get(chosen) ?? []).filter((entry) => slot === null || inSlot(entry.session, chosen, slot));
+  const untimed = schedule.entries.filter((entry) => !entry.session.startsAt);
 
   return (
     <Screen title="My week" sub={sub} action={share}>
-      <div className="days" role="group" aria-label="Day">
-        {dates.map((date) => {
-          const { weekday, day } = dayChip(date);
-          return (
-            <button
-              key={date}
-              type="button"
-              className="day"
-              aria-pressed={date === chosen}
-              aria-current={date === today ? "date" : undefined}
-              aria-label={formatDate(date)}
-              onClick={() => setSearch({ day: date }, { replace: true })}
-            >
-              <small>{weekday}</small>
-              <b>{day}</b>
-            </button>
-          );
-        })}
-      </div>
+      {toggle}
+      <DayChips dates={dates} chosen={chosen} />
 
       <section className="section">
         <h2 className="ghead big">
           {formatDate(chosen)} <small>{count(entries.length)}</small>
         </h2>
+        {slot !== null && (
+          <p className="gfoot slot-note">
+            On from {formatMinute(slot)} to {formatMinute(slot + slotMinutes)}.{" "}
+            <Link to={{ search: `?view=list&day=${chosen}` }}>Show the whole day</Link>
+          </p>
+        )}
         {entries.length > 0 ? (
           <ul className="group">{entries.map((entry) => cell(entry, clashing, going))}</ul>
         ) : (
@@ -128,10 +148,7 @@ export function MyWeek() {
             </div>
           </div>
         )}
-        <p className="gfoot">
-          {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
-          Reserving happens on re:Invent; Hallway shows what you reserved there. <WhyLink section="schedule" />
-        </p>
+        {synced}
       </section>
 
       {untimed.length > 0 && (
@@ -170,12 +187,11 @@ function groupByDate(entries: readonly PlanEntry[]): Map<string, PlanEntry[]> {
   return byDate;
 }
 
-/** The day asked for, else today during the event, else the first day with something on it. */
-function pickDate(asked: string | null, dates: string[], byDate: Map<string, PlanEntry[]>): string {
-  if (asked && dates.includes(asked)) return asked;
-  const today = eventDate(new Date());
-  if (dates.includes(today)) return today;
-  return dates.find((date) => byDate.has(date)) ?? dates[0] ?? today;
+/** The count beside a block for the people I know going; a hidden entry is mine alone, as in the list. */
+function goingNote(entry: PlanEntry, going: GoingBySession): GoingNote | undefined {
+  const n = going.get(entry.sessionId)?.length ?? 0;
+  if (entry.hidden || n === 0) return undefined;
+  return { short: String(n), spoken: n === 1 ? "1 person you know is going" : `${n} people you know are going` };
 }
 
 const count = (n: number) => (n === 1 ? "1 session" : `${n} sessions`);
