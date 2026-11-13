@@ -191,6 +191,7 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
       add: [entry(friend.id, morning), entry(friend.id, afternoon, true)],
       remove: [],
       update: [],
+      lastSync: { syncedAt: at, added: 2, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
     });
     await world.schedule.applySync({
       attendeeId: stranger.id,
@@ -199,6 +200,7 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
       add: [entry(stranger.id, morning)],
       remove: [],
       update: [],
+      lastSync: { syncedAt: at, added: 1, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
     });
 
     const listed = await world.network.connectionPlans(me.id, event, { sessionIds: [morning, afternoon] });

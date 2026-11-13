@@ -55,6 +55,12 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
       hidden: false,
       addedAt: at,
     }));
+    const counts = {
+      added: added.length,
+      removed: plan.remove.length,
+      changed: plan.update.length,
+      unchanged: plan.unchanged.length,
+    };
     await schedule.applySync({
       attendeeId,
       eventId: event.eventId,
@@ -62,16 +68,10 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
       add: added,
       remove: plan.remove.map((entry) => entry.sessionId),
       update: plan.update,
+      lastSync: { syncedAt: at, ...counts, missingSessions: missingSessions.length },
     });
 
-    return ok({
-      added: added.length,
-      removed: plan.remove.length,
-      changed: plan.update.length,
-      unchanged: plan.unchanged.length,
-      sessionsStored: stored.length,
-      missingSessions,
-    });
+    return ok({ ...counts, sessionsStored: stored.length, missingSessions });
   };
 }
 

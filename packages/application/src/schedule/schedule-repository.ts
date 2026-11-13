@@ -21,6 +21,17 @@ export interface SessionFilter {
   limit: number;
 }
 
+/** What the attendee's last sync for an event did, and when (domain.md, "Plan entry"). */
+export interface LastSync {
+  syncedAt: string;
+  added: number;
+  removed: number;
+  changed: number;
+  unchanged: number;
+  /** How many listed ids were skipped for want of a session. */
+  missingSessions: number;
+}
+
 /** Everything one sync writes. Applied all or nothing. */
 export interface SyncWrite {
   attendeeId: string;
@@ -32,6 +43,8 @@ export interface SyncWrite {
   remove: string[];
   /** Entries whose intent changed; only `intent` is written. */
   update: PlanEntry[];
+  /** Replaces the attendee's last sync for the event, in the same write, so it never tells of a sync that did not land. */
+  lastSync: LastSync;
 }
 
 /**
@@ -52,6 +65,9 @@ export interface ScheduleRepository {
   entries(attendeeId: string, eventId: string): Promise<PlanEntry[]>;
   /** The attendee's entries with their sessions, hidden ones included, in session order. */
   schedule(attendeeId: string, eventId: string): Promise<ScheduledEntry[]>;
+
+  /** What the attendee's last sync for the event did; undefined before the first. */
+  lastSync(attendeeId: string, eventId: string): Promise<LastSync | undefined>;
 
   /** One atomic write: either all of it lands or none of it does. */
   applySync(write: SyncWrite): Promise<void>;

@@ -1,4 +1,4 @@
-import type { CatalogSession, ScheduleRepository } from "@hallway/application";
+import type { CatalogSession, LastSync, ScheduleRepository } from "@hallway/application";
 import type { PlanEntry } from "@hallway/domain";
 
 /** The fake: answers as the D1 repository does (schedule-repository.test.ts holds both to it). */
@@ -9,6 +9,7 @@ export function scheduleInMemory(): ScheduleRepository {
   const entryKey = (attendeeId: string, eventId: string, sessionId: string) =>
     JSON.stringify([attendeeId, eventId, sessionId]);
   const eventOf = new Map<string, string>();
+  const lastSyncs = new Map<string, LastSync>();
 
   const sessionsOf = (eventId: string) => [...catalog.values()].filter((s) => s.eventId === eventId);
   const entriesOf = (attendeeId: string, eventId: string) =>
@@ -71,7 +72,12 @@ export function scheduleInMemory(): ScheduleRepository {
         .sort((a, b) => bySessionOrder(a.session, b.session));
     },
 
-    async applySync({ attendeeId, eventId, sessions, add, remove, update }) {
+    async lastSync(attendeeId, eventId) {
+      const lastSync = lastSyncs.get(JSON.stringify([attendeeId, eventId]));
+      return lastSync && structuredClone(lastSync);
+    },
+
+    async applySync({ attendeeId, eventId, sessions, add, remove, update, lastSync }) {
       for (const session of sessions) catalog.set(sessionKey(session.eventId, session.sessionId), structuredClone(session));
       for (const sessionId of remove) plans.delete(entryKey(attendeeId, eventId, sessionId));
       for (const { sessionId, intent } of update) {
@@ -79,6 +85,7 @@ export function scheduleInMemory(): ScheduleRepository {
         if (entry) entry.intent = intent;
       }
       for (const entry of add) putEntry(eventId, entry);
+      lastSyncs.set(JSON.stringify([attendeeId, eventId]), structuredClone(lastSync));
     },
 
     async addEntry(eventId, entry) {

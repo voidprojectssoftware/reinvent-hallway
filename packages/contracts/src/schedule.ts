@@ -127,11 +127,26 @@ export const PlanEntry = z
   .meta({ id: "PlanEntry", description: "One session on my schedule." });
 export type PlanEntry = z.infer<typeof PlanEntry>;
 
+const count = z.int().min(0);
+
+export const LastSync = z
+  .object({
+    syncedAt: instant.meta({ description: "When the sync landed." }),
+    added: count.meta({ description: "Sessions it put on the schedule." }),
+    removed: count.meta({ description: "Synced sessions it took off." }),
+    changed: count.meta({ description: "Entries whose intent it changed." }),
+    unchanged: count.meta({ description: "Sent sessions already on the schedule as they should be." }),
+    missingSessions: count.meta({ description: "Listed ids it skipped for want of a session object." }),
+  })
+  .meta({ id: "LastSync", description: "What my agent's last sync for this event did, and when." });
+export type LastSync = z.infer<typeof LastSync>;
+
 export const MySchedule = z
   .object({
     eventId: EventId,
     timezone: z.string().meta({ description: "The event's IANA timezone, to show times in.", example: "America/Los_Angeles" }),
     entries: z.array(PlanEntry),
+    lastSync: LastSync.optional().meta({ description: "Absent until my agent first syncs this event." }),
   })
   .meta({ id: "MySchedule", description: "My entries for one event, hidden ones included, in start order." });
 export type MySchedule = z.infer<typeof MySchedule>;
@@ -162,8 +177,6 @@ export type SyncScheduleBody = z.infer<typeof SyncScheduleBody>;
 /** `PUT /api/events/{eventId}/my-schedule` is EventScope plus this body; `sync_my_schedule` takes both at once. */
 export const SyncScheduleInput = EventScope.extend(SyncScheduleBody.shape);
 export type SyncScheduleInput = z.infer<typeof SyncScheduleInput>;
-
-const count = z.int().min(0);
 
 export const SyncResult = z
   .object({
