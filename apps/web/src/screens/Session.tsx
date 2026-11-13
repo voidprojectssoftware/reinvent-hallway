@@ -1,8 +1,9 @@
 // One session (docs/design/session.html): when, where, who speaks, what it
 // is about and who it is for, the link to re:Invent, and its place on my
-// week. The abstract comes only to an attendee whose own agent has synced
-// (ADR 0025), and is AWS's plain text, so it is rendered as text, never as
-// HTML. Anyone may open a session; the "On your week" part is for someone
+// week. The abstract comes only to an attendee one of whose synced
+// descriptions another attendee's agent has matched (ADR 0025), and is AWS's
+// plain text, so it is rendered as text, never as HTML. Without one, the line
+// under "Open on re:Invent" says why for where the reader stands (issue #88). Anyone may open a session; the "On your week" part is for someone
 // signed in.
 import { goingFacesShown, type GoingPerson, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
 import { useState } from "react";
@@ -19,6 +20,9 @@ import { Icon, type IconName } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
+import { whyNoDescription, type DescriptionReader } from "../why/copy.ts";
+import { descriptionReader } from "../why/reader.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 type Loaded =
   | { found: false }
@@ -26,8 +30,8 @@ type Loaded =
       found: true;
       session: SessionResource;
       signedIn: boolean;
-      /** My agent has synced this event: abstracts come with sessions, when attendees sent them. */
-      synced: boolean;
+      /** Why I might see no description: signed out, never synced, or not yet corroborated. */
+      reader: DescriptionReader;
       entry: PlanEntry | null;
       going: GoingPerson[];
     };
@@ -53,7 +57,7 @@ export async function sessionLoader({ params }: { params: { sessionId?: string }
     found: true,
     session,
     signedIn: schedule !== null,
-    synced: schedule?.lastSync !== undefined,
+    reader: descriptionReader(schedule),
     entry: schedule?.entries.find((e) => e.sessionId === sessionId) ?? null,
     going,
   };
@@ -74,7 +78,7 @@ export function Session() {
       </Screen>
     );
   }
-  const { session, signedIn, synced, entry, going } = loaded;
+  const { session, signedIn, reader, entry, going } = loaded;
   const sub = [session.code, session.type, session.level].filter(Boolean);
 
   return (
@@ -118,10 +122,12 @@ export function Session() {
             : session.abstract
               ? "Seats and reservations are on the re:Invent site."
               : "The description, seats and reservations are on the re:Invent site."}
-          {signedIn && !synced && (
+          {!session.abstract && ` ${whyNoDescription[reader]}`}{" "}
+          <WhyLink section={session.abstract ? "schedule" : "description"} sessionUrl={session.url} />
+          {!session.abstract && reader === "never-synced" && (
             <>
               {" "}
-              Once your agent syncs your schedule, descriptions show here too. <Link to="/connect">Connect your agent</Link>
+              <Link to="/connect">Connect your agent</Link>
             </>
           )}
         </p>

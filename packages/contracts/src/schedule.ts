@@ -203,6 +203,10 @@ export const MySchedule = z
     timezone: z.string().meta({ description: "The event's IANA timezone, to show times in.", example: "America/Los_Angeles" }),
     entries: z.array(PlanEntry),
     lastSync: LastSync.optional().meta({ description: "Absent until my agent first syncs this event." }),
+    readsAbstracts: z.boolean().meta({
+      description:
+        "True once a description my agent synced matches another attendee's report of the same session (ADR 0025): search and get then carry `abstract`. False until then, so a screen can say why it shows none.",
+    }),
   })
   .meta({ id: "MySchedule", description: "My entries for one event, hidden ones included, in start order." });
 export type MySchedule = z.infer<typeof MySchedule>;

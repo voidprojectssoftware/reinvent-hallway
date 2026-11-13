@@ -16,6 +16,7 @@ import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { formatAgo } from "../time.ts";
+import { WhyRow } from "../why/WhySheet.tsx";
 
 export async function settingsLoader({ request }: { request: Request }): Promise<{
   me: Me;
@@ -75,6 +76,13 @@ export function Settings() {
       <Tokens tokens={tokens} />
       <SignInMethods identities={identities} offered={offered} />
       <ContactsImport last={contactImport} />
+      <section className="section">
+        <ul className="group">
+          <li>
+            <WhyRow section="schedule" />
+          </li>
+        </ul>
+      </section>
       <SignOut />
     </Screen>
   );

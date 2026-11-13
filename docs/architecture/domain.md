@@ -273,7 +273,7 @@ what they are told (hunt F10).
 | `GetMe` | my attendee, with private fields |
 | `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
 | `GetInvite` | my share link with its invite token, made on first ask, to me signed in as a person (not an agent token) |
-| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync) |
+| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync), and `readsAbstracts` (whether `canReadAbstract` lets me read descriptions yet, so a screen can say why it shows none: issue #88) |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |

@@ -52,7 +52,7 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Get my schedule",
       description:
-        "The user's Hallway schedule for an event (`reinvent2026`), hidden entries included and marked. Times are UTC instants; show them in the returned `timezone` (Las Vegas time), the time on the badge.",
+        "The user's Hallway schedule for an event (`reinvent2026`), hidden entries included and marked. Times are UTC instants; show them in the returned `timezone` (Las Vegas time), the time on the badge. `readsAbstracts` says whether `search_sessions` and `get_session` carry descriptions for the user yet.",
       inputSchema: EventScope,
       outputSchema: asToolOutput(MySchedule),
       annotations: { readOnlyHint: true, openWorldHint: false },
