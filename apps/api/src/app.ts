@@ -11,6 +11,7 @@ import type { DevSignInBindings } from "./auth/dev-sign-in.ts";
 import { resolveActor } from "./auth/resolve-actor.ts";
 import { registerMcp } from "./mcp/server.ts";
 import { httpStatus } from "./outcome-http.ts";
+import { registerDocsRoutes } from "./routes/docs.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerIdentityRoutes } from "./routes/identity.ts";
 import { registerNetworkRoutes } from "./routes/network.ts";
@@ -68,6 +69,7 @@ export function createApp<Bindings extends DevSignInBindings>(
   registerNetworkRoutes(app);
   registerSharingRoutes(app, dependencies.renderPng);
   registerMcp(app);
+  registerDocsRoutes(app);
 
   app.doc31("/api/openapi.json", {
     openapi: "3.1.0",

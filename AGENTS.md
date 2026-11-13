@@ -82,7 +82,33 @@ npm ci
 npm run verify   # ADR and script checks, typecheck, boundaries, tests, e2e: what CI runs
 npm run test:e2e # two scripted agents against the real Worker (e2e/, review.md Lens 1)
 npm run dev      # the Worker with local D1, migrations applied first; prints its URL
+npm run aspire   # the same under Aspire, with demo data and a dashboard; prints every URL
 ```
+
+Two ways to run it locally; both work from any worktree at once.
+
+**`npm run aspire`** (ADR 0017; needs the Aspire CLI 13.5, `~/.aspire/bin/aspire`,
+no .NET SDK) runs `aspire start --isolated` on `apphost.mts`, waits until the
+demo data is in, and prints the dashboard's sign-in link and every resource's
+URLs. Resources: `web` (the `vite build --watch`), `api` (wrangler dev; links
+to the app, `/api/docs` and `/api/openapi.json`), `seed` (`npm run seed:demo`,
+idempotent, so it runs on every start) and, in LAN mode, `lan`. Every port is
+Aspire's; D1 and wrangler's files live under `.state/` (delete it to reset).
+`npm run aspire:stop` stops it (`aspire stop --apphost apphost.mts`). Dev sign-in
+as "Blake Hastings" to see the seeded week.
+
+**LAN mode** is for a person on another machine: `HALLWAY_LAN=1 npm run aspire`
+adds `lan`, a proxy on `0.0.0.0:${HALLWAY_LAN_PORT:-8796}` that presents each
+request to the Worker as a loopback one (dev sign-in and cookies trust only
+loopback, ADR 0008), and puts the dashboard on
+`0.0.0.0:${HALLWAY_LAN_DASHBOARD_PORT:-8797}`. The printed links use this
+machine's LAN address (`HALLWAY_LAN_HOST` overrides it); the dashboard link
+carries this run's sign-in token. Never on unless asked. Several agents run
+servers here: pick LAN ports nobody else uses, and never stop what you did not
+start.
+
+`npm run seed:demo -- <url>` loads the same demo data into a running
+`npm run dev` (it needs dev sign-in, so a loopback URL).
 
 `npm run dev` picks a port from this checkout's path (20000 to 29999, the next
 free one if taken; `HALLWAY_PORT` overrides) and keeps D1 under this checkout's
@@ -93,8 +119,8 @@ you started), never with a pattern that matches other worktrees' servers.
 - The web app is at `/` on the same origin. `npm run dev` builds `apps/web`
   first and rebuilds it on every change (no hot reload: reload the page;
   ADR 0010). `/sign-in` is the sign-in screen.
-- `GET /api/events/reinvent2026`, `GET /api/openapi.json`, MCP at `/mcp`
-  (streamable HTTP, stateless).
+- `GET /api/events/reinvent2026`, `GET /api/openapi.json`, the API reference
+  at `/api/docs` (Scalar), MCP at `/mcp` (streamable HTTP, stateless).
 - Signing in locally (ADR 0008): `curl -c jar.txt -H 'content-type:
   application/json' -X POST <url>/api/dev/sign-in -d '{"name":"Jane Doe"}'`
   sets the session cookie; then `curl -b jar.txt <url>/api/me`. An agent
