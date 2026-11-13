@@ -1,6 +1,23 @@
 export { ApiError, ErrorKind } from "./error.ts";
 export { Event, EventId, GetEventInput } from "./event.ts";
 export {
+  AgentToken,
+  AgentTokenList,
+  AttendeeCard,
+  CalendarFeed,
+  DevSignInInput,
+  GetAttendeeInput,
+  Handle,
+  IssueAgentTokenInput,
+  IssuedAgentToken,
+  Me,
+  RevokeAgentTokenInput,
+  SetVisibilityInput,
+  SignInOptions,
+  UpdateProfileInput,
+  Visibility,
+} from "./identity.ts";
+export {
   AwsSession,
   EntrySource,
   EventScope,

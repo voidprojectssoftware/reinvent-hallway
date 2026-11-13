@@ -83,10 +83,19 @@ you started), never with a pattern that matches other worktrees' servers.
   ADR 0010). `/sign-in` is the sign-in screen.
 - `GET /api/events/reinvent2026`, `GET /api/openapi.json`, MCP at `/mcp`
   (streamable HTTP, stateless).
-- Dev sign-in, a stand-in until real sign-in lands: send
-  `Authorization: Bearer dev:<attendeeId>`. It works only with
-  `DEV_SIGN_IN=1` in `apps/api/.dev.vars` (copied from `.dev.vars.example` on
-  first run) and only on a loopback host.
+- Signing in locally (ADR 0008): `curl -c jar.txt -H 'content-type:
+  application/json' -X POST <url>/api/dev/sign-in -d '{"name":"Jane Doe"}'`
+  sets the session cookie; then `curl -b jar.txt <url>/api/me`. An agent
+  token from `POST /api/me/tokens` goes in `Authorization: Bearer hw_...` on
+  `/api` and `/mcp`. `Authorization: Bearer dev:<attendeeId>` still acts as
+  that attendee without a sign-in. Dev sign-in and the `dev:` bearer work only
+  with `DEV_SIGN_IN=1` in `apps/api/.dev.vars` (copied from
+  `.dev.vars.example` on first run) and only on a loopback host. LinkedIn
+  sign-in answers 404 until `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`
+  are set there. In application tests, build an `Actor` directly:
+  `{ kind: "attendee", attendeeId, via: "session" }`. An agent token
+  (`via: "agent-token"`) is refused (403) on token management and the
+  calendar feed, so get those with the cookie, not the token.
 - `npm run db:generate -- <name>` writes the next migration from
   `packages/infrastructure/src/persistence/d1/entities/`; add `--custom` for a
   hand-written data migration. `npm run types -w @hallway/api` after changing

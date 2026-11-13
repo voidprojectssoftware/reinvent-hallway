@@ -8,6 +8,7 @@
 // stream, since no tool here streams progress.
 import type { Actor } from "@hallway/application";
 import { GetEventInput, Event } from "@hallway/contracts";
+import { Me } from "@hallway/contracts";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -47,6 +48,17 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (input) => toolResult(await handlers.getEvent(actor, input)),
+  );
+  server.registerTool(
+    "whoami",
+    {
+      title: "Who am I on Hallway",
+      description:
+        "The Hallway attendee your agent token acts as: handle, display name, visibility, and the name and email LinkedIn verified. Call it first to check the token works.",
+      outputSchema: asToolOutput(Me),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async () => toolResult(await handlers.identity.getMe(actor)),
   );
   registerScheduleTools(server, handlers, actor);
   return server;

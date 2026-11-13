@@ -3,9 +3,9 @@
 // and editing over REST, and the two agreeing.
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getEvent, scheduleHandlers } from "@hallway/application";
+import { getEvent, identityHandlers, scheduleHandlers } from "@hallway/application";
 import type { MySchedule, SyncResult } from "@hallway/contracts";
-import { eventsInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
+import { eventsInMemory, identityInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
@@ -33,9 +33,11 @@ let call: (input: string | URL | Request, init?: RequestInit) => Promise<Respons
 beforeEach(() => {
   const events = eventsInMemory([reinvent2026]);
   const schedule = scheduleInMemory();
+  const identity = identityHandlers(identityInMemory());
   const app = createApp<typeof bindings>({
     handlers: () => ({
       getEvent: getEvent(events),
+      identity,
       ...scheduleHandlers({
         events,
         schedule,
