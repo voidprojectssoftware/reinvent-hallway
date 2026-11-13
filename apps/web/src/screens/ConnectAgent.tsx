@@ -21,6 +21,8 @@ import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { sessions, syncCounts } from "../schedule/sync.ts";
 import { formatAgo } from "../time.ts";
+import { whyAgentLine } from "../why/copy.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 export function connectAgentLoader({ request }: { request: Request }): Promise<MySchedule> {
   return requireSignIn(api.mySchedule(EVENT_ID), request);

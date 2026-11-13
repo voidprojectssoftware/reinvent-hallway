@@ -18,7 +18,7 @@ interface WhyProps {
   /** The part to open on. */
   section: WhySection;
   /** The session's re:Invent page, which becomes the closing step. */
-  sessionUrl?: string;
+  sessionUrl?: string | undefined;
 }
 
 /** "Why?" inside a sentence (a group's footer), opening the sheet. */

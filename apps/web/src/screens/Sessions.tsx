@@ -19,6 +19,7 @@ import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn } from "../shell/signed-in.ts";
 import { dayChip, eventDates, formatDate, zoneAbbreviation } from "../time.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 type Intent = "interested" | "reserved";
 

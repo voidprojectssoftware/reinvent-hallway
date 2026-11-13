@@ -16,6 +16,7 @@ import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { dayChip, eventDate, eventDates, formatAgo, formatDate, zoneAbbreviation } from "../time.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 type GoingBySession = Map<string, Person[]>;
 
