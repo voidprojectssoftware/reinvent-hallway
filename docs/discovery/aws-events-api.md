@@ -38,6 +38,15 @@ https://docs.aws.amazon.com/events/latest/devguide/mcp-server.html
 - **No session URL in the API.** The public site's deep-link format was not
   found (owner question).
 
+## Adding the server to an agent
+
+An agent must name the shared client id and a fixed loopback callback port, or
+Builder ID sign-in fails with a redirect mismatch (AWS's MCP server docs above).
+The Connect screen (`apps/web/src/screens/ConnectAgent.tsx`) shows these:
+Claude Code `claude mcp add --transport http --scope user awsevents https://api.awsevents.com/mcp --callback-port 8484 --client-id 7vmom55m1qstvq8i71ph127bfq`;
+Kiro `mcp.json` `"awsevents": { "url": "https://api.awsevents.com/mcp", "oauth": { "clientId": "7vmom55m1qstvq8i71ph127bfq", "redirectUri": "http://127.0.0.1:8976", "oauthScopes": ["openid", "email", "events/access"] } }`
+(`redirectUri` ends at the port; Kiro adds `/oauth/callback` itself).
+
 ## What Hallway takes from it
 
 The `Session` shape, reduced (no abstract, ADR 0003), and the `Schedule` shape

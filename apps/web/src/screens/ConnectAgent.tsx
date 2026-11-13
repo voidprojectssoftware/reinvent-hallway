@@ -19,7 +19,12 @@ export function connectAgentLoader(): Promise<MySchedule> {
   return requireSignIn(api.mySchedule(EVENT_ID));
 }
 
+// AWS's sign-in has one shared public client, which accepts only fixed
+// loopback callbacks, so each agent's setup must name that client and a
+// fixed port or Builder ID sign-in fails with a redirect mismatch
+// (docs/discovery/aws-events-api.md, "Adding the server to an agent").
 const AWS_EVENTS_MCP = "https://api.awsevents.com/mcp";
+const AWS_CLIENT_ID = "7vmom55m1qstvq8i71ph127bfq";
 const PROMPT = "Put my re:Invent 2026 schedule on Hallway.";
 
 type Agent = "claude" | "kiro";
@@ -28,7 +33,8 @@ const agents: Record<Agent, { name: string; label: string; awsSetup: string; hal
   claude: {
     name: "Claude Code",
     label: "Claude Code on laptop",
-    awsSetup: `claude mcp add --transport http \\\n  aws-events ${AWS_EVENTS_MCP}`,
+    // AWS's command in AWS's order, broken so no line wraps at 390 px.
+    awsSetup: `claude mcp add --transport http \\\n  --scope user awsevents \\\n  ${AWS_EVENTS_MCP} \\\n  --callback-port 8484 \\\n  --client-id ${AWS_CLIENT_ID}`,
     hallwaySetup: (url, secret) =>
       `claude mcp add --transport http \\\n  hallway ${url} \\\n  --header "Authorization: Bearer ${secret}"`,
     where: "Run it in a terminal.",
@@ -36,7 +42,13 @@ const agents: Record<Agent, { name: string; label: string; awsSetup: string; hal
   kiro: {
     name: "Kiro",
     label: "Kiro on laptop",
-    awsSetup: kiroConfig({ "aws-events": { url: AWS_EVENTS_MCP } }),
+    // Kiro appends /oauth/callback to redirectUri itself, so it ends at the port.
+    awsSetup: kiroConfig({
+      awsevents: {
+        url: AWS_EVENTS_MCP,
+        oauth: { clientId: AWS_CLIENT_ID, redirectUri: "http://127.0.0.1:8976", oauthScopes: ["openid", "email", "events/access"] },
+      },
+    }),
     hallwaySetup: (url, secret) => kiroConfig({ hallway: { url, headers: { Authorization: `Bearer ${secret}` } } }),
     where: "Add it under mcpServers in ~/.kiro/settings/mcp.json (or .kiro/settings/mcp.json in one workspace).",
   },
@@ -76,7 +88,7 @@ export function ConnectAgent() {
         </div>
         <p className="gfoot">
           {agent === "kiro" && `${chosen.where} `}
-          Your agent signs you in with your AWS Builder ID the first time it uses it. Other agents: add the same URL as a remote MCP server.
+          Your agent signs you in with your AWS Builder ID the first time it uses it. Other agents: add the same URL as a remote MCP server with a fixed loopback callback port and the client id {AWS_CLIENT_ID}; AWS refuses sign-in without both.
         </p>
       </section>
 
