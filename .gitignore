@@ -7,3 +7,6 @@ dist/
 .claude/worktrees/
 .aspire/
 .state/
+
+# Campus map tiles, cut by `npm run tiles` (scripts/venues/cut-tiles.mjs, ADR 0029).
+apps/web/public/tiles/

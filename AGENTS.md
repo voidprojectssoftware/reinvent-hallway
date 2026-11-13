@@ -146,6 +146,11 @@ the toolbar only with `?annotate` in the URL. Never stop a note server on
 `npm run dev` after adding them. Its own page shows every post with its
 picture. Nothing reaches LinkedIn (ADR 0026).
 
+`npm run tiles` cuts the campus map's street tiles to the Strip from a pinned
+Protomaps build into `apps/web/public/tiles/` (git-ignored, about 3.4 MiB,
+ADR 0029); run it once per checkout, and before any deploy. Without it the Map
+view draws the venues and the path on a plain background.
+
 `npm run seed:demo -- <url>` loads the same demo data into a running
 `npm run dev` (it needs dev sign-in, so a loopback URL).
 

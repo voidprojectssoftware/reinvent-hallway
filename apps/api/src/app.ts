@@ -3,7 +3,7 @@
 // tools both reach the same handlers through `c.var.handlers` (ADR 0002).
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import type { Actor, GetEvent, IdentityHandlers } from "@hallway/application";
+import type { Actor, GetEvent, GetVenues, IdentityHandlers } from "@hallway/application";
 import type { NetworkHandlers, ScheduleHandlers } from "@hallway/application";
 import type { PostingHandlers, SharingHandlers } from "@hallway/application";
 import type { ApiError } from "@hallway/contracts";
@@ -24,6 +24,7 @@ import type { RenderPng } from "./sharing/png.ts";
 /** Every handler the interfaces may call, built per request from the bindings. */
 export interface Handlers extends ScheduleHandlers {
   getEvent: GetEvent;
+  getVenues: GetVenues;
   identity: IdentityHandlers;
   network: NetworkHandlers;
   sharing: SharingHandlers;

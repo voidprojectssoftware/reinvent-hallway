@@ -9,11 +9,14 @@
   },
   "dependencies": {
     "@hallway/contracts": "*",
+    "leaflet": "1.9.4",
+    "protomaps-leaflet": "5.1.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router": "8.5.1"
   },
   "devDependencies": {
+    "@types/leaflet": "1.9.22",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",

@@ -1,0 +1,1896 @@
+{
+  "measuredOn": "2026-11-13",
+  "source": "OSRM foot profile, routing.openstreetmap.de (FOSSGIS e.V.), on OpenStreetMap data",
+  "walks": [
+    {
+      "from": "venetian",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 77.24,
+                "summary": "",
+                "duration": 717.3,
+                "distance": 893.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 77.24,
+            "duration": 717.3,
+            "distance": 893.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "venetian",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 220.1,
+                "summary": "",
+                "duration": 2034.9,
+                "distance": 2540.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 220.1,
+            "duration": 2034.9,
+            "distance": 2540.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "venetian",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 136.09,
+                "summary": "",
+                "duration": 1270.2,
+                "distance": 1582.5
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 136.09,
+            "duration": 1270.2,
+            "distance": 1582.5
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "venetian",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 144.35,
+                "summary": "",
+                "duration": 1386.9,
+                "distance": 1730.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 144.35,
+            "duration": 1386.9,
+            "distance": 1730.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "venetian",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 198.04,
+                "summary": "",
+                "duration": 1902.5,
+                "distance": 2375.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 198.04,
+            "duration": 1902.5,
+            "distance": 2375.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    },
+    {
+      "from": "venetian",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16623005,36.12189765;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 439.98,
+                "summary": "",
+                "duration": 4206.2,
+                "distance": 5254.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 439.98,
+            "duration": 4206.2,
+            "distance": 5254.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 77.24,
+                "summary": "",
+                "duration": 715.3,
+                "distance": 893.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 77.24,
+            "duration": 715.3,
+            "distance": 893.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 146.39,
+                "summary": "",
+                "duration": 1299.1,
+                "distance": 1623.4
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 146.39,
+            "duration": 1299.1,
+            "distance": 1623.4
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 150.16,
+                "summary": "",
+                "duration": 1386.8,
+                "distance": 1730.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 150.16,
+            "duration": 1386.8,
+            "distance": 1730.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 158.42,
+                "summary": "",
+                "duration": 1503.5,
+                "distance": 1878.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 158.42,
+            "duration": 1503.5,
+            "distance": 1878.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 169.02,
+                "summary": "",
+                "duration": 1605.6,
+                "distance": 2007.1
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 169.02,
+            "duration": 1605.6,
+            "distance": 2007.1
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-forum",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1661886,36.11893695;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 382.73,
+                "summary": "",
+                "duration": 3624,
+                "distance": 4528
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 382.73,
+            "duration": 3624,
+            "distance": 4528
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 220.1,
+                "summary": "",
+                "duration": 2032.9,
+                "distance": 2540.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 220.1,
+            "duration": 2032.9,
+            "distance": 2540.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 146.39,
+                "summary": "",
+                "duration": 1299.1,
+                "distance": 1623.4
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 146.39,
+            "duration": 1299.1,
+            "distance": 1623.4
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 220.37,
+                "summary": "",
+                "duration": 2010.9,
+                "distance": 2511
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 220.37,
+            "duration": 2010.9,
+            "distance": 2511
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 228.63,
+                "summary": "",
+                "duration": 2127.6,
+                "distance": 2659.1
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 228.63,
+            "duration": 2127.6,
+            "distance": 2659.1
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 259.66,
+                "summary": "",
+                "duration": 2420.8,
+                "distance": 3023
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 259.66,
+            "duration": 2420.8,
+            "distance": 3023
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    },
+    {
+      "from": "caesars-palace",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17665295,36.11662475;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 371.92,
+                "summary": "",
+                "duration": 3484.3,
+                "distance": 4355.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 371.92,
+            "duration": 3484.3,
+            "distance": 4355.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 136.09,
+                "summary": "",
+                "duration": 1268.2,
+                "distance": 1582.5
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 136.09,
+            "duration": 1268.2,
+            "distance": 1582.5
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 150.16,
+                "summary": "",
+                "duration": 1386.8,
+                "distance": 1730.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 150.16,
+            "duration": 1386.8,
+            "distance": 1730.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 220.37,
+                "summary": "",
+                "duration": 2010.9,
+                "distance": 2511
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 220.37,
+            "duration": 2010.9,
+            "distance": 2511
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 55.62,
+                "summary": "",
+                "duration": 500.4,
+                "distance": 625.4
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 55.62,
+            "duration": 500.4,
+            "distance": 625.4
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 275.96,
+                "summary": "",
+                "duration": 2611.2,
+                "distance": 3261.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 275.96,
+            "duration": 2611.2,
+            "distance": 3261.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    },
+    {
+      "from": "wynn",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1656312,36.126651100000004;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 472.17,
+                "summary": "",
+                "duration": 4466,
+                "distance": 5580.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 472.17,
+            "duration": 4466,
+            "distance": 5580.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 144.35,
+                "summary": "",
+                "duration": 1384.9,
+                "distance": 1730.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 144.35,
+            "duration": 1384.9,
+            "distance": 1730.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 158.42,
+                "summary": "",
+                "duration": 1503.5,
+                "distance": 1878.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 158.42,
+            "duration": 1503.5,
+            "distance": 1878.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 228.63,
+                "summary": "",
+                "duration": 2127.6,
+                "distance": 2659.1
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 228.63,
+            "duration": 2127.6,
+            "distance": 2659.1
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 55.62,
+                "summary": "",
+                "duration": 500.4,
+                "distance": 625.4
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 55.62,
+            "duration": 500.4,
+            "distance": 625.4
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 284.22,
+                "summary": "",
+                "duration": 2727.9,
+                "distance": 3409.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 284.22,
+            "duration": 2727.9,
+            "distance": 3409.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    },
+    {
+      "from": "encore",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.1647264,36.129456000000005;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 480.43,
+                "summary": "",
+                "duration": 4582.7,
+                "distance": 5728.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 480.43,
+            "duration": 4582.7,
+            "distance": 5728.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 198.04,
+                "summary": "",
+                "duration": 1900.5,
+                "distance": 2375.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 198.04,
+            "duration": 1900.5,
+            "distance": 2375.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 169.02,
+                "summary": "",
+                "duration": 1605.6,
+                "distance": 2007.1
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 169.02,
+            "duration": 1605.6,
+            "distance": 2007.1
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 259.66,
+                "summary": "",
+                "duration": 2420.8,
+                "distance": 3023
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 259.66,
+            "duration": 2420.8,
+            "distance": 3023
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 275.96,
+                "summary": "",
+                "duration": 2611.2,
+                "distance": 3261.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 275.96,
+            "duration": 2611.2,
+            "distance": 3261.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 284.22,
+                "summary": "",
+                "duration": 2727.9,
+                "distance": 3409.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 284.22,
+            "duration": 2727.9,
+            "distance": 3409.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "mgm-grand",
+      "to": "mandalay-bay",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.16481440000001,36.1045537;-115.17637615000001,36.088948099999996?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 243.35,
+                "summary": "",
+                "duration": 2310.1,
+                "distance": 2887.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 243.35,
+            "duration": 2310.1,
+            "distance": 2887.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          },
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "venetian",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.16623005,36.12189765?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 439.98,
+                "summary": "",
+                "duration": 4204.2,
+                "distance": 5254.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 439.98,
+            "duration": 4204.2,
+            "distance": 5254.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "Xih9kIpPmZAAAAAASAAAAAAAAADlBQAAAAAAAKlRCUEAAAAA3xI1QwAAAABFAAAAAAAAAKkFAAAUAAAAu7Ui-TwvJwLqsyL5Ki0nAgAATwIAAAAA",
+            "location": [
+              -115.165765,
+              36.122428
+            ],
+            "name": "",
+            "distance": 72.1859012
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "caesars-forum",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.1661886,36.11893695?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 382.73,
+                "summary": "",
+                "duration": 3624,
+                "distance": 4528
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 382.73,
+            "duration": 3624,
+            "distance": 4528
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "L3OZkMQEXpFkBgAAkgEAAJYAAACVAgAAF68jQ7qgIEItom9Bi1mEQh0FAABCAQAAeAAAABICAAAUAAAAHbQi-UgjJwITtCL5mSEnAgIAvwUAAAAA",
+            "location": [
+              -115.166179,
+              36.119368
+            ],
+            "name": "",
+            "distance": 47.83280046
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "caesars-palace",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.17665295,36.11662475?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 371.92,
+                "summary": "",
+                "duration": 3484.3,
+                "distance": 4355.9
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 371.92,
+            "duration": 3484.3,
+            "distance": 4355.9
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "gNHqg4TR6oNlAQAAZQMAAAAAAAC6AAAAxAUPQsmirUIAAAAA0TGVQR4BAAC3AgAAAAAAAJUAAAAUAAAAS4si-RQbJwIziyL5kRgnAgAA_xAAAAAA",
+            "location": [
+              -115.176629,
+              36.117268
+            ],
+            "name": "Caesars Palace Self Parking",
+            "distance": 71.38083239
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "wynn",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.1656312,36.126651100000004?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 472.17,
+                "summary": "",
+                "duration": 4466,
+                "distance": 5580.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 472.17,
+            "duration": 4466,
+            "distance": 5580.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "Br6eh-1rIomUBAAAAAAAAFwEAABVAwAA9XjqQgAAAACEVd9Cq6CqQqoDAAAAAAAAfgMAAKoCAAAUAAAA_bYi-SJDJwJBtiL5uz8nAggAvwYAAAAA",
+            "location": [
+              -115.165443,
+              36.127522
+            ],
+            "name": "",
+            "distance": 98.11790658
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "encore",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.1647264,36.129456000000005?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 480.43,
+                "summary": "",
+                "duration": 4582.7,
+                "distance": 5728.8
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 480.43,
+            "duration": 4582.7,
+            "distance": 5728.8
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "n1-ZkKNfmZABAAAALgAAAHQAAAAfAAAAnpBYPskJrkBy4V1B5tJqQAEAAAAsAAAAbwAAAB0AAAAUAAAAJLoi-fRKJwLKuSL5sEonAgQAzxMAAAAA",
+            "location": [
+              -115.164636,
+              36.129524
+            ],
+            "name": "",
+            "distance": 11.07129149
+          }
+        ]
+      }
+    },
+    {
+      "from": "mandalay-bay",
+      "to": "mgm-grand",
+      "url": "https://routing.openstreetmap.de/routed-foot/route/v1/driving/-115.17637615000001,36.088948099999996;-115.16481440000001,36.1045537?overview=false",
+      "answer": {
+        "code": "Ok",
+        "routes": [
+          {
+            "legs": [
+              {
+                "steps": [],
+                "weight": 243.35,
+                "summary": "",
+                "duration": 2310.1,
+                "distance": 2887.6
+              }
+            ],
+            "weight_name": "routability",
+            "weight": 243.35,
+            "duration": 2310.1,
+            "distance": 2887.6
+          }
+        ],
+        "waypoints": [
+          {
+            "hint": "QwWHhkUFh4akAAAATAAAAMMAAAAAAAAAC2GDQSdz8UDbYJxBAAAAAIMAAAA9AAAAnAAAAAAAAAAUAAAAo4wi-XSsJgJIjCL5dKwmAgIAfxYAAAAA",
+            "location": [
+              -115.176285,
+              36.088948
+            ],
+            "name": "",
+            "distance": 8.197119617
+          },
+          {
+            "hint": "9iSbkB8sm5AjAAAAJQAAAEQFAAA8AgAAsPWGQEgPjkDAwyFDvDqJQiEAAAAkAAAADgUAACQCAAAUAAAAkbwi-XfpJgJyuSL5aukmAhoAbxYAAAAA",
+            "location": [
+              -115.164015,
+              36.104567
+            ],
+            "name": "",
+            "distance": 71.94138979
+          }
+        ]
+      }
+    }
+  ]
+}

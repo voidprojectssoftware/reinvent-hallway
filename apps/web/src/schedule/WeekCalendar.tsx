@@ -41,13 +41,15 @@ interface WeekCalendarProps<E extends CalendarEntry> {
   cell: (entry: E) => ReactNode;
   /** The footnote under the grid, as the list has under its day (My week's sync line). */
   foot?: ReactNode;
+  /** The List | Calendar | Map switch, at the right of the day's header (or the week's, side by side). */
+  toggle?: ReactNode;
 }
 
 /** The narrowest block worth drawing: a session code and a short word of title fit (at 60 px, codes and titles were cut to three letters). */
 const narrowestBlock = 84;
 const wide = "(min-width: 768px)";
 
-export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing, going, cell, foot }: WeekCalendarProps<E>) {
+export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing, going, cell, foot, toggle }: WeekCalendarProps<E>) {
   const [search] = useSearchParams();
   const sideBySide = useMediaQuery(wide);
   const [dayWidth, measure] = useWidth();
@@ -72,11 +74,18 @@ export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing
     <>
       {!sideBySide && <DayChips dates={dates} chosen={chosen} />}
       <section className="section">
-        {!sideBySide && (
-          <h2 className="ghead big">
-            {formatDate(chosen)} <small>{count(timed.filter(({ span }) => span.date === chosen).length + allDayShown.length)}</small>
-          </h2>
-        )}
+        <div className="day-head">
+          {sideBySide ? (
+            <h2 className="ghead big">
+              <span className="day-name">The week</span> <small>{count(timed.length + allDayShown.length)}</small>
+            </h2>
+          ) : (
+            <h2 className="ghead big">
+              <span className="day-name">{formatDate(chosen)}</span> <small>{count(timed.filter(({ span }) => span.date === chosen).length + allDayShown.length)}</small>
+            </h2>
+          )}
+          {toggle}
+        </div>
         <div className={sideBySide ? "cal week" : "cal"} style={style}>
           {sideBySide && (
             <div className="cal-row cal-head" aria-hidden="true">
