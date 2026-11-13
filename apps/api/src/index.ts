@@ -7,9 +7,10 @@ import {
   invitePathOf,
   networkHandlers,
   postingHandlers,
+  recordGitHubFollowing,
   scheduleHandlers,
   sharingHandlers,
-  type AreConnected,
+  type TieBetween,
   type IdentityProviders,
   type LinkedInPoster,
 } from "@hallway/application";
@@ -83,17 +84,18 @@ function handlersFor(env: Env): Handlers {
   const schedule = scheduleOnD1(db);
   const network = networkOnD1(db);
   const now = () => new Date();
-  // The one answer to "are these two connected" for every read path that
-  // asks the visibility rule: identity's card, sharing's page, feed and
-  // image, and the network reads (which use the same repository).
-  const areConnected: AreConnected = (a, b) => network.areConnected(a, b);
+  // The one answer to "how does this viewer stand to this owner" (connected,
+  // followed by the owner: ADR 0019) for every read path that asks the
+  // visibility rule: identity's card, sharing's page, feed and image, and the
+  // network reads, whose bulk reads return the same tie from the same tables.
+  const tieBetween: TieBetween = (viewer, owner) => network.tie(viewer, owner);
   const poster = linkedInPosting(env);
   const sharing = {
     attendees,
     calendarFeeds,
     events,
     schedule,
-    areConnected,
+    tieBetween,
     sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
     invitePath: invitePathOf(network, now),
   };
@@ -104,9 +106,9 @@ function handlersFor(env: Env): Handlers {
       agentTokens: agentTokensOnD1(db),
       webSessions: webSessionsOnD1(db),
       calendarFeeds,
-      areConnected,
+      tieBetween,
       providers: signInProviders(env),
-      // GitHub's following list is dropped until #63 stores follows (ADR 0019).
+      recordGitHubFollowing: recordGitHubFollowing(network, now),
     }),
     ...scheduleHandlers({
       events,
@@ -120,6 +122,7 @@ function handlersFor(env: Env): Handlers {
       network,
       events,
       schedule,
+      tieBetween,
       sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
       now,
     }),

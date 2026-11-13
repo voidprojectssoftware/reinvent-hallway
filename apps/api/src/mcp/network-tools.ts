@@ -4,13 +4,13 @@
 // each tool.
 import type { Actor } from "@hallway/application";
 import {
-  ConnectionList,
   GetPersonScheduleInput,
   ListConnectionsInput,
   MeetingGaps,
   MeetingGapsInput,
   NetworkAgenda,
   NetworkAgendaInput,
+  NetworkList,
   PersonSchedule,
   WhoIsGoing,
   WhoIsGoingInput,
@@ -21,21 +21,23 @@ import { toolResult } from "./outcome-mcp.ts";
 import { asToolOutput } from "./server.ts";
 
 export const networkToolDescriptions = {
-  list_my_connections: [
-    "The people the user is connected to on Hallway: the people whose re:Invent plans the user can see.",
-    "Call it first when the user talks about meeting, finding or following someone, to turn a name into a `handle` for the other tools. Only connections and people with public schedules can be planned around.",
-    "Pass `eventId` (`reinvent2026`) to get, per connection, how many sessions of theirs the user can see (`sessions`) and how many of those are on the user's own schedule too (`sharedWithMe`): a quick way to tell who the user will keep running into.",
+  list_my_network: [
+    "The user's network on Hallway: the people they are connected to, and the people they follow (on GitHub, or found in the LinkedIn Connections.csv they uploaded), each once. `how` says which: `connection`, `github`, `linkedin-import`.",
+    "Call it first when the user talks about meeting, finding or following someone, to turn a name into a `handle` for the other tools.",
+    "A followed person's week shows only if they share it with the user: `scheduleVisible` is true when their schedule is public, or they are connected to the user, or they follow the user. Following someone does not show you their week; plan around only the people with `scheduleVisible` true.",
+    "Pass `eventId` (`reinvent2026`) to get, per person, how many sessions of theirs the user can see (`sessions`) and how many of those are on the user's own schedule too (`sharedWithMe`): a quick way to tell who the user will keep running into.",
   ].join(" "),
+  list_my_connections: "The old name of list_my_network, kept for one release: the same call and the same answer. Use list_my_network.",
   get_person_schedule: [
     "One person's re:Invent schedule (by `handle`), as much of it as their visibility lets the user see, in start order. Times are UTC; show them in the returned `timezone` (Las Vegas time).",
-    "Use it to plan around one person: to catch them between sessions, to join a session they are going to, or before suggesting a meeting. A refusal (`forbidden`) says why: a private schedule, which nobody else can see, or one kept to their connections, which the user can see once they connect on Hallway.",
+    "Use it to plan around one person: to catch them between sessions, to join a session they are going to, or before suggesting a meeting. A refusal (`forbidden`) says why: a private schedule, which nobody else can see, or one kept to their network (their connections and the people they follow), which the user can see once they connect on Hallway. The user following them does not open it.",
   ].join(" "),
   who_is_going: [
-    "For a list of session ids (AWS's `sessionId`, as search_sessions returns it), which of the user's connections plan to attend each. Ids Hallway's catalog does not have are listed in `unknownSessions`.",
+    "For a list of session ids (AWS's `sessionId`, as search_sessions returns it), which people in the user's network (connections, and people they follow who share their week with the user) plan to attend each. Ids Hallway's catalog does not have are listed in `unknownSessions`.",
     "Before choosing between two sessions in the same slot, ask who_is_going for both: a session a colleague is at is a chance to meet them. Pass every session you are weighing in one call (up to 200), not one call per session.",
   ].join(" "),
   network_agenda: [
-    "What the user's connections plan to attend in a window of one day of re:Invent (`day`, 2026-11-30 to 2026-12-04, and optionally `from` and `to`, Las Vegas time, HH:MM, `to` up to 24:00), with who is going to each.",
+    "What the people in the user's network (connections, and people they follow who share their week with the user) plan to attend in a window of one day of re:Invent (`day`, 2026-11-30 to 2026-12-04, and optionally `from` and `to`, Las Vegas time, HH:MM, `to` up to 24:00), with who is going to each.",
     "Start here when the user says something like \"I'm free Tuesday afternoon, what are my people going to?\": it lists the sessions, then use who_is_going or get_person_schedule to go deeper. Each session's `url` opens it on the re:Invent site, where the user reserves a seat.",
   ].join(" "),
   find_meeting_gaps: [
@@ -47,17 +49,24 @@ export const networkToolDescriptions = {
 const readOnly = { readOnlyHint: true, openWorldHint: false } as const;
 
 export function registerNetworkTools(server: McpServer, handlers: Handlers, actor: Actor) {
-  server.registerTool(
-    "list_my_connections",
-    {
-      title: "List my connections",
-      description: networkToolDescriptions.list_my_connections,
-      inputSchema: ListConnectionsInput,
-      outputSchema: asToolOutput(ConnectionList),
-      annotations: readOnly,
-    },
-    (input) => toolResult(() => handlers.network.listConnections(actor, input)),
-  );
+  // list_my_connections is the name before #63; it answers as list_my_network
+  // for one release, so an agent that learned the old name keeps working.
+  for (const [name, title] of [
+    ["list_my_network", "List my network"],
+    ["list_my_connections", "List my network (old name)"],
+  ] as const) {
+    server.registerTool(
+      name,
+      {
+        title,
+        description: networkToolDescriptions[name],
+        inputSchema: ListConnectionsInput,
+        outputSchema: asToolOutput(NetworkList),
+        annotations: readOnly,
+      },
+      (input) => toolResult(() => handlers.network.listMyNetwork(actor, input)),
+    );
+  }
 
   server.registerTool(
     "get_person_schedule",
@@ -86,7 +95,7 @@ export function registerNetworkTools(server: McpServer, handlers: Handlers, acto
   server.registerTool(
     "network_agenda",
     {
-      title: "What my connections are going to",
+      title: "What my network is going to",
       description: networkToolDescriptions.network_agenda,
       inputSchema: NetworkAgendaInput,
       outputSchema: asToolOutput(NetworkAgenda),

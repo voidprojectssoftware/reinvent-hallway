@@ -7,8 +7,12 @@
 import { z } from "zod";
 
 export const Visibility = z
-  .enum(["public", "connections", "private"])
-  .meta({ id: "Visibility", description: "Who may see the attendee's schedule." });
+  .enum(["public", "network", "private"])
+  .meta({
+    id: "Visibility",
+    description:
+      "Who may see the attendee's schedule. `public`: anyone with the link. `network` (\"My network\", called `connections` before #63): the attendee, their Hallway connections, and the people they follow on GitHub or found in their LinkedIn import. Following someone does not let you see their schedule; their following you does. `private`: the attendee only.",
+  });
 export type Visibility = z.infer<typeof Visibility>;
 
 export const Handle = z
@@ -98,6 +102,23 @@ export const DevSignInInput = z
   .object({ name: z.string().trim().min(1).max(100).meta({ example: "Jane Doe" }) })
   .meta({ id: "DevSignIn" });
 export type DevSignInInput = z.infer<typeof DevSignInInput>;
+
+const gitHubAccount = z.object({
+  id: z.int().positive().meta({ description: "GitHub's numeric user id.", example: 583231 }),
+  login: z.string().min(1).max(39).meta({ example: "octocat" }),
+});
+
+/**
+ * Dev only: what a GitHub link round trip would bring back, believed as
+ * given, so a dev server and the e2e suite can exercise follows without
+ * GitHub (ADR 0019, note of 2026-11-13).
+ */
+export const DevLinkGitHubInput = gitHubAccount
+  .extend({
+    following: z.array(gitHubAccount).max(4000).default([]).meta({ description: "Who this account follows on GitHub." }),
+  })
+  .meta({ id: "DevLinkGitHub" });
+export type DevLinkGitHubInput = z.infer<typeof DevLinkGitHubInput>;
 
 const instant = z.string().meta({ description: "ISO-8601 UTC instant." });
 

@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { AttendeeCard, Handle, Person } from "./identity.ts";
+import { ReturnPath } from "./return-path.ts";
 import { EventScope, GoingPerson, Intent, Session, SessionId } from "./schedule.ts";
 
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
@@ -25,10 +26,10 @@ export const Connection = z
       description: "With `eventId` asked: how many of those sessions are also on my schedule.",
     }),
   })
-  .meta({ id: "Connection", description: "Someone I am connected to. Connections see each other's `connections` schedules." });
+  .meta({ id: "Connection", description: "Someone I am connected to. Connections see each other's `network` schedules." });
 export type Connection = z.infer<typeof Connection>;
 
-/** `GET /api/me/connections?eventId=` and `list_my_connections`: the event to count sessions at. */
+/** `GET /api/me/connections`, `/api/me/network`, `/api/me/following` and `list_my_network`, with `?eventId=`: the event to count sessions at. */
 export const ListConnectionsInput = z.object({
   eventId: EventId.optional().meta({
     description: "Count each connection's sessions at this event (`sessions`, `sharedWithMe`). Without it, no counts.",
@@ -41,6 +42,80 @@ export const ConnectionList = z
   .object({ connections: z.array(Connection) })
   .meta({ id: "ConnectionList", description: "My connections, by display name." });
 export type ConnectionList = z.infer<typeof ConnectionList>;
+
+// ---- My network: connections and follows (ADR 0019) ----
+
+export const FollowSource = z.enum(["github", "linkedin-import"]).meta({
+  id: "FollowSource",
+  description:
+    "`github`: I follow them on GitHub. `linkedin-import`: they matched a contact in my LinkedIn Connections.csv (verified email, or claimed profile URL plus verified name).",
+});
+export type FollowSource = z.infer<typeof FollowSource>;
+
+const scheduleVisible = z.boolean().meta({
+  description:
+    "Whether I may see their schedule: it is public, or we are connected, or they follow me. Following them is not enough.",
+});
+const sessionsSeen = z.int().min(0).optional().meta({
+  description: "With `eventId` asked: how many sessions of theirs I may see there. Hidden entries never count.",
+});
+
+export const NetworkMember = z
+  .object({
+    person: Person,
+    how: z
+      .array(z.enum(["connection", "github", "linkedin-import"]))
+      .min(1)
+      .meta({ description: "Every way they are in my network: a Hallway connection, and the sources I follow them from." }),
+    connectedSince: instant.optional().meta({ description: "When we connected, if we are." }),
+    scheduleVisible,
+    sessions: sessionsSeen,
+    sharedWithMe: z.int().min(0).optional().meta({
+      description: "With `eventId` asked: how many of those sessions are also on my schedule.",
+    }),
+  })
+  .meta({ id: "NetworkMember", description: "Someone in my network, labelled with how." });
+export type NetworkMember = z.infer<typeof NetworkMember>;
+
+export const NetworkList = z
+  .object({ people: z.array(NetworkMember) })
+  .meta({ id: "NetworkList", description: "My connections and the people I follow, by display name, each once." });
+export type NetworkList = z.infer<typeof NetworkList>;
+
+export const FollowedPerson = z
+  .object({ person: Person, since: instant, scheduleVisible, sessions: sessionsSeen })
+  .meta({ id: "FollowedPerson", description: "Someone I follow, from one source." });
+export type FollowedPerson = z.infer<typeof FollowedPerson>;
+
+export const Following = z
+  .object({
+    github: z.object({
+      linked: z.boolean().meta({ description: "Whether I sign in with GitHub. Without it there is nothing to refresh from." }),
+      people: z.array(FollowedPerson).meta({ description: "People I follow on GitHub who are on Hallway, by name." }),
+      notOnHallway: z.int().min(0).meta({
+        description: "People I follow on GitHub who have not linked GitHub on Hallway yet. They join this list when they do.",
+      }),
+    }),
+    linkedinImport: z.object({
+      people: z.array(FollowedPerson).meta({ description: "Attendees my last Connections.csv matched, by name." }),
+    }),
+  })
+  .meta({ id: "Following", description: "The people I follow, grouped by where the follow came from." });
+export type Following = z.infer<typeof Following>;
+
+export const RefreshGitHubFollowsInput = z
+  .object({
+    returnTo: ReturnPath.optional().meta({ description: "Where to land after GitHub, a path on this site. Default `/network`." }),
+  })
+  .meta({ id: "RefreshGitHubFollows" });
+export type RefreshGitHubFollowsInput = z.infer<typeof RefreshGitHubFollowsInput>;
+
+export const GitHubRoundTrip = z
+  .object({
+    authorizationUrl: z.string().meta({ description: "Send the browser here. GitHub comes back to Hallway, which reads who I follow and drops the token." }),
+  })
+  .meta({ id: "GitHubRoundTrip" });
+export type GitHubRoundTrip = z.infer<typeof GitHubRoundTrip>;
 
 export const ConnectionRequest = z
   .object({
@@ -205,7 +280,7 @@ export const SessionGoing = z.object({
   sessionId: SessionId,
   people: z
     .array(GoingPerson)
-    .meta({ description: "Every connection of mine going whose entry I may see, by display name, each with their intent." }),
+    .meta({ description: "Everyone in my network going whose entry I may see, by display name, each with their intent." }),
 });
 
 export const WhoIsGoing = z
@@ -216,7 +291,7 @@ export const WhoIsGoing = z
         "Present when some asked ids are not in Hallway's catalog: those ids, which nobody can be going to here. Ids are AWS's `sessionId`, not the code (`AIM3315`): find a session's id with search_sessions.",
     }),
   })
-  .meta({ id: "WhoIsGoing", description: "Per session, which of my connections plan to be there." });
+  .meta({ id: "WhoIsGoing", description: "Per session, which people in my network plan to be there, as far as each lets me see." });
 export type WhoIsGoing = z.infer<typeof WhoIsGoing>;
 
 // ---- Network agenda ----
@@ -231,7 +306,7 @@ export type NetworkAgendaInput = z.infer<typeof NetworkAgendaInput>;
 
 export const AgendaItem = z.object({
   session: Session,
-  people: z.array(GoingPerson).meta({ description: "My connections going, by display name, each with their intent." }),
+  people: z.array(GoingPerson).meta({ description: "People in my network going, by display name, each with their intent." }),
 });
 
 export const NetworkAgenda = z
@@ -242,7 +317,7 @@ export const NetworkAgenda = z
     to: instant,
     items: z.array(AgendaItem).meta({ description: "Sessions starting in the window, in start order." }),
   })
-  .meta({ id: "NetworkAgenda", description: "What my connections plan to attend in a window." });
+  .meta({ id: "NetworkAgenda", description: "What people in my network plan to attend in a window." });
 export type NetworkAgenda = z.infer<typeof NetworkAgenda>;
 
 // ---- Meeting gaps ----

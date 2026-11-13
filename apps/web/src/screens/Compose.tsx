@@ -95,7 +95,7 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
     setNote(copied ? "Text copied. Paste it into LinkedIn's post box." : null);
   }
 
-  const visibility = me?.visibility ?? "connections";
+  const visibility = me?.visibility ?? "network";
   const linkHere = encodeURIComponent(`/share/post${searchOf(pick)}`);
 
   return (
@@ -216,7 +216,7 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
           {!draft.linkPreviewShowsWeek && visibility !== "public" && (
             <div className="post-vis">
               <p className="gfoot">
-                {visibility === "private" ? "Your week is private" : "Your week is for your connections"}, so people who open the link see
+                {visibility === "private" ? "Your week is private" : "Your week is for My network"}, so people who open the link see
                 only your name. The picture still shows these sessions.
               </p>
               <WhoCanSee visibility={visibility} />

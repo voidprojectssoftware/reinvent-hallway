@@ -74,7 +74,7 @@ beforeEach(() => {
 });
 
 /** Signs in, syncs the fixture's AWS schedule, sets visibility; returns the attendee. */
-async function attendee(name: string, visibility: "public" | "connections" | "private"): Promise<Me> {
+async function attendee(name: string, visibility: "public" | "network" | "private"): Promise<Me> {
   const me = (await (await call("/api/dev/sign-in", { method: "POST", body: JSON.stringify({ name }) })).json()) as Me;
   await call("/api/events/reinvent2026/my-schedule", {
     as: me.id,
@@ -163,7 +163,7 @@ describe("no image URL gives the owner's week to anyone else (#70)", () => {
   const bytes = async (response: Response) => Buffer.from(await response.arrayBuffer()).toString("base64");
 
   it("answers every image URL the owner is handed with the stranger's card or a refusal, never their week", async () => {
-    const me = await attendee("Sam Okafor", "connections");
+    const me = await attendee("Sam Okafor", "network");
     const links = (await (await call("/api/me/share", { as: me.id })).json()) as ShareLinks;
     const drafts = await Promise.all(
       ["", "?day=2026-12-01", "?session=s-aim3315"].map(

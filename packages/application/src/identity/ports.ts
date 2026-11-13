@@ -3,7 +3,7 @@
 // for each of Google, Microsoft, LinkedIn and GitHub; apps/api picks them in
 // its composition root.
 import type { SignInProvider } from "@hallway/contracts";
-import type { Attendee } from "@hallway/domain";
+import type { Attendee, Tie } from "@hallway/domain";
 
 /** An attendee as stored: the domain's Attendee plus what only auditing reads. */
 export interface AttendeeRecord extends Attendee {
@@ -98,8 +98,12 @@ export interface CalendarFeedRepository {
   ownerOf(token: string): Promise<string | undefined>;
 }
 
-/** Whether two attendees are connected. The network slice owns the real answer. */
-export type AreConnected = (a: string, b: string) => Promise<boolean>;
+/**
+ * How a signed-in viewer stands to a schedule's owner: connected, and whether
+ * the owner follows them (ADR 0019). The one lookup every read path hands the
+ * visibility rule; the network slice owns the real answer.
+ */
+export type TieBetween = (viewer: string, owner: string) => Promise<Tie>;
 
 /** A GitHub account, by its stable id; the login is only for showing. */
 export interface GitHubUser {
@@ -140,7 +144,8 @@ export interface IdentityProvider {
 export type IdentityProviders = Partial<Record<SignInProvider, IdentityProvider>>;
 
 /**
- * Where the people an attendee follows on GitHub go once fetched (ADR 0019).
- * #63 stores them as follows; until then it is a no-op.
+ * Where the people an attendee follows on GitHub go once fetched (ADR 0019):
+ * they replace the attendee's GitHub follows. An empty list forgets them,
+ * which is what unlinking GitHub does.
  */
 export type RecordGitHubFollowing = (input: { attendeeId: string; following: GitHubUser[] }) => Promise<void>;

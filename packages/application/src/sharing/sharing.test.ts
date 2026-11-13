@@ -73,7 +73,7 @@ function setup(visibility: Visibility) {
     },
     events: { get: async (id) => (id === event.eventId ? event : undefined) },
     schedule,
-    areConnected: async (a, b) => connections.has([a, b].sort().join("|")),
+    tieBetween: async (a, b) => ({ connected: connections.has([a, b].sort().join("|")), followedByOwner: false }),
     sessionUrlTemplate: "https://example.test/catalog?search={code}",
     invitePath: async (attendee) => `/@${attendee.handle}?invite=inv-1`,
   });
@@ -98,7 +98,7 @@ describe("getSharedSchedule", () => {
   });
 
   it("shows a connections-only schedule as the card alone to a stranger, and in full to a connection", async () => {
-    const { handlers, connections } = setup("connections");
+    const { handlers, connections } = setup("network");
     const stranger = await handlers.getSharedSchedule(anonymous, { handle: "sam" });
     expect(stranger.ok && stranger.value.scheduleVisible).toBe(false);
     expect(ids(stranger)).toEqual([]);
@@ -154,7 +154,7 @@ describe("exportCalendar", () => {
 
 describe("getShareLinks", () => {
   it("gives the page, the versioned image and, to a person signed in, the feed and the invite link", async () => {
-    const { handlers, feeds } = setup("connections");
+    const { handlers, feeds } = setup("network");
     feeds.set("a-owner", "tok-1");
     const links = await handlers.getShareLinks(attendee("a-owner"), { origin: "https://hallway.example" });
     expect(links.ok && links.value).toEqual({

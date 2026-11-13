@@ -1,6 +1,7 @@
 // Every handler over the in-memory fakes, wired as index.ts wires them over
 // D1: one attendee store, one schedule store, and the network fake's answer
-// to "are these two connected" given to identity, sharing and session search.
+// to "how does this viewer stand to this owner" given to identity, sharing
+// and the network reads.
 // The API tests build their app from this, so a slice adding a handler adds
 // it in one place for all of them.
 import {
@@ -10,9 +11,10 @@ import {
   invitePathOf,
   networkHandlers,
   postingHandlers,
+  recordGitHubFollowing,
   scheduleHandlers,
   sharingHandlers,
-  type AreConnected,
+  type TieBetween,
   type IdentityPorts,
   type LinkedInPoster,
 } from "@hallway/application";
@@ -45,14 +47,20 @@ export function inMemoryHandlers(
   const attendees = attendeesInMemory();
   const schedule = scheduleInMemory();
   const network = networkInMemory({ attendees, schedule });
-  const areConnected: AreConnected = (a, b) => network.areConnected(a, b);
-  const identityPorts = identityInMemory({ attendees, areConnected, now, ...options.identity });
+  const tieBetween: TieBetween = (viewer, owner) => network.tie(viewer, owner);
+  const identityPorts = identityInMemory({
+    attendees,
+    tieBetween,
+    recordGitHubFollowing: recordGitHubFollowing(network, now),
+    now,
+    ...options.identity,
+  });
   const sharing = {
     attendees,
     calendarFeeds: identityPorts.calendarFeeds,
     events,
     schedule,
-    areConnected,
+    tieBetween,
     sessionUrlTemplate: testSessionUrlTemplate,
     invitePath: invitePathOf(network, now),
   };
@@ -67,7 +75,15 @@ export function inMemoryHandlers(
       now,
       connectionsGoing: connectionsGoing(network),
     }),
-    network: networkHandlers({ attendees, network, events, schedule, sessionUrlTemplate: testSessionUrlTemplate, now }),
+    network: networkHandlers({
+      attendees,
+      network,
+      events,
+      schedule,
+      tieBetween,
+      sessionUrlTemplate: testSessionUrlTemplate,
+      now,
+    }),
     sharing: sharingHandlers(sharing),
     posting: postingHandlers({ ...sharing, drafts, now, ...(options.poster && { poster: options.poster }) }),
   };

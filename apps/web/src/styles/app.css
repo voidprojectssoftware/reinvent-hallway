@@ -210,6 +210,112 @@ body.loading main {
   font: 600 15px/1.15 var(--font);
 }
 
+/* Sign-in provider buttons (#61). Each is its provider's published button,
+   so its colors are the provider's, not tokens: Google's and Microsoft's
+   light and dark themes as their guidelines give them, LinkedIn's blue,
+   GitHub's black with the white mark (GitHub allows the mark in black or
+   white only). Every one is the same height and weight, as Google asks of
+   the buttons beside its own, and 44 px tall for the tap target. The font
+   is the system font: Hallway loads none (docs/design/README.md), so
+   Google's Google Sans and Microsoft's Segoe UI are the two rules not kept. */
+.pbtns {
+  display: grid;
+  gap: var(--sp-3);
+}
+.pbtn {
+  --pbtn-bg: #ffffff;
+  --pbtn-line: #747775;
+  --pbtn-text: #1f1f1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--pbtn-line);
+  border-radius: 4px;
+  background: var(--pbtn-bg);
+  color: var(--pbtn-text);
+  font: 500 16px/20px var(--font);
+  letter-spacing: 0;
+}
+.pmark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+.pbtn.microsoft {
+  --pbtn-line: #8c8c8c;
+  --pbtn-text: #5e5e5e;
+  /* Microsoft's button is square-cornered, with 12 px from mark to text. */
+  border-radius: 0;
+  gap: 12px;
+}
+.pbtn.microsoft .pmark {
+  width: 21px;
+  height: 21px;
+}
+.pbtn.linkedin {
+  --pbtn-bg: #0a66c2;
+  --pbtn-line: #0a66c2;
+  --pbtn-text: #ffffff;
+}
+.pbtn.linkedin:active {
+  --pbtn-bg: #004182;
+}
+.pbtn.github {
+  --pbtn-bg: #24292f;
+  --pbtn-line: #24292f;
+  --pbtn-text: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .pbtn.google {
+    --pbtn-bg: #131314;
+    --pbtn-line: #8e918f;
+    --pbtn-text: #e3e3e3;
+  }
+  :root:not([data-theme='light']) .pbtn.microsoft {
+    --pbtn-bg: #2f2f2f;
+    --pbtn-line: #2f2f2f;
+    --pbtn-text: #ffffff;
+  }
+  /* GitHub's black would sink into the dark page; GitHub's own dark
+     buttons carry a light border. */
+  :root:not([data-theme='light']) .pbtn.github {
+    --pbtn-line: #8e918f;
+  }
+}
+:root[data-theme='dark'] .pbtn.google {
+  --pbtn-bg: #131314;
+  --pbtn-line: #8e918f;
+  --pbtn-text: #e3e3e3;
+}
+:root[data-theme='dark'] .pbtn.microsoft {
+  --pbtn-bg: #2f2f2f;
+  --pbtn-line: #2f2f2f;
+  --pbtn-text: #ffffff;
+}
+:root[data-theme='dark'] .pbtn.github {
+  --pbtn-line: #8e918f;
+}
+
+/* A provider's mark in Settings' sign-in methods, on the white tile every
+   one of the marks is published on (Google's "G" may only sit on white).
+   LinkedIn's "in" is its blue there, GitHub's mark black. */
+.ico.brand {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 0.5px var(--sep);
+}
+.ico.brand svg {
+  width: 18px;
+  height: 18px;
+}
+.ico.brand.linkedin {
+  color: #0a66c2;
+}
+.ico.brand.github {
+  color: #1f2328;
+
 /* The composer (ADR 0026). The picture for the selection, as large as the
    column allows, at the card's own ratio so nothing jumps when it loads. */
 .post-pic {

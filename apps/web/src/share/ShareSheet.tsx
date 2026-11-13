@@ -41,7 +41,7 @@ const webcal = (calendarUrl: string) => calendarUrl.replace(/^https?:/, "webcal:
 export function ShareSheet({ onClose }: { onClose: () => void }) {
   const me = useMe();
   const placeholder = me?.handlePlaceholder ?? false;
-  const visibility = me?.visibility ?? "connections";
+  const visibility = me?.visibility ?? "network";
   const [links, setLinks] = useState<ShareLinks | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [failed, setFailed] = useState<Failed | null>(null);
@@ -135,7 +135,7 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
               <p className="sheet-vis-t">
                 {visibility === "private"
                   ? "Your week is private, so the link preview shows only your name."
-                  : "Your week is for your connections, so the link preview shows only your name."}
+                  : "Your week is for your network, so the link preview shows only your name."}
               </p>
               <WhoCanSee visibility={visibility} onChanged={() => void load()} />
             </div>

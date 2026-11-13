@@ -21,7 +21,10 @@ import {
   Connection,
   ConnectionList,
   ContactImport,
+  Following,
+  GitHubRoundTrip,
   Event,
+  IdentityList,
   IssuedAgentToken,
   Invite,
   Me,
@@ -39,11 +42,12 @@ import {
   WhoIsGoing,
   type BeginLinkedInPostInput,
   type ErrorKind,
+  type SignInProvider,
   type UpdateProfileInput,
   type Visibility,
 } from "@hallway/contracts";
 
-export type { SignInOptions };
+export type { SignInOptions, SignInProvider };
 
 /** What a contract schema offers here. Structural, so apps/web needs no zod import of its own. */
 export interface Schema<T> {
@@ -119,7 +123,7 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
   return {
     getEvent: (eventId: string) => request("GET", `/api/events/${encodeURIComponent(eventId)}`, Event),
 
-    /** Which ways to sign in the server offers: whether to show dev sign-in, and LinkedIn. */
+    /** Which ways to sign in the server offers: dev sign-in, and the configured providers in their order. */
     signInOptions: () => request("GET", "/api/auth/options", SignInOptions),
 
     /** `POST /api/dev/sign-in { name }` sets the session cookie. */
@@ -135,6 +139,12 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
     agentTokens: () => request("GET", "/api/me/tokens", AgentTokenList),
     issueAgentToken: (label: string) => request("POST", "/api/me/tokens", IssuedAgentToken, { label }),
     revokeAgentToken: (tokenId: string) => request("DELETE", `/api/me/tokens/${encodeURIComponent(tokenId)}`, AgentToken),
+
+    /** The providers I sign in with, oldest first; `dev` among them on a developer's machine. */
+    identities: () => request("GET", "/api/me/identities", IdentityList),
+    /** Refused (`conflict`) for my last way to sign in. */
+    unlinkIdentity: (provider: SignInProvider) =>
+      request("DELETE", `/api/me/identities/${encodeURIComponent(provider)}`, IdentityList),
 
     calendarFeed: () => request("GET", "/api/me/calendar-feed", CalendarFeed),
     rotateCalendarFeed: () => request("POST", "/api/me/calendar-feed/rotate", CalendarFeed),
@@ -164,6 +174,11 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
     /** LinkedIn's Connections.csv, as the file reads; it replaces my last upload. */
     importContacts: (csv: string) => request("POST", "/api/me/contacts", ContactImport, new RawBody(csv, "text/csv")),
     suggestions: () => request("GET", "/api/me/suggestions", SuggestionList),
+    /** Who I follow, by source; with an event, each carries how many of their sessions I may see there. */
+    following: (eventId: string) => request("GET", `/api/me/following?eventId=${encodeURIComponent(eventId)}`, Following),
+    /** Starts the GitHub round trip that reads who I follow again; the browser goes to the URL it returns. */
+    refreshGitHubFollows: (returnTo: string) =>
+      request("POST", "/api/me/following/github/refresh", GitHubRoundTrip, { returnTo }),
 
     /** Per session, my connections going. At most 200 ids a call (the contract's limit). */
     whoIsGoing: (eventId: string, sessionIds: readonly string[]) =>
@@ -203,7 +218,16 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 
 export const api = createApiClient();
 
-/** A page navigation, not a fetch, because it redirects to LinkedIn and back with a cookie. */
-/** Sign In with LinkedIn, landing back on `returnTo` (a path the server checks again) or `/`. */
-export const linkedInSignInHref = (returnTo: string | null) =>
-  returnTo === null ? "/api/auth/linkedin" : `/api/auth/linkedin?returnTo=${encodeURIComponent(returnTo)}`;
+/**
+ * Where a sign-in button goes: a page navigation, not a fetch, because it
+ * redirects to the provider and back with a cookie (ADR 0018). It lands on
+ * `returnTo` (a path the server checks again) or `/`. With `link`, the
+ * provider is added to the person signed in instead (Settings).
+ */
+export function signInHref(provider: SignInProvider, returnTo: string | null, link = false): string {
+  const query = new URLSearchParams();
+  if (returnTo !== null) query.set("returnTo", returnTo);
+  if (link) query.set("link", "1");
+  const search = query.size > 0 ? `?${query}` : "";
+  return `/api/auth/${encodeURIComponent(provider)}${search}`;
+}

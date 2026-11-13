@@ -241,13 +241,13 @@ describe("refusals that name a next step (F10)", () => {
     expect(unknown.error).toMatchObject({ kind: "not-found", message: expect.stringContaining("search_sessions") });
   });
 
-  it("says why a schedule is not visible: private, or connections only", async () => {
+  it("says why a schedule is not visible: private, or network only", async () => {
     const [ana, carol, dave] = [await signIn("Ana Silva"), await signIn("Carol Ng", "private"), await signIn("Dave Ito")];
     await connect(ana, carol);
     const privateOne = await tool(ana.id, "get_person_schedule", { eventId, handle: carol.handle });
     expect(privateOne.error?.message).toMatch(/keeps their schedule private.*connecting does not change that/);
     const notConnected = await tool(ana.id, "get_person_schedule", { eventId, handle: dave.handle });
-    expect(notConnected.error?.message).toMatch(/connections only, and you are not connected/);
+    expect(notConnected.error?.message).toMatch(/network only .*and you are not in it\. Following them does not change that/);
   });
 
   it("tells an agent with no token how to get one", async () => {

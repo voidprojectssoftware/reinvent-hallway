@@ -312,18 +312,18 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
   );
 }
 
-/** "Your connections going": a cell per person, with their Reserved or Interested badge, linking to their week. */
+/** "Your network going": a cell per person, with their Reserved or Interested badge, linking to their week. */
 function ConnectionsGoing({ people }: { people: GoingPerson[] }) {
   return (
     <section className="section">
       <h2 className="ghead">
-        Your connections going <span>{people.length}</span>
+        Your network going <span>{people.length}</span>
       </h2>
       <ul className="group">
         {people.length === 0 ? (
           <li>
             <div className="cell">
-              <span className="cellmain cellsub">None of your connections has this on their week yet.</span>
+              <span className="cellmain cellsub">No one in your network has this on their week yet.</span>
             </div>
           </li>
         ) : (

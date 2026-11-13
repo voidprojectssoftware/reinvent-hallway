@@ -261,7 +261,7 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
           type="button"
           disabled={busy}
           onClick={() => {
-            if (window.confirm(`Remove ${card.displayName} from your connections? Neither of you sees the other's connections-only week after this.`)) {
+            if (window.confirm(`Remove ${card.displayName} from your connections? You stop seeing each other's weeks, unless a week is public or the one who keeps it follows the other.`)) {
               void act(() => api.removeConnection(card.handle));
             }
           }}
@@ -357,7 +357,7 @@ function Locked({ card, standing }: { card: AttendeeCard; standing: Standing }) 
     card.visibility === "private"
       ? [`${name} keeps their week private`, `Only ${name} sees their sessions.`]
       : [
-          `${name}'s week is for connections`,
+          `${name}'s week is for their network`,
           standing.kind === "signed-out"
             ? `Sign in and connect with ${name} to see their sessions.`
             : standing.kind === "invited"

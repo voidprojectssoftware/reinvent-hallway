@@ -6,22 +6,38 @@ export type ViewerId = string | null;
 type Owner = Pick<Attendee, "id" | "visibility">;
 
 /**
+ * How the viewer stands to the owner, as far as the visibility rule cares
+ * (ADR 0019). Only the owner's own acts are here: a connection they agreed to,
+ * and a follow they made. Whether the viewer follows the owner is left out on
+ * purpose: it never lets the viewer see anything.
+ */
+export interface Tie {
+  /** A Hallway connection, which both sides agreed to. */
+  connected: boolean;
+  /** The owner follows the viewer: on GitHub, or found in the owner's own LinkedIn import. */
+  followedByOwner: boolean;
+}
+
+/** How an anonymous viewer, the owner themselves, or a stranger stands. */
+export const noTie: Tie = { connected: false, followedByOwner: false };
+
+/**
  * The one visibility rule (domain.md "Rules"). Every read path (REST, MCP,
  * calendar feed, share image, link preview) asks this and nothing else.
- * `areConnected` is whether viewer and owner are connected; the caller looks
- * it up, so this stays pure.
+ * `tie` is how the viewer stands to the owner; the caller looks it up, so
+ * this stays pure.
+ *
+ * A `network` schedule is visible to the owner, their connections, and the
+ * people they follow. Following someone never lets you see their schedule;
+ * their following you does: the owner's act is the consent, nobody else's.
  */
-export function canViewSchedule(
-  viewer: ViewerId,
-  owner: Owner,
-  areConnected: boolean,
-): boolean {
+export function canViewSchedule(viewer: ViewerId, owner: Owner, tie: Tie): boolean {
   if (viewer === owner.id) return true;
   switch (owner.visibility) {
     case "public":
       return true;
-    case "connections":
-      return viewer !== null && areConnected;
+    case "network":
+      return viewer !== null && (tie.connected || tie.followedByOwner);
     case "private":
       return false;
   }
@@ -37,9 +53,9 @@ export function visibleEntries(
   viewer: ViewerId,
   owner: Owner,
   entries: readonly PlanEntry[],
-  areConnected: boolean,
+  tie: Tie,
 ): PlanEntry[] {
-  if (!canViewSchedule(viewer, owner, areConnected)) return [];
+  if (!canViewSchedule(viewer, owner, tie)) return [];
   if (viewer === owner.id) return [...entries];
   return entries.filter((entry) => !entry.hidden);
 }
@@ -55,7 +71,7 @@ export function shareableEntries(
   viewer: ViewerId,
   owner: Owner,
   entries: readonly PlanEntry[],
-  areConnected: boolean,
+  tie: Tie,
 ): PlanEntry[] {
-  return visibleEntries(viewer, owner, entries, areConnected).filter((entry) => !entry.hidden);
+  return visibleEntries(viewer, owner, entries, tie).filter((entry) => !entry.hidden);
 }

@@ -12,6 +12,7 @@ import {
   canViewSchedule,
   eventDays as eventSpan,
   isEventDay,
+  noTie,
   postText,
   selectEntries,
   toLocal,
@@ -204,7 +205,7 @@ export function postingHandlers(dependencies: PostingDependencies): PostingHandl
         imageUrl: new URL(myShareImagePath(selection), origin).href,
         pageUrl,
         // What a stranger who opens the link sees: the one visibility rule, asked as no one.
-        linkPreviewShowsWeek: canViewSchedule(null, me, false) && week.entries.length > 0,
+        linkPreviewShowsWeek: canViewSchedule(null, me, noTie) && week.entries.length > 0,
         direct,
       });
     },
