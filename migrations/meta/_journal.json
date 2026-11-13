@@ -78,13 +78,6 @@
       "when": 1794601903393,
       "tag": "0010_add_identities",
       "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1794603222135,
-      "tag": "0011_add_follows_and_network_visibility",
-      "breakpoints": true
     }
   ]
 }
