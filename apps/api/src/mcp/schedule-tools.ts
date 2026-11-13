@@ -62,7 +62,7 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Search sessions",
       description:
-        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker) and by `day` in Las Vegas time (`2026-12-01`). Times are UTC instants. Each session's `url` opens it on the re:Invent site.",
+        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker, ignoring case and accents) and by `day` in Las Vegas time (`2026-12-01`). Times are UTC instants. Each session's `url` opens it on the re:Invent site.",
       inputSchema: SearchSessionsInput,
       outputSchema: asToolOutput(SessionList),
       annotations: { readOnlyHint: true, openWorldHint: false },
