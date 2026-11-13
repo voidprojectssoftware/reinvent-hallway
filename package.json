@@ -12,7 +12,7 @@
   "scripts": {
     "verify": "npm run verify:factory && npm run typecheck && npm run boundaries && npm test",
     "verify:factory": "node scripts/check-adr-numbers.mjs && node --test 'scripts/**/*.test.mjs'",
-    "typecheck": "npm run types:check -w @hallway/api && tsc -p tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/api/tsconfig.node.json",
+    "typecheck": "npm run types:check -w @hallway/api && tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/api/tsconfig.node.json",
     "boundaries": "depcruise apps packages",
     "test": "vitest run",
     "dev": "node apps/api/scripts/dev.mjs",

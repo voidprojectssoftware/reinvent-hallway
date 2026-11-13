@@ -33,7 +33,12 @@ const scaffold = {
   "node_modules/left-pad/index.js": "export default 1;\n",
   "node_modules/vitest/package.json": JSON.stringify({ name: "vitest", main: "index.js" }),
   "node_modules/vitest/index.js": "export const test = 1;\n",
-  "packages/domain/package.json": pkg("domain"),
+  "packages/domain/node_modules/nested/package.json": JSON.stringify({ name: "nested", main: "index.js" }),
+  "packages/domain/node_modules/nested/index.js": "export default 1;\n",
+  // packages/domain pins its own vitest, which npm installs under it.
+  "packages/domain/node_modules/vitest/package.json": JSON.stringify({ name: "vitest", main: "index.js" }),
+  "packages/domain/node_modules/vitest/index.js": "export const test = 1;\n",
+  "packages/domain/package.json": pkg("domain", { nested: "1" }),
   "packages/contracts/package.json": pkg("contracts"),
   "packages/application/package.json": pkg("application"),
   "packages/infrastructure/package.json": pkg("infrastructure", { "left-pad": "1" }),
@@ -77,6 +82,8 @@ test("each forbidden import is reported under the rule that forbids it", () => {
     "packages/domain/src/c.ts": from("node:crypto"),
     "packages/domain/src/d.ts": from("left-pad"),
     "packages/domain/src/e.test.ts": from("../../infrastructure/src/index.ts"),
+    // A package installed under the domain's own node_modules is still outside it.
+    "packages/domain/src/f.ts": from("nested"),
     // Application: never infrastructure, never an app.
     "packages/application/src/a.ts": from("../../infrastructure/src/index.ts"),
     "packages/application/src/b.ts": from("../../../apps/api/src/index.ts"),
@@ -102,6 +109,7 @@ test("each forbidden import is reported under the rule that forbids it", () => {
     "domain-imports-only-itself: packages/domain/src/b.ts -> packages/application/src/index.ts",
     "domain-imports-only-itself: packages/domain/src/c.ts -> crypto",
     "domain-imports-only-itself: packages/domain/src/d.ts -> node_modules/left-pad/index.js",
+    "domain-imports-only-itself: packages/domain/src/f.ts -> packages/domain/node_modules/nested/index.js",
     "domain-tests-import-only-domain-and-vitest: packages/domain/src/e.test.ts -> packages/infrastructure/src/index.ts",
     "no-undeclared-dependency: apps/api/src/b.ts -> node_modules/left-pad/index.js",
     "no-undeclared-dependency: packages/domain/src/d.ts -> node_modules/left-pad/index.js",

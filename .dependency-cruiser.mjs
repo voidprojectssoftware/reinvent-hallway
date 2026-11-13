@@ -11,6 +11,9 @@
 // fails on a violation.
 
 const tests = "\\.test\\.ts$";
+// The domain's own files. Not just "^packages/domain/": a package installed
+// under packages/domain/node_modules would match that and slip through.
+const domainSource = "^packages/domain/(?!node_modules/)";
 
 /** @type {import("dependency-cruiser").IConfiguration} */
 export default {
@@ -20,15 +23,15 @@ export default {
       comment:
         "packages/domain imports nothing outside itself: no other package, no app, no npm module, no Node builtin (ADR 0002).",
       severity: "error",
-      from: { path: "^packages/domain/", pathNot: tests },
-      to: { pathNot: "^packages/domain/" },
+      from: { path: domainSource, pathNot: tests },
+      to: { pathNot: domainSource },
     },
     {
       name: "domain-tests-import-only-domain-and-vitest",
       comment: "A domain test may add the test runner and nothing else.",
       severity: "error",
       from: { path: `^packages/domain/.*${tests}` },
-      to: { pathNot: ["^packages/domain/", "^node_modules/vitest/", "^node_modules/@vitest/"] },
+      to: { pathNot: [domainSource, "(^|/)node_modules/(vitest|@vitest/[^/]+)/"] },
     },
     {
       name: "application-only-domain-and-contracts",
