@@ -173,6 +173,8 @@ describe("no image URL gives the owner's week to anyone else (#70)", () => {
     const urls = [links.imageUrl, links.myImageUrl!, ...drafts, `${origin}/og/${me.handle}.png`, `${origin}/og/${me.handle}.png?day=2026-12-01`];
     const path = (url: string) => new URL(url).pathname + new URL(url).search;
 
+    // The link's version is the anonymous card's, so the card it names is current and cacheable.
+    expect((await call(path(links.imageUrl))).headers.get("cache-control")).toBe("public, max-age=86400, immutable");
     const strangersCard = await bytes(await call(`/og/${me.handle}.png`));
     const ownersWeek = await call(path(links.myImageUrl!), { as: me.id });
     expect(ownersWeek.status).toBe(200);

@@ -87,11 +87,14 @@ export function sharingHandlers(dependencies: SharingDependencies): SharingHandl
       if (actor.kind !== "attendee") return fail("unauthenticated", "Sign in first.");
       const me = await dependencies.attendees.byId(actor.attendeeId);
       if (!me) return fail("not-found", `No attendee ${actor.attendeeId}.`);
-      const mine = await shared(me.id, me);
-      if (!mine.ok) return mine;
+      // The card's version is the anonymous view's, since that is all
+      // /og/{handle}.png ever draws (#70): it moves only when what strangers
+      // see moves, and matches, so the card may be cached as current.
+      const card = await shared(null, me);
+      if (!card.ok) return card;
       const links: ShareLinks = {
         pageUrl: new URL(`/@${me.handle}`, origin).href,
-        imageUrl: new URL(shareImagePath(me.handle, mine.value.version), origin).href,
+        imageUrl: new URL(shareImagePath(me.handle, card.value.version), origin).href,
       };
       // The feed URL and the invite link are credentials: only for a person
       // signed in (ADR 0008), never for an agent token.

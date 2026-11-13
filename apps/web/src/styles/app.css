@@ -315,6 +315,7 @@ body.loading main {
 }
 .ico.brand.github {
   color: #1f2328;
+}
 
 /* The composer (ADR 0026). The picture for the selection, as large as the
    column allows, at the card's own ratio so nothing jumps when it loads. */
