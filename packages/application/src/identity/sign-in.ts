@@ -1,18 +1,25 @@
-// SignIn (domain.md): a verified identity in, a web session out. LinkedIn and
-// dev sign-in both end here, so an attendee is created, and refreshed, in one
-// place whichever door was used.
-import type { DevSignInInput, Me, SignInOptions } from "@hallway/contracts";
+// SignIn and LinkIdentity (domain.md, ADR 0018): a verified identity in, a web
+// session (or a linked identity) out. Every provider and dev sign-in end here,
+// so an attendee is created, refreshed and refused in one place whichever door
+// was used.
+import type { DevSignInInput, Identity, Me, SignInOptions, SignInProvider } from "@hallway/contracts";
+import { signInProviders } from "@hallway/contracts";
 import { handleFromName, hashEmail, normalizeName, placeholderHandle } from "@hallway/domain";
+import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
+import { personAtKeyboard } from "./person-at-keyboard.ts";
 import type {
   AttendeeRecord,
   AttendeeRepository,
-  IdentityProvider,
+  IdentityKind,
+  IdentityProviders,
+  IdentityRecord,
+  RecordGitHubFollowing,
   VerifiedIdentity,
   WebSessionRepository,
 } from "./ports.ts";
 import { randomSecret, sha256Hex } from "./secrets.ts";
-import { toMe } from "./views.ts";
+import { toIdentity, toMe } from "./views.ts";
 
 export const sessionLifetimeDays = 30;
 
@@ -22,39 +29,76 @@ export interface SignedIn {
   session: { secret: string; expiresAt: string };
 }
 
-export type SignIn = (identity: VerifiedIdentity) => Promise<Outcome<SignedIn>>;
+/** The callback either signed someone in or added an identity to the person already signed in. */
+export type Completed = ({ mode: "signed-in" } & SignedIn) | { mode: "linked"; identity: Identity };
+
 export type DevSignIn = (input: DevSignInInput) => Promise<Outcome<SignedIn>>;
-export type BeginLinkedInSignIn = (input: { redirectUri: string }) => Promise<
-  Outcome<{ authorizationUrl: string; state: string }>
->;
-export type CompleteLinkedInSignIn = (input: {
+export type BeginSignIn = (input: {
+  actor: Actor;
+  provider: SignInProvider;
+  /** Add this provider to the signed-in person rather than sign in with it. */
+  link: boolean;
+  redirectUri: string;
+}) => Promise<Outcome<{ authorizationUrl: string; state: string; linkFor?: string }>>;
+export type CompleteSignIn = (input: {
+  actor: Actor;
+  /** From the callback's path, never from the state cookie. */
+  provider: SignInProvider;
   code?: string | undefined;
   state?: string | undefined;
   /** The state the browser's short-lived cookie holds; absent when it has none. */
   expectedState?: string | undefined;
+  /** The attendee a link round trip was started for, from the same cookie. */
+  linkFor?: string | undefined;
   error?: string | undefined;
   redirectUri: string;
-}) => Promise<Outcome<SignedIn>>;
+}) => Promise<Outcome<Completed>>;
 export type SignOut = (input: { sessionSecret: string }) => Promise<Outcome<Record<string, never>>>;
 /** `devSignIn` is the interface's answer: only it knows the bindings and the host. */
 export type GetSignInOptions = (input: { devSignIn: boolean }) => Promise<Outcome<SignInOptions>>;
 
-export function getSignInOptions(provider: IdentityProvider | undefined): GetSignInOptions {
-  return async ({ devSignIn }) => ok({ devSignIn, linkedIn: provider !== undefined });
+export const providerTitle: Record<IdentityKind, string> = {
+  google: "Google",
+  microsoft: "Microsoft",
+  linkedin: "LinkedIn",
+  github: "GitHub",
+  dev: "dev sign-in",
+};
+
+export function getSignInOptions(providers: IdentityProviders): GetSignInOptions {
+  return async ({ devSignIn }) => {
+    const configured = signInProviders.filter((provider) => providers[provider] !== undefined);
+    return ok({ devSignIn, providers: configured, linkedIn: configured.includes("linkedin") });
+  };
 }
 
-export function signIn(
-  attendees: AttendeeRepository,
-  sessions: WebSessionRepository,
-  now: () => Date,
-): SignIn {
-  return async (identity) => {
-    const known = await attendees.byLinkedinSub(identity.subject);
-    const attendee = known
-      ? await refreshed(known, identity)
-      : await created(identity, await freeHandle(attendees, identity.name), now());
-    if (known) await attendees.save(attendee);
-    else await attendees.create(attendee);
+interface SignInPorts {
+  attendees: AttendeeRepository;
+  sessions: WebSessionRepository;
+  recordGitHubFollowing: RecordGitHubFollowing;
+  now: () => Date;
+}
+
+/** Signs in as whoever owns this identity, or creates them, unless their verified email is someone else's. */
+function signInWith({ attendees, sessions, recordGitHubFollowing, now }: SignInPorts) {
+  return async (kind: IdentityKind, identity: VerifiedIdentity): Promise<Outcome<SignedIn>> => {
+    const known = await attendees.identity(kind, identity.subject);
+    let attendee: AttendeeRecord;
+    if (known) {
+      const stored = await attendees.byId(known.attendeeId);
+      if (!stored) return fail("not-found", `No attendee ${known.attendeeId}.`);
+      const [first] = await attendees.identitiesOf(stored.id);
+      attendee = refreshed(stored, identity, first?.provider === kind);
+      await attendees.saveIdentity(await identityRecord(stored.id, kind, identity, known.linkedAt));
+      await attendees.save(attendee);
+    } else {
+      const refused = await emailBelongsToSomeoneElse(attendees, kind, identity);
+      if (refused) return refused;
+      const at = now();
+      attendee = created(identity, await freeHandle(attendees, identity.name), at);
+      await attendees.create(attendee, await identityRecord(attendee.id, kind, identity, at.toISOString()));
+    }
+    if (identity.following) await recordGitHubFollowing({ attendeeId: attendee.id, following: identity.following });
 
     const secret = randomSecret();
     const createdAt = now();
@@ -70,42 +114,123 @@ export function signIn(
 }
 
 /**
- * Dev sign-in: believes the name it is given. The interface offers it only
- * when DEV_SIGN_IN is on (ADR 0004). The same name signs in as the same
- * attendee, so a dev can come back to their data.
+ * No merge by email (ADR 0018): a new identity whose verified email is
+ * already some attendee's verified email neither signs in to that account
+ * nor makes a second one. An email is not proof two accounts are one person.
  */
-export function devSignIn(signInWith: SignIn): DevSignIn {
-  return ({ name }) =>
-    signInWith({ subject: `dev:${normalizeName(name)}`, name, emailVerified: false });
-}
-
-export function beginLinkedInSignIn(provider: IdentityProvider | undefined): BeginLinkedInSignIn {
-  return async ({ redirectUri }) => {
-    if (!provider) return notConfigured();
-    const state = randomSecret();
-    return ok({ authorizationUrl: provider.authorizationUrl({ state, redirectUri }), state });
-  };
+async function emailBelongsToSomeoneElse(
+  attendees: AttendeeRepository,
+  kind: IdentityKind,
+  identity: VerifiedIdentity,
+): Promise<Outcome<never> | undefined> {
+  if (!identity.emailVerified || !identity.email) return undefined;
+  const holder = await attendees.identityWithVerifiedEmail(await hashEmail(identity.email));
+  if (!holder) return undefined;
+  return fail(
+    "account-exists",
+    `There is already a Hallway account for this email. Sign in the way you did before, then add ${providerTitle[kind]} in Settings.`,
+  );
 }
 
 /**
- * The OAuth callback. `state` must equal the one this browser was given at
- * the start (held in a short-lived cookie), which is what makes a callback
- * started in someone else's browser useless here.
+ * LinkIdentity: adds this provider account to the person signed in. Refused
+ * when the account is someone else's (no silent merge) or when they already
+ * have a different account of the same provider.
  */
-export function completeLinkedInSignIn(
-  provider: IdentityProvider | undefined,
-  signInWith: SignIn,
-): CompleteLinkedInSignIn {
-  return async ({ code, state, expectedState, error, redirectUri }) => {
-    if (!provider) return notConfigured();
-    if (!expectedState || state !== expectedState) {
-      return fail("forbidden", "This sign-in was not started in this browser, or took too long. Start again.");
+function linkTo({ attendees, recordGitHubFollowing, now }: SignInPorts) {
+  return async (attendeeId: string, kind: SignInProvider, identity: VerifiedIdentity): Promise<Outcome<Completed>> => {
+    const owner = await attendees.identity(kind, identity.subject);
+    if (owner && owner.attendeeId !== attendeeId) {
+      return fail(
+        "conflict",
+        `This ${providerTitle[kind]} account is already linked to another Hallway account. Sign in with it to use that account.`,
+      );
     }
-    if (error) return fail("unauthenticated", `LinkedIn did not sign you in (${error}).`);
-    if (!code) return fail("invalid", "The callback carries no authorization code.");
-    const identity = await provider.identify({ code, redirectUri });
-    if (!identity) return fail("unauthenticated", "LinkedIn did not accept the authorization code.");
-    return signInWith(identity);
+    let record: IdentityRecord;
+    if (owner) {
+      record = await identityRecord(attendeeId, kind, identity, owner.linkedAt);
+      await attendees.saveIdentity(record);
+    } else {
+      const mine = await attendees.identitiesOf(attendeeId);
+      if (mine.some((linked) => linked.provider === kind)) {
+        return fail(
+          "conflict",
+          `You already have a different ${providerTitle[kind]} account linked. Remove it in Settings before adding this one.`,
+        );
+      }
+      record = await identityRecord(attendeeId, kind, identity, now().toISOString());
+      await attendees.link(record);
+    }
+    if (identity.following) await recordGitHubFollowing({ attendeeId, following: identity.following });
+    return ok({ mode: "linked", identity: toIdentity(record) });
+  };
+}
+
+export interface SignInHandlers {
+  devSignIn: DevSignIn;
+  beginSignIn: BeginSignIn;
+  completeSignIn: CompleteSignIn;
+}
+
+export function signInHandlers(providers: IdentityProviders, ports: SignInPorts): SignInHandlers {
+  const signIn = signInWith(ports);
+  const link = linkTo(ports);
+  const notConfigured = (provider: SignInProvider) =>
+    fail("not-found", `${providerTitle[provider]} sign-in is not configured here (no ${provider.toUpperCase()}_CLIENT_ID).`);
+
+  return {
+    /**
+     * Dev sign-in: believes the name it is given. The interface offers it
+     * only when DEV_SIGN_IN is on (ADR 0004). The same name signs in as the
+     * same attendee, so a dev can come back to their data.
+     */
+    devSignIn: ({ name }) => signIn("dev", { subject: normalizeName(name), name, emailVerified: false }),
+
+    async beginSignIn({ actor, provider, link: linking, redirectUri }) {
+      const adapter = providers[provider];
+      if (!adapter) return notConfigured(provider);
+      let linkFor: string | undefined;
+      if (linking) {
+        const person = personAtKeyboard(actor);
+        if (!person.ok) return person;
+        linkFor = person.value;
+      }
+      const state = randomSecret();
+      return ok({
+        authorizationUrl: adapter.authorizationUrl({ state, redirectUri }),
+        state,
+        ...(linkFor !== undefined && { linkFor }),
+      });
+    },
+
+    /**
+     * The OAuth callback. `state` must equal the one this browser was given
+     * at the start (held in a short-lived cookie), which is what makes a
+     * callback started in someone else's browser useless here. A link round
+     * trip must also end with the same person signed in who started it.
+     */
+    async completeSignIn({ actor, provider, code, state, expectedState, linkFor, error, redirectUri }) {
+      const adapter = providers[provider];
+      if (!adapter) return notConfigured(provider);
+      if (!expectedState || state !== expectedState) {
+        return fail("forbidden", "This sign-in was not started in this browser, or took too long. Start again.");
+      }
+      if (linkFor !== undefined) {
+        const person = personAtKeyboard(actor);
+        if (!person.ok) return person;
+        if (person.value !== linkFor) {
+          return fail("forbidden", "You are signed in as someone else than when you started. Start again from Settings.");
+        }
+      }
+      const title = providerTitle[provider];
+      if (error) return fail("unauthenticated", `${title} did not sign you in (${error}).`);
+      if (!code) return fail("invalid", "The callback carries no authorization code.");
+      const identity = await adapter.identify({ code, redirectUri });
+      if (!identity) return fail("unauthenticated", `${title} did not accept the authorization code.`);
+      if (linkFor !== undefined) return link(linkFor, provider, identity);
+      const signedIn = await signIn(provider, identity);
+      return signedIn.ok ? ok({ mode: "signed-in", ...signedIn.value }) : signedIn;
+    },
   };
 }
 
@@ -115,9 +240,6 @@ export function signOut(sessions: WebSessionRepository): SignOut {
     return ok({});
   };
 }
-
-const notConfigured = () =>
-  fail("not-found", "LinkedIn sign-in is not configured here (no LINKEDIN_CLIENT_ID).");
 
 interface NewHandle {
   handle: string;
@@ -135,16 +257,33 @@ async function freeHandle(attendees: AttendeeRepository, name: string): Promise<
   }
 }
 
-/** LinkedIn's verified facts. The email is kept only when LinkedIn says it is verified. */
-async function verifiedFacts(identity: VerifiedIdentity) {
-  const email = identity.emailVerified ? identity.email : undefined;
+async function identityRecord(
+  attendeeId: string,
+  provider: IdentityKind,
+  identity: VerifiedIdentity,
+  linkedAt: string,
+): Promise<IdentityRecord> {
+  const { email } = identity;
+  const verified = identity.emailVerified && email !== undefined;
   return {
-    verifiedName: identity.name,
-    ...(email ? { email, verifiedEmailSha256: await hashEmail(email) } : {}),
+    attendeeId,
+    provider,
+    subject: identity.subject,
+    ...(email !== undefined && { email }),
+    emailVerified: verified,
+    ...(verified && { verifiedEmailSha256: await hashEmail(email) }),
+    ...(identity.username !== undefined && { username: identity.username }),
+    linkedAt,
   };
 }
 
-async function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle, at: Date): Promise<AttendeeRecord> {
+/** The first identity's verified facts. The email is kept only when the provider says it is verified. */
+function verifiedFacts(identity: VerifiedIdentity) {
+  const email = identity.emailVerified ? identity.email : undefined;
+  return { verifiedName: identity.name, ...(email ? { email } : {}) };
+}
+
+function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle, at: Date): AttendeeRecord {
   return {
     id: crypto.randomUUID(),
     handle,
@@ -152,18 +291,24 @@ async function created(identity: VerifiedIdentity, { handle, placeholder }: NewH
     displayName: identity.name,
     ...(identity.picture ? { avatarUrl: identity.picture } : {}),
     visibility: "connections",
-    linkedinSub: identity.subject,
-    ...(await verifiedFacts(identity)),
+    ...verifiedFacts(identity),
     createdAt: at.toISOString(),
   };
 }
 
-/** A returning attendee: LinkedIn's facts are refreshed, what they typed is kept. */
-async function refreshed(known: AttendeeRecord, identity: VerifiedIdentity): Promise<AttendeeRecord> {
-  const { email: _email, verifiedEmailSha256: _hash, verifiedName: _name, ...kept } = known;
+/**
+ * A returning attendee. Their first identity's facts are refreshed (ADR
+ * 0018: the verified name comes from the first identity); another identity
+ * only fills a missing picture. What they typed is kept either way.
+ */
+function refreshed(known: AttendeeRecord, identity: VerifiedIdentity, isFirst: boolean): AttendeeRecord {
+  if (!isFirst) {
+    return !known.avatarUrl && identity.picture ? { ...known, avatarUrl: identity.picture } : known;
+  }
+  const { email: _email, verifiedName: _name, ...kept } = known;
   return {
     ...kept,
     ...(identity.picture ? { avatarUrl: identity.picture } : {}),
-    ...(await verifiedFacts(identity)),
+    ...verifiedFacts(identity),
   };
 }

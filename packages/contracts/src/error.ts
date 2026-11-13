@@ -11,6 +11,9 @@ export const ErrorKind = z.enum([
   "forbidden",
   "not-found",
   "conflict",
+  // A sign-in whose verified email already belongs to another account (ADR
+  // 0018): its own kind so the web can show "sign in the way you did before".
+  "account-exists",
   "unavailable",
 ]);
 export type ErrorKind = z.infer<typeof ErrorKind>;

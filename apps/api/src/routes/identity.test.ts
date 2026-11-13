@@ -8,9 +8,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { AgentTokenList, CalendarFeed, IssuedAgentToken, Me } from "@hallway/contracts";
 import { createApp } from "../app.ts";
+import { Browser, origin } from "../testing/browser.ts";
 import { inMemoryHandlers } from "../testing/in-memory-handlers.ts";
 
-const origin = "http://127.0.0.1:8787";
 
 /** The handlers this file does not exercise, so the app has every one it needs. */
 function otherHandlers() {
@@ -21,35 +21,12 @@ const renderPng = async () => new Uint8Array();
 
 function world(bindings: { DEV_SIGN_IN?: string } = { DEV_SIGN_IN: "1" }) {
   const linkedIn = fakeLinkedIn();
-  const identity = identityHandlers(identityInMemory({ linkedIn: linkedInOidc(linkedIn) }));
+  const identity = identityHandlers(identityInMemory({ providers: { linkedin: linkedInOidc(linkedIn) } }));
   const others = otherHandlers();
   const app = createApp<typeof bindings>({ handlers: () => ({ ...others, identity }), renderPng });
   const call = async (input: string | URL | Request, init?: RequestInit) =>
     app.fetch(new Request(input, init), bindings);
   return { linkedIn, call };
-}
-
-/** A browser's cookie jar, reduced to what these routes set: name=value pairs. */
-class Browser {
-  private jar = new Map<string, string>();
-  constructor(private readonly call: (input: string, init?: RequestInit) => Promise<Response>) {}
-
-  async fetch(path: string, init: RequestInit = {}) {
-    const headers = new Headers(init.headers);
-    if (this.jar.size) headers.set("cookie", [...this.jar].map(([k, v]) => `${k}=${v}`).join("; "));
-    const response = await this.call(path.startsWith("http") ? path : `${origin}${path}`, { ...init, headers });
-    for (const cookie of response.headers.getSetCookie()) {
-      const [pair = ""] = cookie.split(";");
-      const [name = "", value = ""] = pair.split("=");
-      if (value === "" || /max-age=0/i.test(cookie)) this.jar.delete(name);
-      else this.jar.set(name, value);
-    }
-    return response;
-  }
-
-  cookie(name: string) {
-    return this.jar.get(name);
-  }
 }
 
 const postJson = (body: unknown, method = "POST"): RequestInit => ({
@@ -67,19 +44,20 @@ async function devSignedIn(name = "Jane Doe") {
 }
 
 describe("GET /api/auth/options", () => {
-  it("offers dev sign-in only where it is allowed, and LinkedIn only when configured", async () => {
+  it("offers dev sign-in only where it is allowed, and a provider only when configured", async () => {
     const options = async (call: (input: string) => Promise<Response>, url = `${origin}/api/auth/options`) =>
       (await call(url)).json();
-    expect(await options(world().call)).toEqual({ devSignIn: true, linkedIn: true });
-    expect(await options(world({}).call)).toEqual({ devSignIn: false, linkedIn: true });
-    expect(await options(world().call, "https://hallway.example/api/auth/options")).toEqual({ devSignIn: false, linkedIn: true });
+    const linkedInOnly = { providers: ["linkedin"], linkedIn: true };
+    expect(await options(world().call)).toEqual({ devSignIn: true, ...linkedInOnly });
+    expect(await options(world({}).call)).toEqual({ devSignIn: false, ...linkedInOnly });
+    expect(await options(world().call, "https://hallway.example/api/auth/options")).toEqual({ devSignIn: false, ...linkedInOnly });
 
     const unconfigured = createApp<object>({
       handlers: () => ({ ...otherHandlers(), identity: identityHandlers(identityInMemory()) }),
       renderPng,
     });
     const response = await unconfigured.fetch(new Request(`${origin}/api/auth/options`), {});
-    expect(await response.json()).toEqual({ devSignIn: false, linkedIn: false });
+    expect(await response.json()).toEqual({ devSignIn: false, providers: [], linkedIn: false });
   });
 });
 
@@ -162,13 +140,14 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
     expect(me).toMatchObject({ handle: "jane-doe", verifiedName: "Jane Doe", email: "jane@example.com" });
   });
 
-  it("refuses a callback in a browser that did not start the sign-in", async () => {
+  it("refuses a callback in a browser that did not start the sign-in, sending it to the sign-in screen", async () => {
     const { linkedIn, call } = world();
     const victim = new Browser(call);
     const { state, redirectUri } = await startAt(new Browser(call));
     const code = linkedIn.issueCode(jane, redirectUri);
     const forged = await victim.fetch(`/api/auth/linkedin/callback?code=${code}&state=${state}`);
-    expect(forged.status).toBe(403);
+    expect(forged.status).toBe(302);
+    expect(forged.headers.get("location")).toBe("/sign-in?error=forbidden&provider=linkedin");
     expect(victim.cookie("hallway_session")).toBeUndefined();
   });
 
@@ -177,9 +156,10 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
     const browser = new Browser(call);
     const { state, redirectUri } = await startAt(browser);
     const wrong = await browser.fetch(`/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=other`);
-    expect(wrong.status).toBe(403);
+    expect(wrong.headers.get("location")).toBe("/sign-in?error=forbidden&provider=linkedin");
     const replay = await browser.fetch(`/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=${state}`);
-    expect(replay.status).toBe(403);
+    expect(replay.headers.get("location")).toBe("/sign-in?error=forbidden&provider=linkedin");
+    expect(browser.cookie("hallway_session")).toBeUndefined();
   });
 
   it("comes back to the returnTo the sign-in started with, once", async () => {
@@ -215,7 +195,7 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
   it("goes to / when the state cookie's return path was tampered with", async () => {
     const { linkedIn, call } = world();
     const { state, redirectUri } = await startAt(new Browser(call), "/@sam");
-    const forged = `${state}|//evil.example/`;
+    const forged = `${state}||//evil.example/`;
     const back = await call(`${origin}/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=${state}`, {
       headers: { cookie: `hallway_oauth_state=${encodeURIComponent(forged)}` },
     });

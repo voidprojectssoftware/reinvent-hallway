@@ -128,9 +128,11 @@ you started), never with a pattern that matches other worktrees' servers.
   `/api` and `/mcp`. `Authorization: Bearer dev:<attendeeId>` still acts as
   that attendee without a sign-in. Dev sign-in and the `dev:` bearer work only
   with `DEV_SIGN_IN=1` in `apps/api/.dev.vars` (copied from
-  `.dev.vars.example` on first run) and only on a loopback host. LinkedIn
-  sign-in answers 404 until `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`
-  are set there. In application tests, build an `Actor` directly:
+  `.dev.vars.example` on first run) and only on a loopback host. Each of
+  Google, Microsoft, LinkedIn and GitHub sign-in answers 404 until its
+  `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET` are set there
+  (ADR 0018); each is tested against its fake in
+  `packages/infrastructure/src/identity/fake-*.ts`, never a real provider. In application tests, build an `Actor` directly:
   `{ kind: "attendee", attendeeId, via: "session" }`. An agent token
   (`via: "agent-token"`) is refused (403) on token management and the
   calendar feed, so get those with the cookie, not the token.

@@ -9,13 +9,17 @@ import {
   scheduleHandlers,
   sharingHandlers,
   type AreConnected,
+  type IdentityProviders,
 } from "@hallway/application";
 import {
   agentTokensOnD1,
   attendeesOnD1,
   calendarFeedsOnD1,
   eventsOnD1,
+  gitHubOAuth,
+  googleOidc,
   linkedInOidc,
+  microsoftOidc,
   networkOnD1,
   openDatabase,
   scheduleOnD1,
@@ -24,6 +28,26 @@ import {
 import { createApp, type Handlers } from "./app.ts";
 import { isPersonPage, personPage } from "./person-page.ts";
 import { renderPng } from "./sharing/worker-renderer.ts";
+
+/**
+ * Each provider is on when both its client id and secret are set (in
+ * .dev.vars locally, as Worker secrets when deployed); off, its sign-in
+ * answers 404 and `GET /api/auth/options` leaves it out.
+ */
+function signInProviders(env: Env): IdentityProviders {
+  const client = (clientId: string | undefined, clientSecret: string | undefined) =>
+    clientId && clientSecret ? { clientId, clientSecret } : undefined;
+  const google = client(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  const microsoft = client(env.MICROSOFT_CLIENT_ID, env.MICROSOFT_CLIENT_SECRET);
+  const linkedin = client(env.LINKEDIN_CLIENT_ID, env.LINKEDIN_CLIENT_SECRET);
+  const github = client(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET);
+  return {
+    ...(google && { google: googleOidc(google) }),
+    ...(microsoft && { microsoft: microsoftOidc(microsoft) }),
+    ...(linkedin && { linkedin: linkedInOidc(linkedin) }),
+    ...(github && { github: gitHubOAuth(github) }),
+  };
+}
 
 function handlersFor(env: Env): Handlers {
   const db = openDatabase(env.DB);
@@ -45,11 +69,8 @@ function handlersFor(env: Env): Handlers {
       webSessions: webSessionsOnD1(db),
       calendarFeeds,
       areConnected,
-      // LinkedIn sign-in is off until the owner's LinkedIn app supplies these.
-      linkedIn:
-        env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET
-          ? linkedInOidc({ clientId: env.LINKEDIN_CLIENT_ID, clientSecret: env.LINKEDIN_CLIENT_SECRET })
-          : undefined,
+      providers: signInProviders(env),
+      // GitHub's following list is dropped until #63 stores follows (ADR 0019).
     }),
     ...scheduleHandlers({
       events,

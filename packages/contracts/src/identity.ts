@@ -3,7 +3,7 @@
 //
 // Two shapes of an attendee, on purpose: `Me` carries my private fields and is
 // only ever returned to me; `AttendeeCard` is what anyone else may see and has
-// no field that could carry `email`, `linkedinSub` or `verifiedName`.
+// no field that could carry `email`, an identity or `verifiedName`.
 import { z } from "zod";
 
 export const Visibility = z
@@ -40,8 +40,11 @@ export const Me = z
     verifiedName: z
       .string()
       .optional()
-      .meta({ description: "The name LinkedIn verified at sign-in. Not editable." }),
-    email: z.string().optional().meta({ description: "Present only when LinkedIn said it is verified." }),
+      .meta({ description: "The name the first sign-in provider gave (GitHub: the login when it has no name). Not editable." }),
+    email: z
+      .string()
+      .optional()
+      .meta({ description: "The first sign-in's email, present only when that provider said it is verified." }),
   })
   .meta({ id: "Me", description: "The signed-in attendee, with private fields." });
 export type Me = z.infer<typeof Me>;
@@ -71,10 +74,22 @@ export type UpdateProfileInput = z.infer<typeof UpdateProfileInput>;
 export const SetVisibilityInput = z.object({ visibility: Visibility }).meta({ id: "SetVisibility" });
 export type SetVisibilityInput = z.infer<typeof SetVisibilityInput>;
 
+/** The providers a person can sign in with, in the order a sign-in screen lists them (ADR 0018). */
+export const signInProviders = ["google", "microsoft", "linkedin", "github"] as const;
+export const SignInProvider = z
+  .enum(signInProviders)
+  .meta({ id: "SignInProvider", description: "A provider a person signs in with." });
+export type SignInProvider = z.infer<typeof SignInProvider>;
+
 export const SignInOptions = z
   .object({
     devSignIn: z.boolean().meta({ description: "Dev sign-in by name is on: DEV_SIGN_IN=1 and a loopback host." }),
-    linkedIn: z.boolean().meta({ description: "Sign In with LinkedIn is configured." }),
+    providers: z.array(SignInProvider).meta({
+      description: "The providers configured here, in the order Google, Microsoft, LinkedIn, GitHub. Each starts at `GET /api/auth/{provider}`.",
+    }),
+    linkedIn: z
+      .boolean()
+      .meta({ description: "Deprecated: `providers` includes `linkedin`. Kept until the sign-in screen reads `providers` (#61)." }),
   })
   .meta({ id: "SignInOptions", description: "Which ways to sign in this server offers." });
 export type SignInOptions = z.infer<typeof SignInOptions>;
@@ -85,6 +100,25 @@ export const DevSignInInput = z
 export type DevSignInInput = z.infer<typeof DevSignInInput>;
 
 const instant = z.string().meta({ description: "ISO-8601 UTC instant." });
+
+export const Identity = z
+  .object({
+    provider: z.enum([...signInProviders, "dev"]).meta({
+      description: "Who vouches for this way in. `dev` is local dev sign-in by name, never offered on a deployed server.",
+    }),
+    email: z.string().optional().meta({ description: "The email the provider gave, verified or not." }),
+    emailVerified: z.boolean().meta({ description: "The provider vouched for the email (ADR 0018: Microsoft only with `xms_edov` or a personal account)." }),
+    username: z.string().optional().meta({ description: "The GitHub login. Only GitHub has one.", example: "octocat" }),
+    linkedAt: instant,
+  })
+  .meta({ id: "Identity", description: "One provider account I sign in with. Each provider at most once." });
+export type Identity = z.infer<typeof Identity>;
+
+export const IdentityList = z.object({ identities: z.array(Identity) }).meta({ id: "IdentityList" });
+export type IdentityList = z.infer<typeof IdentityList>;
+
+export const UnlinkIdentityInput = z.object({ provider: SignInProvider });
+export type UnlinkIdentityInput = z.infer<typeof UnlinkIdentityInput>;
 
 export const AgentToken = z
   .object({

@@ -130,7 +130,6 @@ describe("suggestions", () => {
     handlePlaceholder: false,
     displayName: id,
     visibility: "connections",
-    linkedinSub: `sub-${id}`,
     ...extra,
   });
   const contact = (extra: Partial<ImportedContact>): ImportedContact => ({ name: "", ...extra });
@@ -186,7 +185,14 @@ describe("suggestions", () => {
   });
 
   it("a verified email hash suggests on its own", () => {
-    const candidate: SuggestionCandidate = { attendee: attendee("e"), verifiedEmailSha256: JANE_HASH };
+    const candidate: SuggestionCandidate = { attendee: attendee("e"), verifiedEmailSha256s: [JANE_HASH] };
+    expect(suggestions([contact({ emailSha256: JANE_HASH })], [candidate])).toEqual([
+      { attendee: candidate.attendee, reason: "email" },
+    ]);
+  });
+
+  it("any of the attendee's verified identity emails suggests", () => {
+    const candidate: SuggestionCandidate = { attendee: attendee("two"), verifiedEmailSha256s: ["other-hash", JANE_HASH] };
     expect(suggestions([contact({ emailSha256: JANE_HASH })], [candidate])).toEqual([
       { attendee: candidate.attendee, reason: "email" },
     ]);
@@ -195,7 +201,7 @@ describe("suggestions", () => {
   it("an attendee matched both ways is suggested once, for the email", () => {
     const found = suggestions(
       [contact({ profileUrl: "linkedin.com/in/jane-doe-1234", name: "jane doe", emailSha256: JANE_HASH })],
-      [{ attendee: jane, verifiedEmailSha256: JANE_HASH }],
+      [{ attendee: jane, verifiedEmailSha256s: [JANE_HASH] }],
     );
     expect(found).toEqual([{ attendee: jane, reason: "email" }]);
   });
