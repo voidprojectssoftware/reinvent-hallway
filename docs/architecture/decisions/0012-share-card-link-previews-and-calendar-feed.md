@@ -82,8 +82,8 @@ the Worker; these are the choices it left open.
   request. **Deploying this needs Workers Paid** (30 s of CPU by default), or
   a cache in front so a card is drawn once per version. Nothing is deployed,
   so that choice waits for the owner.
-- **Cost of the fallbacks, measured 2026-11-13.** Upload 5,338.07 KiB (1,695.79
-  KiB gzipped) before, 5,404.96 KiB (1,640.04 KiB gzipped) after: the three
+- **Cost of the fallbacks, measured 2026-11-13.** Upload 5,400.43 KiB (1,708.80
+  KiB gzipped) before, 5,467.34 KiB (1,654.48 KiB gzipped) after: the three
   Latin Extended files left the bundle and the four `unicode.json` indexes
   came in. A Latin card renders as before (Node, median of 60: 60.2 to 61.0
   ms before, 61.2 to 63.2 ms after, within the noise of a shared machine;
