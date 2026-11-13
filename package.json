@@ -2,8 +2,27 @@
   "name": "reinvent-hallway",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "verify": "node scripts/check-adr-numbers.mjs && node --test 'scripts/**/*.test.mjs'"
+    "verify": "npm run verify:factory && npm run typecheck && npm run boundaries && npm test",
+    "verify:factory": "node scripts/check-adr-numbers.mjs && node --test 'scripts/**/*.test.mjs'",
+    "typecheck": "npm run types:check -w @hallway/api && tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/api/tsconfig.node.json",
+    "boundaries": "depcruise apps packages",
+    "test": "vitest run",
+    "dev": "node apps/api/scripts/dev.mjs",
+    "db:generate": "node scripts/generate-migration.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "dependency-cruiser": "18.7.0",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
   }
 }

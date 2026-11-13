@@ -1,0 +1,15 @@
+// Every workspace except two with their own programs: apps/api, which runs on
+// Workers (apps/api/tsconfig.json for the Worker, tsconfig.node.json for its
+// tests), and packages/domain, which declares the few runtime globals it may
+// use (src/runtime.d.ts) and would collide with Node's. `npm run typecheck`
+// runs all four. Packages get
+// Node's types because their tests and the local D1 helper run under Node;
+// what reaches the Worker is checked again, without them, by apps/api.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["packages/*/src", "packages/*/*.ts", "*.ts"],
+  "exclude": ["packages/domain"]
+}
