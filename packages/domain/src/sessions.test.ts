@@ -1,0 +1,172 @@
+import { describe, expect, it } from "vitest";
+import { mergeSnapshot, sessionUrl, toSession, type AwsSession } from "./sessions";
+import { toLocal } from "./time";
+import type { Session } from "./types";
+
+const reinvent = { eventId: "reinvent2026", timezone: "America/Los_Angeles" };
+
+function timed(date: string, time: string | undefined, length: string | undefined, extra: Partial<AwsSession> = {}): Session {
+  const sessionTime: NonNullable<AwsSession["sessionTime"]> = { date };
+  if (time !== undefined) sessionTime.time = time;
+  if (length !== undefined) sessionTime.length = length;
+  return toSession({ sessionId: "s1", sessionTime, ...extra }, reinvent);
+}
+
+describe("toSession: local date, time and length to UTC instants", () => {
+  // Each row is a case in the PR's time-conversion table.
+  it.each([
+    ["morning", "2026-12-01", "08:00", "60", "2026-12-01T16:00:00.000Z", "2026-12-01T17:00:00.000Z"],
+    ["16:00 local is UTC midnight", "2026-12-01", "16:00", "60", "2026-12-02T00:00:00.000Z", "2026-12-02T01:00:00.000Z"],
+    ["90 minutes across UTC midnight", "2026-12-02", "15:30", "90", "2026-12-02T23:30:00.000Z", "2026-12-03T01:00:00.000Z"],
+    ["23:30 local, ends after local midnight", "2026-12-03", "23:30", "60", "2026-12-04T07:30:00.000Z", "2026-12-04T08:30:00.000Z"],
+    ["first session of the week", "2026-11-30", "05:30", "30", "2026-11-30T13:30:00.000Z", "2026-11-30T14:00:00.000Z"],
+    ["length with spaces", "2026-12-01", "09:15", " 45 ", "2026-12-01T17:15:00.000Z", "2026-12-01T18:00:00.000Z"],
+  ])("%s", (_name, date, time, length, startsAt, endsAt) => {
+    const session = timed(date, time, length);
+    expect(session.startsAt).toBe(startsAt);
+    expect(session.endsAt).toBe(endsAt);
+  });
+
+  it("uses the zone's rules, not a fixed offset: July is PDT (UTC-7)", () => {
+    expect(timed("2026-07-01", "16:00", "60").startsAt).toBe("2026-07-01T23:00:00.000Z");
+  });
+
+  it("ignores the abbreviation AWS sends: 'PDT' in December is still PST", () => {
+    const session = toSession(
+      { sessionId: "s1", sessionTime: { date: "2026-12-01", time: "16:00", length: "60", timezone: "PDT" } },
+      reinvent,
+    );
+    expect(session.startsAt).toBe("2026-12-02T00:00:00.000Z");
+  });
+
+  it("places an all-day session from local midnight to the next local midnight", () => {
+    const session = timed("2026-12-02", undefined, undefined, { isAllDaySession: true });
+    expect(session).toMatchObject({
+      isAllDay: true,
+      startsAt: "2026-12-02T08:00:00.000Z",
+      endsAt: "2026-12-03T08:00:00.000Z",
+    });
+  });
+
+  it("an all-day flag wins over a time", () => {
+    const session = timed("2026-12-02", "10:00", "60", { isAllDaySession: true });
+    expect(session.startsAt).toBe("2026-12-02T08:00:00.000Z");
+    expect(session.endsAt).toBe("2026-12-03T08:00:00.000Z");
+  });
+
+  it("a session with no sessionTime is a catalog entry with no place in a day", () => {
+    const session = toSession({ sessionId: "s1", title: "Keynote" }, reinvent);
+    expect(session).toEqual({ sessionId: "s1", eventId: "reinvent2026", title: "Keynote" });
+  });
+
+  it("no time, or an unreadable date or time, places nothing", () => {
+    expect(timed("2026-12-01", undefined, "60").startsAt).toBeUndefined();
+    expect(timed("2026-02-30", "10:00", "60").startsAt).toBeUndefined();
+    expect(timed("Dec 1", "10:00", "60").startsAt).toBeUndefined();
+    expect(timed("2026-12-01", "25:00", "60").startsAt).toBeUndefined();
+  });
+
+  it("no or unreadable length gives a start and no end", () => {
+    expect(timed("2026-12-01", "10:00", undefined)).toMatchObject({ startsAt: "2026-12-01T18:00:00.000Z" });
+    expect(timed("2026-12-01", "10:00", undefined).endsAt).toBeUndefined();
+    expect(timed("2026-12-01", "10:00", "an hour").endsAt).toBeUndefined();
+  });
+
+  it("round-trips to the local wall clock", () => {
+    const session = timed("2026-12-03", "23:30", "60");
+    expect(toLocal(session.startsAt!, reinvent.timezone)).toEqual({ date: "2026-12-03", time: "23:30" });
+    expect(toLocal(session.endsAt!, reinvent.timezone)).toEqual({ date: "2026-12-04", time: "00:30" });
+  });
+});
+
+describe("toSession: what is kept", () => {
+  const full = {
+    sessionId: "abc",
+    title: "Building agents",
+    abbreviation: "AIM3315",
+    abstract: "AWS's content, behind a login",
+    type: "Chalk talk",
+    level: "300 - Advanced",
+    venue: "Venetian",
+    room: "Level 3, Murano 3201",
+    isAllDaySession: false,
+    isReservable: true,
+    speakers: [{ name: " Priya Rao " }, {}, { name: "Sam Lee" }],
+    topics: ["Artificial Intelligence"],
+    tracks: ["AI"],
+    industries: ["Retail"],
+    services: ["Amazon Bedrock"],
+    areasOfInterest: ["Generative AI"],
+  };
+
+  it("keeps identity and placement, speakers as names, and topics", () => {
+    expect(toSession(full, reinvent)).toEqual({
+      sessionId: "abc",
+      eventId: "reinvent2026",
+      code: "AIM3315",
+      title: "Building agents",
+      type: "Chalk talk",
+      level: "300 - Advanced",
+      venue: "Venetian",
+      room: "Level 3, Murano 3201",
+      isAllDay: false,
+      speakers: ["Priya Rao", "Sam Lee"],
+      topics: ["Artificial Intelligence"],
+    });
+  });
+
+  it("never carries the abstract or the other taxonomies (ADR 0003)", () => {
+    const keys = Object.keys(toSession(full, reinvent));
+    for (const dropped of ["abstract", "tracks", "industries", "services", "areasOfInterest", "isReservable"]) {
+      expect(keys).not.toContain(dropped);
+    }
+    expect(JSON.stringify(toSession(full, reinvent))).not.toContain("behind a login");
+  });
+});
+
+describe("mergeSnapshot", () => {
+  const old: Session = {
+    sessionId: "s1",
+    eventId: "reinvent2026",
+    code: "AIM3315",
+    title: "Old title",
+    room: "Room A",
+    startsAt: "2026-12-01T16:00:00.000Z",
+    endsAt: "2026-12-01T17:00:00.000Z",
+    speakers: ["Priya Rao"],
+  };
+
+  it("a newer field replaces the old one; an absent field keeps it", () => {
+    const merged = mergeSnapshot(old, { sessionId: "s1", eventId: "reinvent2026", title: "New title" });
+    expect(merged).toEqual({ ...old, title: "New title" });
+  });
+
+  it("an empty list is a value, not an absence", () => {
+    expect(mergeSnapshot(old, { sessionId: "s1", eventId: "reinvent2026", speakers: [] }).speakers).toEqual([]);
+  });
+
+  it("a newer start brings its own end, or none, never the old end", () => {
+    const moved = mergeSnapshot(old, { sessionId: "s1", eventId: "reinvent2026", startsAt: "2026-12-02T16:00:00.000Z" });
+    expect(moved.startsAt).toBe("2026-12-02T16:00:00.000Z");
+    expect(moved.endsAt).toBeUndefined();
+  });
+
+  it("does not change its inputs", () => {
+    const before = JSON.parse(JSON.stringify(old));
+    mergeSnapshot(old, { sessionId: "s1", eventId: "reinvent2026", title: "x" });
+    expect(old).toEqual(before);
+  });
+});
+
+describe("sessionUrl", () => {
+  it("fills {code}, encoded", () => {
+    expect(sessionUrl("AIM3315", "https://example.test/catalog?search={code}")).toBe(
+      "https://example.test/catalog?search=AIM3315",
+    );
+    expect(sessionUrl("A B&C", "https://example.test/s/{code}")).toBe("https://example.test/s/A%20B%26C");
+  });
+
+  it("refuses a template that would send every session to one page", () => {
+    expect(() => sessionUrl("AIM3315", "https://example.test/catalog")).toThrow(/\{code\}/);
+  });
+});
