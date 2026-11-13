@@ -7,6 +7,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-10",
 
+  // A session's link is this with `{code}` filled in (domain.md "Session
+  // link"). ASSUMPTION: the re:Invent catalog searched for the code, until the
+  // owner confirms the deep-link format (issue #19); changing it needs no
+  // migration, since the link is derived, never stored.
+  "vars": {
+    "SESSION_URL_TEMPLATE": "https://registration.awsevents.com/flow/awsevents/reinvent2026/event-catalog/page/eventCatalog?search={code}",
+  },
+
   // D1, read as `env.DB`. No database_id: locally wrangler keeps it under
   // --persist-to, which scripts/dev.mjs points inside this worktree.
   "d1_databases": [

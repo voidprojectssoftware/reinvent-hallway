@@ -10,7 +10,10 @@ export interface SyncPlan {
   add: { sessionId: string; intent: Intent }[];
   /** `agent-sync` entries whose session the agent no longer sent. */
   remove: PlanEntry[];
-  /** `agent-sync` entries whose intent changed, already carrying the new intent. */
+  /**
+   * Entries whose intent changed, already carrying the new intent: `agent-sync`
+   * entries either way, `manual` ones only raised to `reserved`.
+   */
   update: PlanEntry[];
   /** Sent sessions already on the plan as they should be, `manual` ones included. */
   unchanged: PlanEntry[];
@@ -23,10 +26,13 @@ export interface SyncPlan {
  * for the event, one per session.
  *
  * - A session in both lists is `reserved`: a reservation is the stronger fact.
- * - Only `agent-sync` entries are added, removed or changed. A `manual` entry
- *   is the attendee's own and is left exactly as it is, even when the agent
- *   sends the same session; no second entry is added beside it.
- * - An updated entry keeps its `hidden` flag and `addedAt`.
+ * - Only `agent-sync` entries are added or removed. A `manual` entry is the
+ *   attendee's own: a sync never removes it and never adds a second entry
+ *   beside it.
+ * - A sync may raise a `manual` entry to `reserved` when the agent says it is
+ *   reserved (the attendee added it by hand, then reserved it on AWS), and
+ *   never lowers one: AWS not listing a manual session says nothing about it.
+ * - An updated entry keeps its `source`, its `hidden` flag and its `addedAt`.
  */
 export function planSync(existing: readonly PlanEntry[], sent: SyncInput): SyncPlan {
   const wanted = new Map<string, Intent>();
@@ -40,7 +46,8 @@ export function planSync(existing: readonly PlanEntry[], sent: SyncInput): SyncP
     onPlan.add(entry.sessionId);
     const intent = wanted.get(entry.sessionId);
     if (entry.source === "manual") {
-      if (intent !== undefined) plan.unchanged.push(entry);
+      if (intent === "reserved" && entry.intent !== "reserved") plan.update.push({ ...entry, intent });
+      else if (intent !== undefined) plan.unchanged.push(entry);
     } else if (intent === undefined) {
       plan.remove.push(entry);
     } else if (intent !== entry.intent) {

@@ -50,13 +50,35 @@ describe("planSync", () => {
     expect(plan.update).toEqual([entry("a", "interested")]);
   });
 
-  it("never removes or changes a manual entry, sent or not", () => {
+  it("never removes a manual entry, sent or not", () => {
     const manualSent = entry("m1", "interested", "manual");
-    const manualNotSent = entry("m2", "interested", "manual");
-    const plan = planSync([manualSent, manualNotSent], { favorites: [], reserved: ["m1"] });
+    const manualNotSent = entry("m2", "reserved", "manual");
+    const plan = planSync([manualSent, manualNotSent], { favorites: ["m1"], reserved: [] });
     expect(plan.remove).toEqual([]);
     expect(plan.update).toEqual([]);
     expect(plan.unchanged).toEqual([manualSent]);
+  });
+
+  it("raises a manual entry to reserved when AWS says it is reserved, keeping source, hidden and addedAt", () => {
+    const manual = entry("m", "interested", "manual", true);
+    const plan = planSync([manual], { favorites: [], reserved: ["m"] });
+    expect(plan.update).toEqual([{ ...manual, intent: "reserved" }]);
+    expect(plan.add).toEqual([]);
+    expect(plan.unchanged).toEqual([]);
+  });
+
+  it("never lowers a manual reservation, whether AWS sends it as a favorite or not at all", () => {
+    const sentAsFavorite = entry("m1", "reserved", "manual");
+    const notSent = entry("m2", "reserved", "manual");
+    const plan = planSync([sentAsFavorite, notSent], { favorites: ["m1"], reserved: [] });
+    expect(plan.update).toEqual([]);
+    expect(plan.remove).toEqual([]);
+    expect(plan.unchanged).toEqual([sentAsFavorite]);
+  });
+
+  it("a manual entry already reserved and sent as reserved is unchanged", () => {
+    const manual = entry("m", "reserved", "manual");
+    expect(planSync([manual], { favorites: [], reserved: ["m"] }).unchanged).toEqual([manual]);
   });
 
   it("never duplicates: a session already on the plan, manual or synced, is not added again", () => {
