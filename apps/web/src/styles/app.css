@@ -1,0 +1,33 @@
+/* What the app needs that the design did not draw, built only from
+   tokens.css. tokens.css and components.css beside this are the design's,
+   ported unchanged; this file is the only place the app adds to them. */
+
+/* A text field filling a cell, as iOS draws one in a grouped form. The design
+   has no form (dev sign-in is the first). */
+.field {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  margin-block: -11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: var(--t-body);
+  color: var(--label);
+}
+.field::placeholder {
+  color: var(--label2);
+}
+
+/* A disabled action keeps its text readable (secondary label, AA on the
+   cell) rather than fading it, as the design does for hidden entries. */
+.cell.action:disabled {
+  color: var(--label2);
+  cursor: default;
+}
+
+/* A refusal under a form. --red is AA on the grouped background in both
+   schemes (4.83:1 light, 6.16:1 dark). */
+.gfoot.error {
+  color: var(--red);
+}
