@@ -1,0 +1,9 @@
+{
+  "name": "reinvent-hallway",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "verify": "node scripts/check-adr-numbers.mjs && node --test 'scripts/**/*.test.mjs'"
+  }
+}
