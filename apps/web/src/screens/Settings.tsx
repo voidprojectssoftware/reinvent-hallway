@@ -1,13 +1,14 @@
 // Settings (docs/design/settings.html): my card, who sees my week, the
-// calendar feed, agent tokens, sign out. Token management and the feed are
+// calendar feed, agent tokens, the providers I sign in with, sign out. Token management and the feed are
 // for a person signed in, never an agent token (ADR 0008); the web app is
 // always the person, by its cookie.
-import type { AgentToken, CalendarFeed, ContactImport, Me } from "@hallway/contracts";
+import type { AgentToken, CalendarFeed, ContactImport, Identity, Me, SignInProvider } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useNavigate, useRevalidator } from "react-router";
 import { api, ApiFailure } from "../api/client.ts";
 import { copyText } from "../copy.ts";
 import { ContactsImport } from "../network/ContactsImport.tsx";
+import { SignInMethods } from "../settings/SignInMethods.tsx";
 import { WhoCanSee } from "../settings/WhoCanSee.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
@@ -21,8 +22,10 @@ export async function settingsLoader({ request }: { request: Request }): Promise
   feed: CalendarFeed | null;
   tokens: AgentToken[];
   contactImport: ContactImport | undefined;
+  identities: Identity[];
+  offered: SignInProvider[];
 }> {
-  const [me, feed, list, suggestions] = await Promise.all([
+  const [me, feed, list, suggestions, identities, options] = await Promise.all([
     requireSignIn(api.me(), request),
     // A new attendee has no feed until the first rotate makes one (404).
     requireSignIn(api.calendarFeed(), request).catch((failure: unknown) => {
@@ -31,12 +34,22 @@ export async function settingsLoader({ request }: { request: Request }): Promise
     }),
     requireSignIn(api.agentTokens(), request),
     requireSignIn(api.suggestions(), request),
+    requireSignIn(api.identities(), request),
+    // Without the options, Settings still lists what I have; it offers no Add.
+    api.signInOptions().catch(() => null),
   ]);
-  return { me, feed, tokens: list.tokens.filter((token) => !token.revokedAt), contactImport: suggestions.contactImport };
+  return {
+    me,
+    feed,
+    tokens: list.tokens.filter((token) => !token.revokedAt),
+    contactImport: suggestions.contactImport,
+    identities: identities.identities,
+    offered: options?.providers ?? [],
+  };
 }
 
 export function Settings() {
-  const { me, feed, tokens, contactImport } = useLoaderData<typeof settingsLoader>();
+  const { me, feed, tokens, contactImport, identities, offered } = useLoaderData<typeof settingsLoader>();
   return (
     <Screen title="Settings">
       <section className="section">
@@ -60,6 +73,7 @@ export function Settings() {
       <WhoCanSee visibility={me.visibility} />
       <CalendarLink feed={feed} />
       <Tokens tokens={tokens} />
+      <SignInMethods identities={identities} offered={offered} />
       <ContactsImport last={contactImport} />
       <SignOut />
     </Screen>

@@ -5,6 +5,7 @@
 // A screen that is only mine sends a signed-out visitor to /sign-in from its
 // loader (requireSignIn); a /@handle and a session are open to anyone.
 import { createBrowserRouter, Link, useLocation, useRevalidator, useRouteError } from "react-router";
+import { AccountExists, accountExistsLoader } from "./screens/AccountExists.tsx";
 import { ConnectAgent, connectAgentLoader } from "./screens/ConnectAgent.tsx";
 import { MyWeek, myWeekLoader } from "./screens/MyWeek.tsx";
 import { Network, networkLoader } from "./screens/Network.tsx";
@@ -24,6 +25,7 @@ import { signInPath } from "./shell/signed-in.ts";
 
 export const router = createBrowserRouter([
   { path: "/sign-in", element: <SignIn />, loader: signInLoader, HydrateFallback: Loading },
+  { path: "/sign-in/account-exists", element: <AccountExists />, loader: accountExistsLoader, HydrateFallback: Loading },
   {
     id: APP_ROUTE_ID,
     element: <AppLayout />,
@@ -62,6 +64,7 @@ const titles: Record<string, string> = {
   "/settings": "Settings",
   "/settings/profile": "Profile",
   "/sign-in": "Hallway",
+  "/sign-in/account-exists": "You already have an account",
 };
 
 const titleOf = (pathname: string): string | undefined => titles[pathname.replace(/(.)\/$/, "$1")];
