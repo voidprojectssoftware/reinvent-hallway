@@ -68,6 +68,11 @@ async function pickPort() {
 function buildWeb() {
   const built = spawnSync(process.execPath, [vite, "build"], { cwd: web, stdio: "inherit" });
   if (built.status !== 0) process.exit(built.status ?? 1);
+  // The share card's fonts go into the same directory after the build has
+  // emptied it. Not wrangler's "build" command: with one, wrangler never
+  // reloads its assets after a web rebuild (#85, wrangler.jsonc).
+  const fonts = spawnSync(process.execPath, [join(api, "scripts/copy-card-fonts.mjs")], { cwd: api, stdio: "inherit" });
+  if (fonts.status !== 0) process.exit(fonts.status ?? 1);
 }
 
 function ensureDevVars() {
@@ -112,6 +117,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   // and again on every rebuild. Built over in place, the new index.html
   // replaces the old one, and the old hashed assets linger until the next
   // `npm run dev`, whose first build (buildWeb) still empties the directory.
+  // wrangler's own asset watcher sees each rebuild and reloads the asset
+  // manifest, so the new index.html and its new hashed bundle are served
+  // within a second or so (#85; e2e/asset-reload.e2e.test.ts checks it).
   // --logLevel warn: the watcher's rebuild lines would bury wrangler's output.
   const watch = spawn(
     process.execPath,
