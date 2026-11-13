@@ -8,10 +8,15 @@ export type {
   AttendeeRecord,
   AttendeeRepository,
   CalendarFeedRepository,
+  GitHubUser,
+  IdentityKind,
   IdentityProvider,
+  IdentityProviders,
+  IdentityRecord,
+  RecordGitHubFollowing,
   VerifiedIdentity,
   WebSessionRecord,
   WebSessionRepository,
 } from "./ports.ts";
-export { sessionLifetimeDays, type SignedIn } from "./sign-in.ts";
+export { sessionLifetimeDays, type Completed, type SignedIn } from "./sign-in.ts";
 export { claimedProfileUrlPrefix } from "./profile.ts";

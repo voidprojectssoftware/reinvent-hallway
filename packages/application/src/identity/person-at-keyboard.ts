@@ -1,5 +1,6 @@
 // The guard for handlers that manage credentials: agent tokens, the
-// calendar feed (ADR 0008) and the share link's invite token. They need a person signed in on the web (or dev
+// calendar feed (ADR 0008), the share link's invite token and the identities
+// one signs in with (ADR 0018). They need a person signed in on the web (or dev
 // sign-in), not an agent token. Otherwise a stolen token could mint a fresh
 // token, or read the feed URL, and keep access after its own revocation.
 import type { Actor } from "../actor.ts";

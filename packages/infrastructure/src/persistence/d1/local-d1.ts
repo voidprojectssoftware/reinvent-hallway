@@ -1,6 +1,7 @@
 // A real D1 for tests: Miniflare runs workerd, the engine `wrangler dev` uses.
 // Each call gets its own in-memory database with migrations/ applied the way
-// `wrangler d1 migrations apply` does: every .sql file, in name order.
+// `wrangler d1 migrations apply` does: every .sql file, in name order. A data
+// migration's test stops `before` one, writes the old shape, then applies it.
 import { readdirSync, readFileSync } from "node:fs";
 import type { D1Database } from "@cloudflare/workers-types";
 import { Miniflare } from "miniflare";
@@ -12,7 +13,16 @@ export interface LocalD1 {
   dispose(): Promise<void>;
 }
 
-export async function startLocalD1(): Promise<LocalD1> {
+/** Runs one migration file's statements as one batch, as wrangler does. */
+export async function applyMigration(d1: D1Database, file: string) {
+  const statements = readFileSync(new URL(file, migrations), "utf8")
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  await d1.batch(statements.map((statement) => d1.prepare(statement)));
+}
+
+export async function startLocalD1(options: { before?: string } = {}): Promise<LocalD1> {
   const mf = new Miniflare({
     workers: [
       {
@@ -31,14 +41,8 @@ export async function startLocalD1(): Promise<LocalD1> {
   });
   const d1 = (await mf.getD1Database("DB")) as unknown as D1Database;
   const files = readdirSync(migrations)
-    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => file.endsWith(".sql") && (options.before === undefined || file < options.before))
     .sort();
-  for (const file of files) {
-    const statements = readFileSync(new URL(file, migrations), "utf8")
-      .split("--> statement-breakpoint")
-      .map((statement) => statement.trim())
-      .filter(Boolean);
-    await d1.batch(statements.map((statement) => d1.prepare(statement)));
-  }
+  for (const file of files) await applyMigration(d1, file);
   return { d1, dispose: () => mf.dispose() };
 }

@@ -8,39 +8,83 @@ import type {
   AttendeeRepository,
   CalendarFeedRepository,
   IdentityPorts,
+  IdentityRecord,
   WebSessionRecord,
   WebSessionRepository,
 } from "@hallway/application";
 
 const copy = <T>(value: T | undefined): T | undefined => value && structuredClone(value);
 
-/** Beside the port, `all()`: the network fake reads every attendee, as D1 joins the table. */
+/**
+ * Beside the port, `all()` and `allIdentities()`: the network fake reads
+ * every attendee and identity, as D1 joins the tables.
+ */
 export function attendeesInMemory(
   seed: readonly AttendeeRecord[] = [],
-): AttendeeRepository & { all(): Promise<AttendeeRecord[]> } {
+): AttendeeRepository & { all(): Promise<AttendeeRecord[]>; allIdentities(): Promise<IdentityRecord[]> } {
   const byId = new Map(seed.map((attendee) => [attendee.id, structuredClone(attendee)]));
+  const identities: IdentityRecord[] = [];
   const find = (match: (attendee: AttendeeRecord) => boolean) => copy([...byId.values()].find(match));
   const assertUnique = (attendee: AttendeeRecord) => {
     for (const other of byId.values()) {
       if (other.id === attendee.id) continue;
       if (other.handle === attendee.handle) throw new Error("UNIQUE constraint failed: attendees.handle");
-      if (other.linkedinSub === attendee.linkedinSub) throw new Error("UNIQUE constraint failed: attendees.linkedin_sub");
     }
   };
+  const assertLinkable = (identity: IdentityRecord) => {
+    if (!byId.has(identity.attendeeId)) throw new Error("FOREIGN KEY constraint failed");
+    for (const other of identities) {
+      if (other.provider === identity.provider && other.subject === identity.subject) {
+        throw new Error("UNIQUE constraint failed: identities.provider, identities.subject");
+      }
+      if (other.attendeeId === identity.attendeeId && other.provider === identity.provider) {
+        throw new Error("UNIQUE constraint failed: identities.attendee_id, identities.provider");
+      }
+    }
+  };
+  const findIdentity = (match: (identity: IdentityRecord) => boolean) => copy(identities.find(match));
   return {
     byId: async (id) => copy(byId.get(id)),
     all: async () => [...byId.values()].map((attendee) => structuredClone(attendee)),
+    allIdentities: async () => structuredClone(identities),
     byHandle: async (handle) => find((attendee) => attendee.handle === handle),
-    byLinkedinSub: async (sub) => find((attendee) => attendee.linkedinSub === sub),
-    async create(attendee) {
+    identity: async (provider, subject) =>
+      findIdentity((identity) => identity.provider === provider && identity.subject === subject),
+    identitiesOf: async (attendeeId) =>
+      structuredClone(
+        identities
+          .filter((identity) => identity.attendeeId === attendeeId)
+          .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt) || a.provider.localeCompare(b.provider)),
+      ),
+    identityWithVerifiedEmail: async (hash) => findIdentity((identity) => identity.verifiedEmailSha256 === hash),
+    async create(attendee, firstIdentity) {
       if (byId.has(attendee.id)) throw new Error("UNIQUE constraint failed: attendees.id");
       assertUnique(attendee);
       byId.set(attendee.id, structuredClone(attendee));
+      try {
+        assertLinkable(firstIdentity);
+      } catch (error) {
+        byId.delete(attendee.id);
+        throw error;
+      }
+      identities.push(structuredClone(firstIdentity));
     },
     async save(attendee) {
       if (!byId.has(attendee.id)) return;
       assertUnique(attendee);
       byId.set(attendee.id, structuredClone(attendee));
+    },
+    async link(identity) {
+      assertLinkable(identity);
+      identities.push(structuredClone(identity));
+    },
+    async saveIdentity(identity) {
+      const at = identities.findIndex((other) => other.provider === identity.provider && other.subject === identity.subject);
+      if (at !== -1) identities[at] = structuredClone(identity);
+    },
+    async unlink(attendeeId, provider) {
+      const at = identities.findIndex((identity) => identity.attendeeId === attendeeId && identity.provider === provider);
+      if (at !== -1) identities.splice(at, 1);
     },
   };
 }
@@ -85,7 +129,7 @@ export function webSessionsInMemory(): WebSessionRepository {
 
 /**
  * Every identity port in memory, for `identityHandlers(...)` in apps/api's
- * tests: no connections and no LinkedIn unless the test brings them.
+ * tests: no connections and no sign-in providers unless the test brings them.
  */
 export function identityInMemory(extra: Partial<IdentityPorts> = {}): IdentityPorts {
   return {

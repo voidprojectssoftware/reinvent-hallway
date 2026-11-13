@@ -67,7 +67,7 @@ erDiagram
 
 | Resource | What it is | Key fields |
 | --- | --- | --- |
-| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `verifiedName` (LinkedIn's name, not editable), `email` (stored only when LinkedIn says it is verified, with its SHA-256 for suggestions) |
+| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
 | **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt` (the newest report). **No abstract** |
 | **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields, `attendeeId`, `reportedAt`. One per attendee and session |
@@ -191,7 +191,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 
 | Command | Who | Effect |
 | --- | --- | --- |
-| `SignIn` | anyone | LinkedIn OIDC (or dev sign-in locally); creates the attendee on first sign-in, picking a free handle |
+| `SignIn` | anyone | Google, Microsoft, LinkedIn or GitHub (or dev sign-in locally); creates the attendee and their first Identity on first sign-in, picking a free handle; refused (`account-exists`) when the verified email is another attendee's |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
 | `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), and `missingSessions`; when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
@@ -270,8 +270,9 @@ holds logic the other lacks. Both take and return the contract schemas in
 
 The owner, 2026-11-13: sign-in with Google, Microsoft, LinkedIn or GitHub, and
 "show them the schedule of people they follow on linkedin / in their network
-and the same for github". ADRs 0018 and 0019 hold the decisions. Until those
-issues land, the code is still the model above; this section is what it moves to.
+and the same for github". ADRs 0018 and 0019 hold the decisions. Identities
+are built (#60); follows are not yet (#63), so the visibility rule is still the
+one above until then.
 
 ```mermaid
 erDiagram

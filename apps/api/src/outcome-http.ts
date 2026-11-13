@@ -10,6 +10,7 @@ export const httpStatus = {
   forbidden: 403,
   "not-found": 404,
   conflict: 409,
+  "account-exists": 409,
 } as const satisfies Record<ErrorKind, ContentfulStatusCode>;
 
 const refusal = (description: string) => ({
@@ -27,7 +28,9 @@ export const errorResponses = {
   [httpStatus.unauthenticated]: refusal("The bearer token was not accepted."),
   [httpStatus.forbidden]: refusal("The actor may not do this."),
   [httpStatus["not-found"]]: refusal("No such resource, or not one the actor may see."),
-  [httpStatus.conflict]: refusal("The resource changed in a way that refuses this."),
+  [httpStatus.conflict]: refusal(
+    "The resource changed in a way that refuses this; `account-exists` when a sign-in's verified email belongs to another account.",
+  ),
 } as const;
 
 export function respond<T extends object>(c: Context, outcome: Outcome<T>) {
