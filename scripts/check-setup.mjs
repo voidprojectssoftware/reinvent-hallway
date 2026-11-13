@@ -1,0 +1,2198 @@
+// Which enforcement layers this repo actually has, and which it only has
+// instructions about.
+//
+// WHAT THIS PREVENTS
+// The layers in references/enforcement.md get installed by copying files and
+// wiring two of them up, and none of that is self-verifying. A repo with
+// guard-merge.mjs sitting in scripts/ and no hook entry in settings.json looks
+// exactly like a repo that is protected, right up until an agent merges. In one
+// project the setup was never done at all: 20 merges went through raw
+// `gh pr merge`, one of them landing a PR whose main check was still pending.
+// The setup section had been read at turn one. Reading it is not doing it.
+//
+// So setup ends with printed output instead of with a table having been read.
+// Run this before installing anything and every layer that applies reports
+// MISSING; install, run it again, and paste both. It exits non-zero until each
+// of those is present AND wired, because wiring is the half that gets skipped.
+// Re-run it after any change to the hook settings or to CI job names, where the
+// same layers go quiet without going away.
+//
+// WHICH LAYERS APPLY IS A QUESTION ABOUT THE WRITE BOUNDARY
+// ADR 0021 splits the factory in two by what it may write to, and the layers
+// are not the same set on both sides. The four numbered below are owned mode's,
+// and every one of them is a change to a repository you are allowed to change.
+// Guest mode has one control instead, `guard-guest-writes.mjs`, installed into
+// untracked local files, and installing any of the other four into somebody
+// else's repository is the thing guest mode exists in order not to do.
+//
+// So this reports the layers that apply to the mode it is in, and explains an
+// absent layer by the mode rather than listing it as a failure. A permanently
+// red line is the same failure as a guard that cries wolf: both get switched
+// off, and a line that is red on every run carries no information about the run
+// you are looking at. That argument is about any report, not about the
+// repository this file happens to ship from.
+//
+// There are three states rather than two: owned, guest, and nobody having said.
+// The third is a finding rather than an error. ADR 0021 has the question asked
+// out loud at initialisation, so a repository where nobody wrote the answer down
+// skipped the step. That is worth printing, and it is not a reason to fail a
+// setup that is otherwise complete.
+//
+// A LAYER THE REPOSITORY DECIDED AGAINST IS NOT A LAYER IT NEGLECTED
+// The mode explains an absent layer that never applied. It says nothing about a
+// layer that applies and that the repository has looked at and decided not to
+// have. Until #156 there was no third answer, so such a layer landed in MISSING
+// beside genuine neglect and its FIX line closed with a recipe for doing the
+// thing the repository had decided not to do.
+//
+// That is not hypothetical and it is not survivable by writing it down. The
+// repository this file ships from declined layer 3, recorded the decision in an
+// ADR, in a process doc and in this header, and an orchestrator who had run this
+// tool that morning filed an issue asking for the layer to be installed anyway.
+// The decision was then reversed, partly on the grounds that the report kept
+// arguing with it. **A report that cannot represent a decision does not lose the
+// argument; it wins it, by being louder than the paragraph asking readers to
+// ignore it.** So the fourth status below is not a convenience.
+//
+// `declined` is read from a declared line in `AGENTS.md`, and that location is
+// the whole of the design. See the section on it below.
+//
+// This also writes the owned answer, with `--record-owned`, because until #100
+// nothing could: the guest record is written by installing the gate, and owned
+// has no gate to install. See that section below for why the reader of a fact
+// is a defensible place to keep its writer.
+//
+//   node <skill>/assets/check-setup.mjs   # from the repo root, before anything
+//   node scripts/check-setup.mjs          # after, once it has been copied in
+//   node scripts/check-setup.mjs --root=/path/to/repo
+//   node scripts/check-setup.mjs --record-owned   # answer ADR 0021's question
+//
+// Requires Node 18 or later, and `git` for two comparisons it skips without.
+// No network, no `gh`, no Python. If `node` itself is missing, that is this
+// check's first finding without it having to run, because layers 1 to 3 ship as
+// Node scripts. The LAYERS table below is the same checklist by eye, for a repo
+// where you cannot run it.
+import { existsSync, readFileSync, readdirSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { homedir } from 'node:os'
+import { basename, dirname, join, relative, resolve } from 'node:path'
+
+const OK = 'ok'
+const PARTIAL = 'PARTIAL'
+const MISSING = 'MISSING'
+// Lower case, with `ok` and `n/a` rather than with `PARTIAL` and `MISSING`.
+// The shouted two mean something is wrong here; these three mean there is
+// nothing to do, and which family a status is in should be readable down the
+// left-hand column without reading the word.
+const DECLINED = 'declined'
+
+// The repo root comes from the working directory, never from this file's own
+// location. That is what lets the first run happen from inside the installed
+// skill, before a single asset has been copied anywhere.
+//
+// Whether that is inside a repository is git's question, so git answers it. An
+// earlier copy walked up asking the filesystem for anything named `.git`, and
+// an empty directory by that name, which git itself refuses, made it report on
+// a home directory as a repository. It also meant GIT_CEILING_DIRECTORIES,
+// which git honours, was silently ignored here. #180.
+const rootArg = process.argv.find((arg) => arg.startsWith('--root='))
+const START = resolve(rootArg ? rootArg.slice('--root='.length) : process.cwd())
+const ROOT = (() => {
+  let said = 'no working tree'
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: START,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    if (top) return resolve(top)
+  } catch (error) {
+    said = String(error.stderr ?? '').trim().split('\n')[0]
+    if (!said) {
+      console.error(`Could not run git from ${START}, so there is no telling whether it is a repository.`)
+      console.error(`  ${error.message}`)
+      process.exit(1)
+    }
+  }
+  console.error('Not inside a git repository, so there is no repo to report on.')
+  console.error(`  git, asked from ${START}: ${said}`)
+  console.error('Run this from the root of the repo you are setting up, or pass --root=.')
+  process.exit(1)
+})()
+
+const readAt = (root, rel) => {
+  try {
+    return readFileSync(join(root, rel), 'utf8')
+  } catch {
+    return null
+  }
+}
+
+const read = (rel) => readAt(ROOT, rel)
+
+// ---------------------------------------------------------------------------
+// One repository is not one directory
+//
+// A linked worktree has its own working-tree root and shares the git common
+// directory with the main checkout, so a fact about the *repository* has to be
+// read from the second or it is invisible from every checkout but one. #122
+// found this the hard way: run from a worktree of a repository recorded as
+// guest, this script read no machine record, reported the boundary unrecorded,
+// reported the four owned layers MISSING and told the operator to install a
+// merge wrapper and a CI workflow into somebody else's repository.
+//
+// `git rev-parse --git-common-dir` answers identically from every checkout,
+// which `--show-toplevel` and `--git-dir` do not. That is why the gate and the
+// record moved there in ADR 0037, and why this reads them from there.
+// ---------------------------------------------------------------------------
+function gitCommonDir() {
+  try {
+    return resolve(ROOT, git(['rev-parse', '--path-format=absolute', '--git-common-dir']))
+  } catch {
+    return null
+  }
+}
+
+const COMMON = gitCommonDir()
+const readCommon = (rel) => (COMMON === null ? null : readAt(COMMON, rel))
+
+// One directory has more than one name, and git answers with a different one
+// from the one you stood in. Windows spells a long user name as an 8.3 short
+// name (`C:\Users\BHASTI~1`), so `os.tmpdir()` does, while git says
+// `C:\Users\bhastings`; a junction, a `subst` drive or a POSIX symlink does the
+// same anywhere. `resolve()` and lowercasing expand none of those, and #193 is
+// this report calling a main checkout a linked worktree of itself.
+//
+// So two paths are compared by what `realpathSync.native` calls them. The
+// native one, because the JavaScript `realpathSync` follows a junction and
+// leaves a short name alone. It throws on a path that is not there, and a
+// compared path can legitimately be absent, so the part that exists is
+// canonicalised and the missing tail is kept as written. Only comparisons go
+// through this: the report still prints a directory the way you named it.
+
+// BEGIN path comparison
+// path comparison stamp: sha256 26390098cb4f6d98
+//
+// The same two functions are in `guard-guest-writes.mjs` and
+// `check-outward-writes.mjs`, and in the skill the test that holds the command
+// reader holds all three to one text and this stamp. If this file was copied
+// into your repository, compare this line with the skill's. #201.
+
+function canonical(path) {
+  const abs = resolve(path)
+  try {
+    return realpathSync.native(abs)
+  } catch {
+    const up = dirname(abs)
+    return up === abs ? abs : join(canonical(up), basename(abs))
+  }
+}
+
+function samePath(a, b) {
+  const normalise = (path) => canonical(path).replace(/[\\/]+$/, '')
+  return process.platform === 'win32'
+    ? normalise(a).toLowerCase() === normalise(b).toLowerCase()
+    : normalise(a) === normalise(b)
+}
+
+// END path comparison
+
+// BEGIN path display
+// path display stamp: sha256 53da66d338517398
+//
+// The same in `check-outward-writes.mjs`, and held to it the same way. #201.
+
+// Relative when the file is under the checkout you are standing in, absolute
+// when it is not. From a worktree that difference is the point: a path leading
+// out of this directory is the visible form of "this fact is the repository's,
+// not this checkout's".
+const show = (abs) => {
+  const path = relative(canonical(ROOT), canonical(abs)).replace(/\\/g, '/')
+  return path !== '' && !path.startsWith('..') ? path : abs
+}
+
+// END path display
+
+// ---------------------------------------------------------------------------
+// The write boundary
+//
+// `guard-guest-writes.mjs`, the asset sitting next to this one, refuses to read
+// the mode off disk at all. These two files are not disagreeing, and the next
+// person to notice should not have to decide which of them is the mistake.
+//
+// **A report is not a hook.** That gate is a `PreToolUse` hook: it runs *before*
+// the command it is judging, so a `cd` in that command has not happened yet and
+// anything it reads from the filesystem may describe a repository the command
+// will never touch. ADR 0029 has the measurement: the merge guard's
+// branch-dependent clause answered `allow` inside a worktree on a command the
+// main checkout denied. That is a property of the mechanism rather than a
+// shortcoming of that gate.
+//
+// This script has no command in front of it to be wrong about. It runs where
+// you are standing, against the root it printed, and it names the file every
+// fact came from. Reading the machine record here is sound in the way it is not
+// there.
+//
+// What stays true in both files: the mode is never inferred from the repository
+// and specifically never from a git remote. A work repository is on GitHub too,
+// and a remote says the factory *can* write outward, which was never the
+// question. Absent is reported as absent.
+// ---------------------------------------------------------------------------
+const OWNED = 'owned'
+const GUEST = 'guest'
+const UNRECORDED = 'unrecorded'
+
+// The paths `guard-guest-writes.mjs --install` writes. Spelled out again here
+// rather than shared, for the reason ADR 0029 gives for its command reader
+// existing twice: an asset is copied into a host repo on its own, and a
+// two-file asset is a setup step that gets half done.
+//
+// The first two are relative to the git common directory and the last two to
+// the checkout, because that is what each of them is a fact about. ADR 0037.
+const MACHINE_RECORD = 'factory/machine.md'
+const GUEST_GATE = 'factory/guard-guest-writes.mjs'
+const LOCAL_SETTINGS = '.claude/settings.local.json'
+const REPO_SETTINGS = '.claude/settings.json'
+
+// Where an install from before #122 put the first two. Reported, never removed:
+// `guard-guest-writes.mjs` says the same thing next to its own copy of these
+// constants, and ADR 0037 decided it there. The operator can see both and
+// decide, and a guess that deletes somebody's file in a repository that is not
+// ours is the wrong way round.
+//
+// These are relative to the checkout, not to the common directory, and that is
+// the whole finding: `.factory/` is in the working tree, so it is per-checkout
+// and a linked worktree cannot see the main checkout's copy.
+const LEGACY_FACTORY = '.factory'
+const LEGACY_RECORD = `${LEGACY_FACTORY}/machine.md`
+const LEGACY_GATE = `${LEGACY_FACTORY}/guard-guest-writes.mjs`
+
+const RECORD_AT = COMMON === null ? `<git common dir>/${MACHINE_RECORD}` : show(join(COMMON, MACHINE_RECORD))
+const GATE_AT = COMMON === null ? `<git common dir>/${GUEST_GATE}` : show(join(COMMON, GUEST_GATE))
+
+// Where layer 2's guard is documented to live, and where `guardLocation` below
+// looks first. This is also the file the report tells you to ask whether it is
+// loaded, and `guard-merge-asset.test.mjs` pins that: it stands up a repository
+// holding the shipped guard, reads the line this script prints, and asserts the
+// guard refuses it.
+//
+// This was a SETUP constant, with a comment telling an installer to edit it
+// where their guard sits elsewhere, and nothing acted on it if they did not
+// (#171). It is the default now rather than an assumption, so an unedited copy
+// is no longer a wrong answer about a correctly installed repository.
+const MERGE_GUARD = 'scripts/guard-merge.mjs'
+
+// ---------------------------------------------------------------------------
+// The probe line belongs to the gate that is installed, not to this file
+//
+// This printed `node scripts/guard-merge.mjs --probe` unconditionally, which is
+// the shipped gate's probe and is the right answer for almost every repository
+// installing this skill. It is not right for a repository whose gate is a
+// version of the asset that recognises something else, and the repository that
+// ships this file is one: ADR 0033 keeps its guard deliberately different, and
+// its probe is a second script, `check-guard-live.mjs`, run without a flag.
+//
+// A fixed string there is refused by nothing in such a repository. It is
+// allowed through, runs a hook script with no payload on stdin, does nothing,
+// and exits 0, which is exactly what an absent gate looks like. A liveness
+// probe reading "not loaded" while the gate is loaded is the single failure the
+// probe exists to rule out, and here it was prescribed by the report and copied
+// into the machine record by `--record-owned`.
+//
+// **The fix belongs here rather than in anybody's gate.** Teaching a gate to
+// answer a second probe line is two things to keep true in two places, and
+// probe recognition is already the subtlest rule either gate has.
+//
+// So this reads the rule out of the gate in front of it. Which line a gate
+// answers to is a property of that gate, and both shipped gates state it in one
+// function, in a shape stable enough to grep. That is the same technique this file
+// already uses on `DEFAULT_BRANCH`, `REQUIRED` and `BASELINE`, and pinned the
+// same way by a test beside each gate.
+//
+// When the gate names itself, the probe is the gate plus its flag. When it names
+// another file, that file is a sibling: `commandName` compares base names, so a
+// path next to the gate is a path the rule matches.
+//
+// A gate whose rule cannot be read falls back to the shipped form. That is the
+// old behaviour and it is wrong in exactly the same way, so it is worth saying
+// what it costs: a gate with no readable probe rule is one this report cannot
+// describe, and every gate this skill ships has one. Reporting a finding
+// instead was considered and refused: it would put a permanent PARTIAL on
+// layer 2 for anyone running a guard from before probes existed, which is the
+// permanently-red line the header above argues against.
+const probeRule = (source) => {
+  const body = /function isLivenessProbe\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/.exec(source ?? '')?.[1]
+  if (body === undefined) return null
+  const script = /commandName\(\s*script\s*\)\s*===\s*['"]([^'"]+)['"]/.exec(body)?.[1]
+  if (script === undefined) return null
+  return { script, flag: /tokens\.includes\(\s*['"](--[\w-]+)['"]\s*\)/.exec(body)?.[1] ?? null }
+}
+
+// The command to type, for a gate at `path` whose source is `source`. `path` is
+// printed back unchanged when the gate is its own probe, so a gate reached
+// through an absolute path keeps it.
+function probeCommand(path, source) {
+  const rule = probeRule(source)
+  if (rule === null) return `node "${path}" --probe`
+  const at = path.replace(/\\/g, '/').lastIndexOf('/')
+  const target = rule.script === path.slice(at + 1) ? path : `${path.slice(0, at + 1)}${rule.script}`
+  return `node "${target}"${rule.flag === null ? '' : ` ${rule.flag}`}`
+}
+
+// ---------------------------------------------------------------------------
+// Where the guard is, rather than where this file says it should be
+//
+// Everything above derives the probe line from the guard's own rule, which is
+// only as good as the file it read, and the file it read was whatever sat at
+// `MERGE_GUARD`. In a repository whose installer put the guard in `tools/`, the
+// read returned nothing, the derivation fell back to the shipped form, and the
+// report printed a command naming a file that is not there: #153 again, down
+// the one path #153's fix could not see (#171). The layer-2 verdict was the
+// worse half of it, `MISSING` on the only preventive layer such a repository
+// actually has, plus a FIX telling it to install what it had already installed.
+// A permanently red line in a correct repository is what this file's header
+// argues against at length.
+//
+// **The repository's own answer is in its hook.** A wired `PreToolUse` entry
+// carries the command the harness runs, written by whoever installed the guard,
+// and `preToolUseHooks` already reads those entries for layer 2's next
+// question. So the order is: the documented path if a file is there, then the
+// path a wired hook names if a file is there, then absent.
+//
+// The documented path wins where both exist, so an ordinary installation is
+// answered without consulting a hook at all and this changes nothing for it.
+//
+// **A hook naming a file that does not exist is not the guard.** Layer 2's
+// `MISSING` covers copied-and-unwired and wired-at-nothing alike, and a locator
+// that believed the hook string would turn the second one green, which is the
+// dangerous way this fix fails. So a candidate counts only once it has been
+// read. Where a hook names something absent, that is said in the finding: it is
+// a more specific failure than "the guard is absent" and it wants a different
+// fix.
+//
+// **Reading a path out of a command line, with no command reader here.** ADR
+// 0029 keeps this file to one file with nothing beside it, so the guards'
+// tokeniser is not available and this does not pretend to be one. It looks only
+// for an argument naming a `guard-merge*.mjs`, quoted arguments first so a path
+// containing a space survives. `$CLAUDE_PROJECT_DIR` is the wiring
+// `references/enforcement.md` ships and it resolves to the root this report is
+// already standing in. Any other variable or substitution is refused rather
+// than guessed at: an unresolvable path that happened to read as a real file
+// would be the wrong answer arriving with the authority of a measurement, and
+// refusing it costs a repository with an exotic hook the old behaviour, which
+// is what it has today.
+const GUARD_IN_COMMAND = [
+  /"([^"]*guard-merge[\w.-]*\.mjs)"/g,
+  /'([^']*guard-merge[\w.-]*\.mjs)'/g,
+  /(?:^|\s)([^\s"']*guard-merge[\w.-]*\.mjs)(?=\s|$)/g,
+]
+
+const PROJECT_DIR = /^\$\{?CLAUDE_PROJECT_DIR\}?[\\/]/
+
+function guardPathsIn(command) {
+  const paths = []
+  for (const pattern of GUARD_IN_COMMAND) {
+    for (const [, raw] of command.matchAll(pattern)) {
+      const path = raw.replace(PROJECT_DIR, '')
+      if (/[$%`]/.test(path)) continue
+      if (!paths.includes(path)) paths.push(path)
+    }
+  }
+  return paths
+}
+
+// `join` does not step aside for an absolute path, so a hook naming one has to
+// be read directly rather than through `read`.
+const readResolved = (abs) => {
+  try {
+    return readFileSync(abs, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+// `path` is how the report spells it, relative where it is inside this checkout.
+// `named` is every path a hook pointed at, so a failure can say which of the two
+// shapes of absence this is.
+function guardLocation() {
+  const source = read(MERGE_GUARD)
+  const named = []
+  if (source !== null) return { path: MERGE_GUARD, source, conventional: true, named }
+
+  for (const { file, entry } of MERGE_HOOKS.wired) {
+    for (const hook of entry.hooks ?? []) {
+      for (const path of guardPathsIn(hook.command ?? '')) {
+        const abs = resolve(ROOT, path)
+        const found = readResolved(abs)
+        if (found === null) {
+          if (!named.includes(path)) named.push(path)
+          continue
+        }
+        return { path: show(abs), source: found, conventional: false, file, named }
+      }
+    }
+  }
+  return { path: MERGE_GUARD, source: null, conventional: true, named }
+}
+
+const MERGE_HOOKS = preToolUseHooks('guard-merge')
+const GUARD = guardLocation()
+const MERGE_PROBE = probeCommand(GUARD.path, GUARD.source)
+
+// The one line a reader and a writer of the machine record have to agree about,
+// asked in one place so they cannot drift apart. `undefined` means the file has
+// no such line at all, which is a different finding from a line saying something
+// unusable.
+const declaredIn = (record) => /^Write boundary:\s*(\S+)/m.exec(record)?.[1].toLowerCase()
+
+// The paragraph for a boundary nobody answered. `found` is what this run saw, as
+// however many lines it takes to say; everything after it is the same sentence
+// every time. Kept whole here rather than concatenated at the console: the legacy
+// branch below has a different thing to say, and splicing its clause into the
+// middle of this one produced a run-on that told an operator nobody had answered,
+// about a file that had (#131).
+const nobodyAnswered = (...found) => [
+  ...found.slice(0, -1),
+  `${found[found.length - 1]}, so nobody has said whether this`,
+  'factory may write outward. b-fac ADR 0021 has that asked out loud at initialisation, so',
+  'this repository skipped the question rather than answered it. That is a finding and',
+  'not an error: the layers below are reported as if owned.',
+]
+
+// Why a legacy record is not the repository's answer even when it is a perfectly
+// good one. This is ADR 0037 in four lines, and it is the reason this branch
+// reports NOT RECORDED rather than adopting what it just read: a per-checkout
+// answer gives one repository as many answers as it has checkouts, which is the
+// state that ADR ended.
+const PER_CHECKOUT = [
+  `${LEGACY_FACTORY}/ is in the working tree, so that answer is this checkout's and no`,
+  'other checkout of this repository can read it. b-fac ADR 0037 moved the record inside the',
+  'git common directory, which every checkout shares, and it has to be written there',
+  'before it is the repository that has answered rather than this directory.',
+]
+
+// A record left where installs before #122 put it. **What it says decides the
+// remedy**, which is the defect #131 measured: this branch used to name
+// `guard-guest-writes.mjs --install` whatever it found, and in a repository
+// recorded owned that command installs a gate refusing every push, and every
+// command it refuses is the workflow there. So the answer is read out, and
+// `unrecordedRemedy()` below prints the one command that writes it.
+function legacyBoundary(legacy) {
+  const said = declaredIn(legacy)
+  if (said !== OWNED && said !== GUEST) {
+    return {
+      mode: UNRECORDED,
+      legacy: null,
+      why: nobodyAnswered(
+        `${LEGACY_RECORD} is here from an install before BlakeHastings/b-fac#122 and answers neither`,
+        `owned nor guest, and ${RECORD_AT} does not exist`,
+      ),
+    }
+  }
+  return {
+    mode: UNRECORDED,
+    legacy: said,
+    why: [
+      `${LEGACY_RECORD} is here from an install before BlakeHastings/b-fac#122, it says`,
+      `"Write boundary: ${said}", and ${RECORD_AT} does not exist.`,
+      ...PER_CHECKOUT,
+      ...(said === OWNED
+        ? [
+            'The layers below are reported as if owned, which is what an unrecorded boundary',
+            'has always done here, and the remedy under them writes this same answer where the',
+            'whole repository can read it.',
+          ]
+        : [
+            'The layers below are reported as if owned, which is what an unrecorded boundary',
+            'has always done here. This record says guest, so do not install them: every one',
+            'is a change to a repository somebody has written down that they are a guest in,',
+            'and no row below offers a way to.',
+          ]),
+    ],
+  }
+}
+
+function writeBoundary() {
+  const record = readCommon(MACHINE_RECORD)
+  if (record === null) {
+    const legacy = read(LEGACY_RECORD)
+    if (legacy !== null) return legacyBoundary(legacy)
+    return { mode: UNRECORDED, why: nobodyAnswered(`${RECORD_AT} does not exist`) }
+  }
+
+  const declared = declaredIn(record)
+  if (declared === OWNED || declared === GUEST) {
+    return { mode: declared, record }
+  }
+  // A record that exists and does not answer is the same state as no record,
+  // reported differently, because the two want different fixes.
+  return {
+    mode: UNRECORDED,
+    record,
+    why: nobodyAnswered(
+      declared === undefined
+        ? `${RECORD_AT} exists and has no "Write boundary:" line`
+        : `${RECORD_AT} says "Write boundary: ${declared}", which is neither owned nor guest`,
+    ),
+  }
+}
+
+const BOUNDARY = writeBoundary()
+
+// Unrecorded is reported against the owned checklist. That is a choice and it
+// is made out loud rather than quietly: it is what this script has always
+// checked, and the summary tells anyone in a repository that is not theirs to
+// install the guest gate instead of the four layers it just listed.
+const CHECKLIST = BOUNDARY.mode === GUEST ? GUEST : OWNED
+
+// A hint this report can neither adopt nor ignore (#134, b-fac ADR 0070). A legacy
+// record saying guest is a per-checkout answer, so it does not set the mode:
+// that is ADR 0037 and `legacyBoundary()` above. But it is somebody having
+// written down that this repository is not theirs, and the two directions of
+// being wrong are not the same size. Offering guest fixes in an owned repository
+// costs a confused minute; offering owned fixes in a guest one is an agent
+// opening a pull request that configures somebody else's CI.
+//
+// So the verdicts stay exactly what the owned checklist makes them and only the
+// recommendation goes: every owned `FIX:` line is withheld and the failing
+// summary stops saying "install them". This is ADR 0054's third rule, "once a
+// claim has been made about a layer, the report stops printing a recipe for
+// it", applied to a claim that fails validation the way a dangling `declined`
+// pointer does. It falls back to MISSING, never to a status of its own, which
+// is why this is not a fifth state. The paragraph under `Write boundary:` said
+// this already; the table and the summary are what a reader in a hurry reads.
+const HINTED_GUEST = BOUNDARY.mode === UNRECORDED && BOUNDARY.legacy === GUEST
+const WITHHELD = `withheld. ${LEGACY_RECORD} says this repository is not yours, so installing this would change somebody else's repository. This report cannot take that record as the repository's answer (b-fac ADR 0037) and does not argue with it either: record the boundary with the command at the end, and this row stops applying.`
+
+// ---------------------------------------------------------------------------
+// A layer the repository decided against, and why the record is in the tree
+//
+// **The location was the whole design question and it is not a coin toss.** The
+// two candidates were `AGENTS.md`, committed, and the machine record in the git
+// common directory, which this file already reads.
+//
+// ADR 0021 splits the initialisation answers by a test rather than by taste: a
+// repo fact is true for anyone who clones, a machine fact is about *this*
+// operator on *this* repository. `OWNED_RECORD` below states the split in its
+// own words and puts repo facts in `AGENTS.md`. **A declined layer passes that
+// test in one line.** Everybody who clones has declined it, because what
+// declined it is a decision record they clone too. The write boundary fails the
+// same test, which is why the two records are in different places rather than
+// in one place for tidiness.
+//
+// Three consequences settle it, and each is a failure the other location has.
+//
+// **A fresh clone would forget.** The whole defect is a repository being told to
+// install something it decided against. Put the record inside `.git/` and the
+// next clone is told exactly that, on its first run, with the decision sitting
+// in a tracked ADR two directories away. The record would be the one part of the
+// decision that did not travel with it.
+//
+// **A declaration nobody can review is one anybody can set.** This status is
+// reachable only by writing a sentence, so what stops it becoming a checklist
+// item is that the sentence is a tracked change somebody merged. A line inside
+// `.git/` appears in no diff, no review and no `git status`, which is the
+// property that makes it right for an operator fact and wrong for this.
+//
+// **ADR 0030 refused to build a reader for `AGENTS.md`, and its two reasons are
+// both about the boundary rather than about the file.** It refused because the
+// boundary is a machine fact by definition, and because the one `AGENTS.md` line
+// the skill asks for has no writer, so a reader would read an absent file for
+// ever. Neither reaches here. This fact is a repo fact by that ADR's own test,
+// and its writer is a person declining a layer, which is a deliberate act and
+// not a step somebody forgot. A repository that has declined nothing has no
+// line, and that is the ordinary case rather than a permanent absence.
+//
+// **What this costs, said out loud.** `AGENTS.md` is a fixed location, and #171
+// is what fixed locations do. The difference is the direction of the failure: a
+// repository with no `AGENTS.md`, or one keeping its conventions elsewhere, has
+// no declarations and gets exactly the report it gets today. A fixed guard path
+// produced a wrong verdict about a correct repository; a fixed declaration path
+// produces the pre-existing verdict and no new claim.
+//
+// **Guest mode cannot use this and must not.** `AGENTS.md` in a repository you
+// are a guest in is the host's, and writing it is the single thing guest mode
+// exists in order not to do. So only layers in the owned checklist are
+// declinable, gate G never is, and a line naming G is reported rather than
+// honoured. That is not a gap: in guest mode the four owned layers are already
+// `n/a` by mode, and the gate is the mode, so declining it is declining guest
+// mode rather than a layer of it.
+// ---------------------------------------------------------------------------
+const REPO_FACTS = 'AGENTS.md'
+
+// Deliberately hard to write by accident, which is #170's lesson arriving at a
+// louder status instead of a false `ok`: a report that says a layer is present
+// when it is not is a lie about a control, and a report that goes quiet about
+// one because of a stray line is the same lie in a different font. Formatting is
+// forgiven (a bullet, bold, backticks) because a person writes this in a
+// markdown document. The wording is not.
+const CLAIM = /^Enforcement layer\s+(\S+):\s*declined\b(.*)$/
+const RECORDED_IN = /^,?\s*recorded in\s+(.+?)\s*\.?$/
+const MARKDOWN_LINK = /^\[[^\]]*\]\(([^)\s]+)\)$/
+
+// **A pointer to a record, and not free text.** Free text was the other
+// candidate and it loses on both halves of what a reason is for. It cannot be
+// checked, so "not needed here" satisfies it and the status becomes the
+// checklist item this must not become. And it ages in place: the sentence is
+// written at the moment of declining and nothing ever revisits it, which is how
+// three copies of ADR 0001's instruction came to be arguing with a report.
+//
+// A path is checkable twice over without the tool forming any opinion about
+// prose. **This never opens the record.** Reading prose to discover whether a
+// decision exists fails silently the first time somebody words it differently,
+// and a check that is wrong about that is worse than no check, so the two
+// questions asked are the two a filesystem answers: is the record there, and is
+// it in the repository everyone clones.
+//
+// What is deliberately not required is that the path look like a decision
+// record. Insisting on `docs/architecture/decisions/` would impose a convention
+// rather than read one (ADR 0022), and a repository keeping its decisions in one
+// `DECISIONS.md`, or in a directory named for its own house style, would be
+// refused for spelling. What matters is that the argument is in the repository.
+function pointerIn(rest) {
+  const named = RECORDED_IN.exec(rest)
+  if (named === null) {
+    return {
+      problem: [
+        `${REPO_FACTS} declares this layer declined and names no record, so this is an`,
+        'assertion rather than a decision. A layer is declined once the argument is written',
+        'somewhere everyone who clones this repository gets it. Complete the line:',
+        `  Enforcement layer <n>: declined, recorded in <path in this repository>`,
+      ],
+    }
+  }
+  const raw = named[1].trim()
+  const path = (MARKDOWN_LINK.exec(raw)?.[1] ?? raw).replace(/^<|>$/g, '').replace(/\\/g, '/')
+  // A path leading out of the checkout is not a record this repository has. The
+  // absolute case is the one worth naming: it points at one machine's disk,
+  // which is the machine fact this design just finished refusing.
+  if (path.startsWith('/') || /^[A-Za-z]:/.test(path) || relative(ROOT, resolve(ROOT, path)).startsWith('..')) {
+    return {
+      problem: [
+        `${REPO_FACTS} declares this layer declined and records the decision at "${path}",`,
+        'which is outside this repository. A record only this machine can read is not the',
+        'repository having decided; it is somebody having decided. Move it into the tree',
+        'and name it by a path relative to the repository root.',
+      ],
+    }
+  }
+  if (!existsSync(join(ROOT, path))) {
+    return {
+      problem: [
+        `${REPO_FACTS} declares this layer declined and records the decision at "${path}",`,
+        'where there is no such file. A pointer to nothing is the same as no pointer, and',
+        'the layer is reported as absent until it resolves',
+      ],
+    }
+  }
+  return { path }
+}
+
+// Every declaration in `AGENTS.md`, by layer. A second line for one layer is
+// ignored rather than merged: two declarations disagreeing about the same layer
+// is a state with no right answer, and the first one is at least the one a
+// reader meets first.
+function claims() {
+  const text = read(REPO_FACTS)
+  if (text === null) return new Map()
+  const found = new Map()
+  for (const line of text.split('\n')) {
+    const bare = line.replace(/[*`]/g, '').replace(/^\s*[-+]\s+/, '').trim()
+    const claim = CLAIM.exec(bare)
+    if (claim === null || found.has(claim[1])) continue
+    found.set(claim[1], { layer: claim[1], ...pointerIn(claim[2]) })
+  }
+  return found
+}
+
+// **Tracked, not merely present.** This is the property the location was chosen
+// for, so it is measured rather than assumed: an untracked `AGENTS.md`, or a
+// record sitting in somebody's working tree and in nobody's clone, is exactly
+// the invisible declaration that ruled out the machine record. Where `git` does
+// not answer the check is skipped and the row says so, which is how this file
+// already treats its other two git comparisons.
+function trackedIn(paths) {
+  if (paths.length === 0) return new Set()
+  try {
+    return new Set(
+      git(['ls-files', '--', ...paths]).split('\n').filter(Boolean).map((p) => p.replace(/\\/g, '/')),
+    )
+  } catch {
+    return null
+  }
+}
+
+const CLAIMS = (() => {
+  const found = claims()
+  const paths = [REPO_FACTS, ...[...found.values()].map((c) => c.path).filter(Boolean)]
+  const tracked = trackedIn(paths)
+  if (tracked === null) {
+    for (const claim of found.values()) claim.unchecked = true
+    return found
+  }
+  for (const claim of found.values()) {
+    if (claim.problem !== undefined) continue
+    const untracked = [REPO_FACTS, claim.path].filter((p) => !tracked.has(p))
+    if (untracked.length > 0) {
+      claim.problem = [
+        `${untracked.join(' and ')}: not tracked here, so this declaration lives in one`,
+        "working tree and in nobody else's clone. A layer is declined by the repository or",
+        'not at all, so commit the record and the file that declares it, and the decision',
+        'arrives with the code it is about',
+      ]
+    }
+  }
+  return found
+})()
+
+// What a declined row says instead of a verdict and a recipe. The `covers` line
+// is still printed above it, which is the point: the risk stays on the screen
+// and only the argument about it stops.
+const declinedRow = (claim) => [
+  `${REPO_FACTS} declares this layer declined, and records the decision in`,
+  `  ${claim.path}`,
+  ...(claim.unchecked ? ['note: `git` did not answer, so whether both files are tracked is unchecked'] : []),
+  'Not counted, and not a finding. What the covers line above names is what this',
+  'repository has decided to do without; read the record before installing it anyway.',
+]
+
+// A refused declaration, printed where somebody wrote one for the gate. Refusing
+// out loud rather than ignoring it: a line that silently does nothing is how
+// somebody comes to believe a layer is declined when the report still judges it.
+const refusedClaim = [
+  `${REPO_FACTS} declares gate G declined. That declaration is not honoured and gate G`,
+  'cannot be declined. It is the one control guest mode has, and in a repository you are',
+  `a guest in ${REPO_FACTS} is the host's file rather than the factory's to write. Remove`,
+  'the line: declining the gate is declining guest mode, which is a boundary to record',
+  'rather than a layer to decline.',
+]
+
+// Every workflow file as one string. Substring questions only: "does any
+// workflow mention this name" is answerable without a YAML parser, and this
+// script takes no dependencies.
+function workflows() {
+  const dir = join(ROOT, '.github', 'workflows')
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .map((f) => ({ file: `.github/workflows/${f}`, text: read(`.github/workflows/${f}`) ?? '' }))
+}
+
+// ---------------------------------------------------------------------------
+// A workflow's triggers, which are not the same thing as its text
+//
+// The question below is whether layer 3's workflow *also* runs on a pull
+// request. It used to be asked of the whole file, comments included, and that
+// is backwards in the case that matters: the more carefully a workflow explains
+// why it avoids a trigger, the more certainly it is accused of using it. The
+// repository this file ships from spent a wiring attempt on exactly that, and
+// then carried a comment telling the next reader not to spell the word, which
+// is a comment doing a check's job (#152, #160).
+//
+// **A false positive is the expensive direction here.** A setup report that
+// accuses a correct installation is the failure that gets the report switched
+// off, which is the whole argument this file's header makes about permanently
+// red lines. A residual false negative in an exotic shape costs one unreported
+// advisory note. The two are not close, and that asymmetry is what picks the
+// rule below.
+//
+// A YAML parser would settle it and there is not one: no dependencies, one
+// file, and a parser written here would be a second thing to be wrong about.
+// So this narrows the *region* instead of narrowing the pattern. It takes the
+// top-level `on:` key and the indented lines under it, strips comments, and
+// asks the question of what is left.
+//
+// Narrowing the pattern instead, to a line beginning with optional indentation
+// and the trigger name, was the other candidate and is rejected. It fixes the
+// reported case and breaks `on: [push, pull_request]`, which is a form real
+// workflows are written in, so it trades a false positive for a false negative
+// in a common shape. The asymmetry above licenses an exotic residual, not a
+// routine one.
+//
+// What is left wrong, said out loud: a trigger named inside a multi-line string
+// inside the `on:` block reads as a trigger, and a `#` inside a quoted scalar
+// there truncates the line. Both are absurd in an `on:` block, and both fail
+// toward saying less rather than more.
+//
+// `null` means no top-level `on:` key was found at all, and the caller asks
+// nothing rather than falling back to the whole file. Falling back would
+// reinstate the defect in precisely the file too odd to read.
+const uncommented = (line) => line.replace(/(^|\s)#.*$/, '$1')
+
+function triggerBlock(text) {
+  const lines = text.split('\n')
+  const at = lines.findIndex((line) => /^(?:on|"on"|'on'):/.test(line))
+  if (at === -1) return null
+  const block = [uncommented(lines[at]).replace(/^(?:on|"on"|'on'):/, '')]
+  for (const line of lines.slice(at + 1)) {
+    if (/^\S/.test(line)) break
+    block.push(uncommented(line))
+  }
+  return block.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// A script a workflow runs, which is not the same thing as one it names
+//
+// Layer 3 asks whether anything actually invokes the audit. That used to be a
+// substring question over the whole workflow file, which answers `ok` for a
+// workflow naming the script only in a comment (#170). It is the same mistake
+// `triggerBlock` above fixed, in the opposite and more expensive direction:
+// that one accused a correct workflow, this one told a repository it had the
+// detection layer when what it had was a paragraph about one. Layer 3 is the
+// only one of the four that detects rather than prevents, so its false `ok` is
+// the report going quiet about the thing the other three are checked against.
+//
+// The route in is not exotic. This repository's own `provenance.yml` names the
+// script in a comment above the step that runs it, so any repository copying
+// that file as a template and dropping the step keeps the comment and the `ok`.
+//
+// So the question is asked of the `run:` values, which is where a workflow
+// invokes anything. A text scan and not a parse, judged enough here for the
+// reason the `on:`-block scan was judged enough for #160: the alternative is a
+// YAML parser written in this file, which is a second thing to be wrong about,
+// and ADR 0029 keeps this to one file with nothing beside it.
+//
+// Block scalars are the half `triggerBlock` did not need. `run: |` carries the
+// command on the lines below it, indented past the key, and that is the shape
+// any step longer than one command is written in.
+//
+// **Comments are stripped from the plain form and not from a block body**, and
+// the asymmetry is deliberate. On the `run:` line itself a `#` is YAML's, the
+// same as everywhere else in the file. Inside a block body the text is the
+// shell's, `#` is the shell's comment character, and stripping it would mean
+// deciding which shell. What is left wrong, said out loud: a shell comment
+// inside a `run:` block naming the audit reads as running it. That is #170's
+// residual rather than its fix, and it is a shape nobody writes by accident,
+// where a header comment above a step is one this repository wrote itself.
+//
+// Also left wrong: a plain scalar continued onto the next line reads as its
+// first line only. Both residuals fail toward saying a script is not run,
+// except the shell-comment one, and the caller separates "no workflow names it"
+// from "a workflow names it somewhere that does not run it" so the second
+// arrives with a remedy instead of as a flat MISSING.
+const RUN_KEY = /^(\s*)(-\s+)?run:(.*)$/
+
+function runScalars(text) {
+  const lines = text.split('\n')
+  const values = []
+  for (let i = 0; i < lines.length; i += 1) {
+    const key = RUN_KEY.exec(lines[i])
+    if (key === null) continue
+    const column = key[1].length + (key[2]?.length ?? 0)
+    if (!/^\s*[|>]/.test(key[3])) {
+      values.push(uncommented(key[3]))
+      continue
+    }
+    // A block body is every following line indented past the key, blank lines
+    // included, which is what lets a `run:` block hold a paragraph break.
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (lines[j].trim() === '') continue
+      if (/^\s*/.exec(lines[j])[0].length <= column) break
+      values.push(lines[j])
+      i = j
+    }
+  }
+  return values.join('\n')
+}
+
+// `pull_request_target` is named as well, because it is the same trigger for
+// this purpose and `\b` will not find it inside the longer word.
+const PULL_REQUEST_TRIGGER = /(?:^|[^\w-])pull_request(?:_target)?(?![\w-])/
+const triggersOnPullRequest = (text) => {
+  const block = triggerBlock(text)
+  return block !== null && PULL_REQUEST_TRIGGER.test(block)
+}
+
+// What the scripts' DEFAULT_BRANCH constants are supposed to equal. A guard
+// that protects `main` in a repo whose default branch is `develop` denies
+// nothing and reports no error, which is the worst shape a control can take.
+//
+// `origin/HEAD` is the authority and is unset in most clones, so the fallback
+// infers from which conventional branch exists on the remote and says that it
+// inferred. Guessing silently would be the same failure this script is about.
+function git(args) {
+  return execFileSync('git', args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim()
+}
+
+function defaultBranch() {
+  try {
+    return { name: git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).replace(/^origin\//, '') }
+  } catch {
+    /* unset locally, which is the normal case. */
+  }
+  const candidates = ['main', 'master', 'develop', 'trunk'].filter((name) => {
+    try {
+      git(['rev-parse', '--verify', `refs/remotes/origin/${name}`])
+      return true
+    } catch {
+      return false
+    }
+  })
+  return candidates.length === 1 ? { name: candidates[0], inferred: true } : null
+}
+
+// The guest gate's own promise is that `git status --porcelain -uall` in the
+// host repo is byte-for-byte what it was before it was installed. That is
+// checkable from here, and it is the half a directory listing cannot see: a
+// gate installed by committing it, or wired by editing somebody's tracked
+// settings file, works exactly as well as one that was not and has already
+// broken the boundary it is there to hold.
+function visibleToTheHostRepo(paths) {
+  try {
+    return {
+      tracked: git(['ls-files', '--', ...paths]).split('\n').filter(Boolean),
+      // `??` is git's mark for an untracked file it can see, which is precisely
+      // what `.git/info/exclude` was supposed to stop it seeing.
+      unignored: git(['status', '--porcelain', '-uall', '--', ...paths])
+        .split('\n')
+        .filter((line) => line.startsWith('??'))
+        .map((line) => line.slice(3)),
+    }
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// --record-owned, which is the answer this repository could not produce
+//
+// ADR 0021 calls the write boundary a machine fact **either way**, and has the
+// question asked out loud at initialisation. Only one thing ever wrote that
+// fact, `guard-guest-writes.mjs --install`, and it only ever writes `guest`,
+// because installing the gate *is* the guest declaration (ADR 0029). So the two
+// states a repository reached on its own were guest and unrecorded, and an
+// owned repository printed NOT RECORDED for ever while being told to write a
+// line nothing could write. ADR 0029's own rule about remedies applies to a
+// report as well as to a gate: a wall with a signpost pointing nowhere is how a
+// layer gets switched off.
+//
+// The cost is worse than a wasted paragraph, and it is the reason this exists
+// rather than the output simply being softened. NOT RECORDED means two things
+// at once: **nobody asked**, which is the state ADR 0021's asymmetry is built
+// to catch, and **asked, answered owned, nowhere to put it**, which is fine. A
+// state every owned repository is permanently in carries no signal. Softening
+// the text instead would have made silence mean owned, and silence meaning
+// owned is the one inference ADR 0021 forbids: "no record" is a fact about the
+// repository in exactly the way "no gate installed" is, and a work repository
+// with nothing set up yet looks precisely like an owned one.
+//
+// **The writer lives beside the reader**, which is the same argument ADR 0027
+// makes for the probe and the rule being one file. The one thing the two halves
+// must agree on is the shape of the `Write boundary:` line, and here they cannot
+// disagree. Guest keeps its own writer, because there the record is a byproduct
+// of installing the gate, and a guest record written without the gate is a
+// declaration with nothing behind it.
+//
+// **It writes the record and excludes it, and does nothing else.** No gate, no
+// hook, no settings file: owned mode has no boundary to hold. A misfire in a
+// repository that is not yours therefore writes one untracked file that makes
+// this report say `owned`, which is already the checklist it reports when
+// nobody has recorded anything, and it cannot touch the gate, which never reads
+// the mode.
+// ---------------------------------------------------------------------------
+
+// The two commands below line up in a column, and the left one is now as long
+// as whichever probe this repository's gate answers to, so the width is measured
+// rather than typed. #153 read the record before it read anything else, which is
+// what a machine record is for, so a ragged one is worse here than in output
+// nobody keeps.
+const RECORD_COLUMN = Math.max('check-setup.mjs'.length, MERGE_PROBE.length) + 3
+
+// What an owned record says, which is nearly all reason and one fact. There is
+// no owned equivalent of the guest record's backlog line or probe command: in
+// owned mode the backlog and the check command are repo facts, true for anyone
+// who clones, and they belong in a committed `AGENTS.md`. The boundary is the
+// only machine fact owned mode has, so this file is thin on purpose, and its
+// worth is that it exists rather than what it holds.
+const OWNED_RECORD = `# Machine facts
+
+Not committed, and not committable. b-fac ADR 0021 splits the initialisation answers
+by who they are about: repo facts are true for anyone who clones and belong in
+\`AGENTS.md\`, and machine facts are about *this* operator on *this*
+repository. This file is the second kind, and it is inside the git common
+directory rather than in the working tree, so nobody who clones this repository
+inherits it, no ignore rule has to hold it out of anybody's \`git status\`, and
+every linked worktree reads the same copy. b-fac ADR 0037.
+
+Write boundary: owned
+
+The factory may write outward from here: create the repository, seed a backlog,
+push branches, open and merge pull requests, configure CI, apply a ruleset.
+
+That is the whole of the answer, and the file is short because owned mode has
+one machine fact and no gate to hold it. The guest record names a gate to probe
+at this point. What there is to ask here is the owned enforcement stack, which
+answers a different question: what may land, rather than what may be written
+outward.
+
+    ${'check-setup.mjs'.padEnd(RECORD_COLUMN)}the layers, and whether each one is wired
+    ${MERGE_PROBE.padEnd(RECORD_COLUMN)}whether the one that refuses a merge loaded
+
+Written by \`check-setup.mjs --record-owned\`, which refuses to overwrite it. If
+the answer here changes, delete this file and record the new one.
+`
+
+// The path to print in a command the reader is meant to run. Relative to the
+// repo root when this script is inside it, which is the copied-into-`scripts/`
+// case, and absolute when it is still being run out of the skill.
+const SELF = (() => {
+  const path = process.argv[1] ?? ''
+  const rel = relative(canonical(ROOT), canonical(path)).replace(/\\/g, '/')
+  return rel !== '' && !rel.startsWith('..') ? rel : path
+})()
+
+const untracked = () => git(['status', '--porcelain', '-uall']).split('\n').filter(Boolean)
+
+function recordOwned() {
+  const refuse = (lines) => {
+    for (const line of lines) console.error(line)
+    console.error('')
+    console.error('Nothing was written.')
+    process.exit(1)
+  }
+
+  // An answer already here is not this command's to overwrite, whether it
+  // answers or not. Somebody wrote it, and the fix for a wrong one is to look
+  // at it rather than to have it replaced from underneath.
+  if (BOUNDARY.record !== undefined) {
+    const line = /^Write boundary:.*$/m.exec(BOUNDARY.record)?.[0] ?? 'no "Write boundary:" line'
+    refuse([
+      `${RECORD_AT} already exists, so the question has been answered here.`,
+      `It says: ${line}`,
+      '',
+      'Delete the file if the answer has changed, and record the new one. Replacing',
+      'it from underneath is how an operator stops believing what it says.',
+    ])
+  }
+
+  // The one case where writing `owned` would be actively wrong: the gate is
+  // installed and its record was deleted, which layer G already reports as what
+  // guest mode looks like with its record gone. Refusing here is not inferring
+  // the mode from the repository. It is declining to write a fact that
+  // contradicts a control somebody deliberately installed.
+  //
+  // Both refusals read the common directory, and until #122 they read the
+  // checkout. In a linked worktree of a repository recorded as guest neither one
+  // could see anything, so this wrote `Write boundary: owned` into the worktree
+  // and the repository then held two records contradicting each other —
+  // manufacturing, from a worktree, exactly the disagreement ADR 0039 built
+  // these refusals to prevent.
+  if (readCommon(GUEST_GATE) !== null) {
+    refuse([
+      `${GATE_AT} is installed here, and installing that gate is the guest`,
+      'declaration (b-fac ADR 0029). Recording this repository as owned would leave a control',
+      'in place that the record says is unnecessary, which is the disagreement layer G',
+      'reports rather than a state to write on purpose.',
+      '',
+      'If this repository really is yours, remove the gate and its wiring first.',
+    ])
+  }
+
+  // The same refusal against the paths installs used before #122, which both of
+  // the checks above read straight past. Measured while fixing #131: in a
+  // repository whose `.factory/` held a guest gate and a record saying guest,
+  // this wrote `Write boundary: owned` into the common directory and exited 0,
+  // leaving the repository holding two records contradicting each other. That is
+  // the state ADR 0039 built these refusals to prevent and ADR 0037 found being
+  // manufactured from a worktree, and it is the same blindness #131 reported in
+  // the reader: this file knew the legacy location existed and never read what
+  // was in it.
+  //
+  // **The record half is asymmetric on purpose.** A legacy record saying `owned`
+  // is not refused, because the report now sends exactly that case here: writing
+  // the answer it already gives, somewhere every checkout can read it, is the
+  // whole remedy. What is refused is writing an answer that contradicts one
+  // somebody declared.
+  const legacyGate = read(LEGACY_GATE) !== null
+  const legacyRecord = read(LEGACY_RECORD)
+  if (legacyGate || (legacyRecord !== null && declaredIn(legacyRecord) === GUEST)) {
+    refuse([
+      `${legacyGate ? LEGACY_GATE : LEGACY_RECORD} is here from an install before BlakeHastings/b-fac#122 and`,
+      'declares this repository a guest. Recording it as owned would leave the repository',
+      'holding two records that contradict each other, and the older one is the harder to',
+      'notice, because nothing reads it any more.',
+      '',
+      'A legacy record answering owned is a different case and is not refused: writing',
+      'that same answer where every checkout can read it is what the report asks for.',
+      '',
+      `If this repository really is yours, remove ${LEGACY_FACTORY}/ and any wiring that`,
+      'names it first, and then this has nothing to contradict.',
+    ])
+  }
+
+  let before
+  if (COMMON === null) {
+    refuse([
+      '`git` did not answer, so the git common directory cannot be resolved and there is',
+      'nowhere to put this record that every checkout of this repository can read.',
+      'b-fac ADR 0037 keeps machine facts there rather than in a working tree, precisely so',
+      'that a worktree is not a second opinion. Run this from inside a git repository,',
+      'with git on PATH.',
+    ])
+  }
+  try {
+    before = untracked()
+  } catch {
+    refuse([
+      '`git status` did not answer, so the promise this command makes — that the host',
+      'repository sees nothing new — cannot be checked, and an unchecked promise about',
+      "somebody else's repository is not one worth making.",
+    ])
+  }
+
+  const done = []
+
+  // No exclude line, and none needed: the record goes inside `.git/`, which git
+  // does not look into. What ADR 0021 asked `.git/info/exclude` to achieve is
+  // now structural. A repository installed before #122 keeps its `/.factory/`
+  // line; nothing here adds one.
+  mkdirSync(join(COMMON, dirname(MACHINE_RECORD)), { recursive: true })
+  writeFileSync(join(COMMON, MACHINE_RECORD), OWNED_RECORD)
+  done.push(`wrote ${show(join(COMMON, MACHINE_RECORD))}, saying "Write boundary: owned"`)
+  done.push('no ignore rule was needed: it is inside the git common directory, which git')
+  done.push('  does not look into, and which every linked worktree shares')
+
+  console.log(`Recorded the write boundary in ${ROOT}\n`)
+  for (const line of done) console.log(`  - ${line}`)
+
+  // The guest gate promises a host repo's `git status` is byte-for-byte what it
+  // was, and asks you to check rather than believe it. This has the same
+  // promise and can check its own, so it does. Lines that *vanished* are the
+  // exclusion catching scratch state that was already showing, which is a
+  // repair rather than a violation, so only additions count.
+  const added = untracked().filter((line) => !before.includes(line))
+  if (added.length > 0) {
+    console.error('\nBut this repository can now see files it could not before:\n')
+    for (const line of added) console.error(`  ${line}`)
+    console.error('\nThat is the half of the promise this command exists to keep, and it should not')
+    console.error('be reachable now that the record lives inside the git common directory. Something')
+    console.error('other than this command put those there.')
+    process.exit(1)
+  }
+  console.log('\n`git status --porcelain -uall` gained nothing, which was checked here rather')
+  console.log('than claimed. Nothing tracked changed and nothing outside this repository was')
+  console.log('written.')
+
+  console.log('\nThis installed nothing: owned mode has no gate, and the answer is the whole')
+  console.log('point. NOT RECORDED now means nobody asked, which is what it is for. Run the')
+  console.log('report to read it back:\n')
+  console.log(`    node ${SELF}`)
+  process.exit(0)
+}
+
+if (process.argv.includes('--record-owned')) recordOwned()
+
+// A copied-but-unedited placeholder, in the two forms the assets ship: the
+// SETUP constants in the scripts, and bracketed phrases in the process docs.
+// The bracket pattern skips markdown links, which are the false positive that
+// would get this check switched off.
+const UNEDITED_CONSTANT = /REPLACE_WITH_[A-Z_]+/g
+const UNEDITED_PROSE = /\[[a-z][^\]\n]{2,80}\](?![([])/g
+
+function leftovers(text, pattern) {
+  return [...new Set((text ?? '').match(pattern) ?? [])]
+}
+
+// Every PreToolUse entry whose command names `needle`, and the settings file it
+// was found in. Both gates ask this same question of the same two files, and
+// the answer to "is it wired" is where each of them separates a copied control
+// from an installed one.
+function preToolUseHooks(needle, root = ROOT) {
+  const wired = []
+  for (const file of [REPO_SETTINGS, LOCAL_SETTINGS]) {
+    const text = readAt(root, file)
+    if (text === null) continue
+    let parsed
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return { wired, unparseable: file }
+    }
+    for (const entry of parsed?.hooks?.PreToolUse ?? []) {
+      if ((entry.hooks ?? []).some((h) => (h.command ?? '').includes(needle))) wired.push({ file, entry })
+    }
+  }
+  return { wired }
+}
+
+// ---------------------------------------------------------------------------
+// Which sessions the guest gate is registered for
+//
+// Measured on Claude Code 2.1.228, because reading the docs would not have
+// answered it: **the harness reads project settings from the directory the
+// session started in and from nowhere else.** Not the parent, not the
+// repository, not `.git/`. A hook in one checkout's `.claude/settings*.json`
+// therefore covers sessions started in that directory and no others, and a
+// linked worktree — where every subagent that pushes a branch or opens a pull
+// request is standing — registers nothing at all.
+//
+// So "is the gate wired" has two answers and this reports both. The second one
+// lives in the operator's home directory, outside the repository, which ADR
+// 0012 already established a check here may read: the question has an answer
+// that is not in the repository, and reporting only the half that is would be
+// the same lie #122 found.
+// ---------------------------------------------------------------------------
+const userSettingsFile = () =>
+  join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'settings.json')
+
+function machineWideHooks() {
+  const file = userSettingsFile()
+  const text = (() => {
+    try {
+      return readFileSync(file, 'utf8')
+    } catch {
+      return null
+    }
+  })()
+  if (text === null) return { file, found: [] }
+
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { file, unparseable: true, found: [] }
+  }
+
+  const found = []
+  for (const entry of parsed?.hooks?.PreToolUse ?? []) {
+    for (const hook of entry.hooks ?? []) {
+      const command = hook.command ?? ''
+      if (!command.includes('guard-guest-writes')) continue
+      // The installer writes the scope quoted and absolute. An unquoted one is
+      // somebody's hand edit and still worth reading.
+      const scope = /--scope\s+(?:"([^"]+)"|(\S+))/.exec(command)
+      found.push({ entry, scope: scope ? (scope[1] ?? scope[2]) : null })
+    }
+  }
+  return { file, found }
+}
+
+// Every checkout of this repository, main and linked. `git worktree list` is a
+// read and answers the same from any of them.
+function checkouts() {
+  try {
+    return git(['worktree', 'list', '--porcelain'])
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => resolve(line.slice('worktree '.length).trim()))
+  } catch {
+    return [ROOT]
+  }
+}
+
+// A matcher selects on tool NAME. A harness offering a second shell tool walks
+// straight past a matcher naming one, which a real session proved by pushing to
+// the default branch through one. An `if` clause uses permission-rule syntax,
+// which also names a single tool, so it reopens the hole the matcher closed.
+function wiringProblems({ file, entry }) {
+  const problems = []
+  const matcher = entry.matcher ?? ''
+  if (!matcher.includes('|')) {
+    problems.push(
+      `${file} matches "${matcher}", which names one tool. A second shell tool` +
+        ' in the same harness is not guarded. Name them all, separated by |',
+    )
+  }
+  if ('if' in entry) {
+    problems.push(
+      `${file} narrows the matcher with an "if" clause, which uses permission-rule` +
+        ' syntax naming a single tool and reopens the hole the matcher just closed',
+    )
+  }
+  return problems
+}
+
+// Skipped in guest mode, where nothing compares a DEFAULT_BRANCH constant
+// because none of the layers holding one may be installed.
+const BRANCH = CHECKLIST === OWNED ? defaultBranch() : null
+const DEFAULT = BRANCH?.name ?? null
+const WORKFLOWS = workflows()
+
+// Two questions that look like one, kept apart because their risk profiles are
+// opposite and #170 is what happens when one helper answers both.
+//
+// `mentions` is layer 1's: do the check names in `merge-pr.mjs`'s REQUIRED
+// array turn up anywhere in CI at all. It only ever prints an advisory note, a
+// name legitimately appears in a comment beside the job that produces it, and a
+// check name is a job's `name:` rather than anything a `run:` line contains, so
+// narrowing it to `run:` values would make it answer nothing. Whole text is the
+// right read there and it is unchanged.
+//
+// `invokers` is layer 3's: does anything actually run this script. That decides
+// a verdict on the one detective layer, so it asks where invocation happens.
+const mentions = (needle) => WORKFLOWS.filter((w) => w.text.includes(needle))
+const invokers = (needle) => WORKFLOWS.filter((w) => runScalars(w.text).includes(needle))
+
+// Layer numbers match references/enforcement.md, weakest first, so this output
+// reads as that chapter rendered against the repo in front of you. The guest
+// gate keeps that chapter's separate numbering rather than becoming a fifth
+// layer here: ADR 0029 makes it a different stack, for a different mode,
+// protecting a different thing.
+//
+// `modes` is which write boundary a layer belongs to, and `skipped` is what the
+// output says where it does not. An absent layer explained by the mode is not a
+// finding, so it is not counted and it does not move the exit code.
+const LAYERS = [
+  {
+    n: 0,
+    name: 'The instruction',
+    modes: [OWNED],
+    covers: 'nothing on its own. Here so its absence is visible too',
+    skipped: () => [
+      "not reported: in a repository that is not yours the host's own contribution",
+      'docs are the contract, and the review record lives in the local store until',
+      'publish. references/first-run.md',
+    ],
+    fix: 'Copy review.md and working-an-issue.md to docs/process/ and pull_request_template.md to .github/, then edit the bracketed commands.',
+    run() {
+      // SETUP: adjust these paths if this repo keeps its process docs elsewhere.
+      const docs = [
+        'docs/process/working-an-issue.md',
+        'docs/process/review.md',
+        '.github/pull_request_template.md',
+      ]
+      const absent = docs.filter((d) => read(d) === null)
+      if (absent.length > 0) return { status: MISSING, findings: [`absent: ${absent.join(', ')}`] }
+
+      const findings = []
+      for (const doc of docs) {
+        const stale = leftovers(read(doc), UNEDITED_PROSE)
+        if (stale.length > 0) {
+          findings.push(`${doc} still has the asset's placeholders: ${stale.slice(0, 3).join(' ')}`)
+        }
+      }
+      return { status: findings.length > 0 ? PARTIAL : OK, findings }
+    },
+  },
+  {
+    n: 1,
+    name: 'The merge wrapper',
+    modes: [OWNED],
+    covers: 'a merge taken with checks red. Does not cover anyone who does not type it',
+    skipped: () => [
+      'not reported: there is no remote check rollup to read, and landing means landing',
+      "on your own integration branch. The gate is the host's own check command, run",
+      'locally. b-fac ADR 0021',
+    ],
+    fix: 'Copy merge-pr.mjs to scripts/ and set REQUIRED to the check names a real run reports.',
+    run() {
+      const source = read('scripts/merge-pr.mjs')
+      if (source === null) return { status: MISSING, findings: ['scripts/merge-pr.mjs is absent'] }
+
+      const stale = leftovers(source, UNEDITED_CONSTANT)
+      if (stale.length > 0) {
+        return {
+          status: PARTIAL,
+          findings: [
+            `REQUIRED still holds ${stale.join(', ')}. A name that never appears reads as`,
+            '"never ran", so every merge refuses. Set it to the names a real run reports',
+          ],
+        }
+      }
+
+      const findings = []
+      const declaration = source.match(/^const REQUIRED = \[([^\]]*)\]/m)?.[1] ?? ''
+      const required = [...declaration.matchAll(/['"]([^'"]+)['"]/g)].map((q) => q[1])
+      for (const name of required) {
+        if (mentions(name).length === 0) {
+          findings.push(
+            `note: no workflow names the required check "${name}". Fine if it comes from` +
+              ' an app outside this repo; a typo here refuses every merge',
+          )
+        }
+      }
+      return { status: OK, findings }
+    },
+  },
+  {
+    n: 2,
+    name: 'The guard hook',
+    modes: [OWNED],
+    covers: 'an agent merging its own PR. Does not cover a session that never loaded it, or a human at a terminal',
+    skipped: () => [
+      'not reported: merging is not yours to do in a repository you are a guest in, and',
+      'gate G below refuses `gh pr merge` along with every other outward write, by its',
+      'general rule rather than as a special case',
+    ],
+    fix: `Copy guard-merge.mjs to scripts/ and add the PreToolUse block from references/enforcement.md to .claude/settings.json. Restart the session afterwards: settings are read at startup. Then \`${MERGE_PROBE}\`, which the guard refuses when it is loaded.`,
+    run() {
+      const { wired, unparseable } = MERGE_HOOKS
+      if (GUARD.source === null) {
+        return {
+          status: MISSING,
+          findings:
+            GUARD.named.length > 0
+              ? [
+                  `${MERGE_GUARD} is absent, and the PreToolUse hook runs ${GUARD.named.join(', ')},`,
+                  'where there is no file either. A hook pointed at nothing loads nothing, so this',
+                  'is wired and absent rather than copied and unwired',
+                ]
+              : [`${MERGE_GUARD} is absent`],
+        }
+      }
+      if (unparseable) {
+        return { status: MISSING, findings: [`${unparseable} is not valid JSON, so no hook loads`] }
+      }
+      // Present but unwired is the failure this whole script exists for, so it
+      // reports as MISSING rather than PARTIAL. A script nothing invokes is not
+      // a weaker layer than an absent one; it is the same layer, plus a file.
+      if (wired.length === 0) {
+        return {
+          status: MISSING,
+          findings: [
+            `the script is at ${GUARD.path} and no PreToolUse hook runs it, so nothing loads it.`,
+            'This is the shape the layer takes when setup was read and not done',
+          ],
+        }
+      }
+
+      const findings = wiringProblems(wired[wired.length - 1])
+      // A note rather than a problem, because the layer is installed and works.
+      // Making this move the status would trade #171's MISSING for a permanent
+      // PARTIAL, which is the same red line one shade lighter.
+      if (!GUARD.conventional) {
+        findings.push(
+          `note: the guard is at ${GUARD.path}, not the conventional ${MERGE_GUARD}. Read` +
+            ` from the hook in ${GUARD.file}, which is this repository's own record of where` +
+            ' it put the file, and the probe line below names that copy',
+        )
+      }
+      const guards = GUARD.source.match(/^const DEFAULT_BRANCH = ['"]([^'"]+)['"]/m)?.[1]
+      if (DEFAULT && guards && guards !== DEFAULT) {
+        findings.push(
+          `DEFAULT_BRANCH is "${guards}" and this repo's default branch is "${DEFAULT}",` +
+            ' so the guard protects a branch that does not exist',
+        )
+      }
+      return { status: findings.some((f) => !f.startsWith('note:')) ? PARTIAL : OK, findings }
+    },
+  },
+  {
+    n: 3,
+    name: 'The provenance audit',
+    modes: [OWNED],
+    covers: 'a commit that reached the default branch outside a PR. Does not cover prevention: it runs after the fact',
+    skipped: () => [
+      "not reported: a workflow is a change to somebody else's repository, and their CI",
+      'runs on the pull request after publish, unchanged. b-fac ADR 0021',
+    ],
+    fix: 'Copy check-main-provenance.mjs to scripts/, set BASELINE to the commit that adds these scripts, and run it from a workflow on push to the default branch.',
+    run() {
+      const source = read('scripts/check-main-provenance.mjs')
+      if (source === null) {
+        return {
+          status: MISSING,
+          findings: [
+            'scripts/check-main-provenance.mjs is absent, so every preventive layer above',
+            'is silent when it is bypassed',
+          ],
+        }
+      }
+      const runners = invokers('check-main-provenance')
+      if (runners.length === 0) {
+        // Named but not run is its own state and gets its own sentence. It is
+        // the shape #170 was reported from, and it is also what a workflow
+        // reaching the script through an npm alias looks like from here, so a
+        // flat "no workflow runs it" would be read as wrong by the second
+        // reader and ignored by both. Naming the file is the contract either
+        // way: a check that cannot follow an alias has to be told.
+        const named = mentions('check-main-provenance')
+        if (named.length === 0) {
+          return { status: MISSING, findings: ['no workflow runs it, so it detects nothing'] }
+        }
+        return {
+          status: MISSING,
+          findings: [
+            `${named.map((w) => w.file).join(', ')} names it outside any run: line, so nothing`,
+            'invokes it and it detects nothing. Name the script in the run: line of a step,',
+            'rather than in a comment or an npm alias beside one',
+          ],
+        }
+      }
+
+      const findings = []
+      const stale = leftovers(source, UNEDITED_CONSTANT)
+      if (stale.length > 0) {
+        findings.push(
+          `BASELINE still holds ${stale.join(', ')}, so the audit exits before judging` +
+            ' anything. Set it to the commit that added these scripts',
+        )
+      }
+      if (DEFAULT) {
+        const audits = source.match(/^const DEFAULT_BRANCH = ['"]([^'"]+)['"]/m)?.[1]
+        if (audits && audits !== DEFAULT) {
+          findings.push(`DEFAULT_BRANCH is "${audits}" and this repo's default branch is "${DEFAULT}"`)
+        }
+      }
+      for (const runner of runners) {
+        if (triggersOnPullRequest(runner.text)) {
+          findings.push(
+            `note: ${runner.file} also triggers on pull_request. Keep this one out of the` +
+              ' required checks: a push-only job reads as "never ran" and refuses every merge',
+          )
+        }
+      }
+      return { status: findings.length > 0 ? PARTIAL : OK, findings }
+    },
+  },
+  {
+    // Lettered, not numbered 4. ADR 0029 makes this a different stack rather
+    // than one more rung of the one above: a different mode, and a repository
+    // that is not yours rather than a trunk that is.
+    n: 'G',
+    name: 'The write-boundary gate',
+    modes: [GUEST],
+    covers:
+      'an outward write from a repo that is not yours. Does not cover a process that never loaded it, a human at a terminal, or a write that arrives by some route other than git, gh or bd',
+    skipped: (mode) => {
+      const copied = readCommon(GUEST_GATE) !== null
+      if (mode === OWNED) {
+        return [
+          `not reported: ${RECORD_AT} records this repository as owned, so the factory`,
+          'may write outward and there is no boundary for a gate to hold. Every command it',
+          'refuses is the workflow here. b-fac ADR 0029',
+          ...(copied
+            ? [`but ${GATE_AT} exists anyway, in a repository recorded as owned. One of`,
+               'those two facts is wrong and the file is the likelier one']
+            : []),
+        ]
+      }
+      return [
+        'not reported: nobody has recorded a write boundary, so the layers above were',
+        'reported instead. If this repository is not yours, do not install those: record',
+        'the boundary and install this gate, and the four above stay off for good.',
+        ...(copied
+          ? [`Note that ${GATE_AT} is already here, which is what guest mode looks like`,
+             `with its record deleted. --install rewrites ${RECORD_AT} without touching`,
+             'anything else']
+          : []),
+      ]
+    },
+    fix: 'Run `node <this skill>/assets/guard-guest-writes.mjs --install` from the repo root, then restart the harness: settings are read at startup. Its output ends with the machine-wide block, which is the half that reaches a worktree.',
+    run() {
+      if (readCommon(GUEST_GATE) === null) {
+        return {
+          status: MISSING,
+          findings: [
+            `${RECORD_AT} records this repository as guest and ${GATE_AT} is absent,`,
+            "so nothing refuses a push, a pull request, or a comment on the host's tracker.",
+            'This is the state where the boundary is a paragraph and not a control',
+          ],
+        }
+      }
+
+      // Two registrations, covering different sessions, and a report that names
+      // only the first is the report #122 found lying in a worktree.
+      const { wired, unparseable } = preToolUseHooks('guard-guest-writes')
+      const machine = machineWideHooks()
+      const scoped = machine.found.filter(
+        ({ scope }) => scope !== null && COMMON !== null && samePath(scope, COMMON),
+      )
+      const unscoped = machine.found.filter(({ scope }) => scope === null)
+
+      if (unparseable) {
+        return { status: MISSING, findings: [`${unparseable} is not valid JSON, so no hook loads`] }
+      }
+
+      // Which sessions each registration reaches, said out loud, because "the
+      // gate is installed" was true for the whole run that produced #122 and
+      // covered none of the sessions doing the writing.
+      const all = checkouts()
+      const covered = all.filter((root) => preToolUseHooks('guard-guest-writes', root).wired.length > 0)
+      const bare = all.filter((root) => !covered.includes(root))
+
+      // MISSING is for a gate nothing anywhere invokes, which is layer 2's rule:
+      // a control nothing invokes is an instruction plus a file. A gate wired
+      // for some checkouts and not others is a different state and wants a
+      // different sentence, so it is PARTIAL and the finding names the gap.
+      if (covered.length === 0 && scoped.length === 0 && unscoped.length === 0) {
+        return {
+          status: MISSING,
+          findings: [
+            `${GATE_AT} is here and no PreToolUse hook runs it, so nothing loads it.`,
+            "No checkout of this repository names it and neither does the operator's own",
+            'settings. --install copies and wires in one step, so this is a half-done install',
+            'or a settings file that was edited afterwards',
+          ],
+        }
+      }
+
+      const findings = []
+      for (const entry of [...wired, ...scoped.map((f) => ({ file: machine.file, entry: f.entry }))]) {
+        findings.push(...wiringProblems(entry))
+      }
+
+      if (scoped.length > 0) {
+        findings.push(
+          `note: registered machine-wide in ${machine.file}, scoped to this repository, so` +
+            ` every session inside any of its ${all.length} checkout(s) is covered`,
+        )
+      } else if (bare.length > 0) {
+        findings.push(
+          `the gate is wired per checkout, and ${bare.length} of this repository's ${all.length}` +
+            ' have no wiring, so a session started in one registers no hook at all:',
+          ...bare.map((root) => `  ${root}`),
+          'Those are where subagents run, and pushing a branch and opening a pull request is',
+          'what they do. Install the machine-wide block instead, which reaches every checkout',
+          'including ones that do not exist yet: `node ' + GATE_AT + ' --user-hook`',
+        )
+      } else if (all.length > 1) {
+        findings.push(
+          `note: wired separately in each of this repository's ${all.length} checkouts. A worktree` +
+            ' added later registers nothing until somebody installs into it; the machine-wide' +
+            ' block does not have that failure mode',
+        )
+      } else {
+        findings.push(
+          'note: wired in this checkout only, which is every checkout this repository has today.' +
+            ' A worktree added later registers nothing. `node ' + GATE_AT + ' --user-hook`',
+        )
+      }
+
+      if (unscoped.length > 0) {
+        findings.push(
+          `${machine.file} runs this gate with no --scope, so it refuses outward writes in` +
+            ' every repository on this machine, including the operator\'s own. That is the false' +
+            ' positive by construction b-fac ADR 0029 refused a user-level hook over. Add --scope',
+        )
+      }
+
+      // The boundary enforcing itself by breaking itself. Both halves of the
+      // gate's promise are checkable and neither is visible in a file listing.
+      const seen = visibleToTheHostRepo([LEGACY_FACTORY, LOCAL_SETTINGS, REPO_SETTINGS])
+      if (seen === null) {
+        findings.push('note: `git` did not answer, so the "nothing tracked changed" half is unchecked')
+      } else {
+        const committed = seen.tracked.filter(
+          (p) => p.startsWith(`${LEGACY_FACTORY}/`) || p === LOCAL_SETTINGS,
+        )
+        if (committed.length > 0) {
+          findings.push(
+            `${committed.join(', ')} is tracked in this repository, so installing the gate` +
+              ' changed a repo you are a guest in. b-fac ADR 0021 keeps machine facts out of the tree',
+          )
+        }
+        if (seen.unignored.length > 0) {
+          findings.push(
+            `git status here shows ${seen.unignored.join(', ')}, so .git/info/exclude did not` +
+              " get the paths and the owner sees the factory's scratch state as their changes",
+          )
+        }
+        for (const { file } of wired) {
+          if (seen.tracked.includes(file)) {
+            findings.push(
+              `the gate is wired in ${file}, which is tracked here. --install writes` +
+                ` ${LOCAL_SETTINGS} precisely so that wiring it is not a change to somebody's repo`,
+            )
+          }
+        }
+      }
+
+      if (read(LEGACY_RECORD) !== null) {
+        findings.push(
+          `note: ${LEGACY_FACTORY}/ is still here from an install before BlakeHastings/b-fac#122 and nothing reads` +
+            ' it now. Check what is in it, then remove it and its /.factory/ line from' +
+            ' .git/info/exclude',
+        )
+      }
+
+      // Advisory, deliberately: the gate is correctly installed either way, and
+      // --install writes this placeholder itself, so counting it would make a
+      // clean install exit non-zero on its first run.
+      if (/^Backlog:\s*\(/m.test(BOUNDARY.record ?? '')) {
+        findings.push(
+          `note: the Backlog line in ${RECORD_AT} is still the template's instruction` +
+            ' rather than a tool name, so nothing says where the factory\'s own issues live',
+        )
+      }
+
+      return { status: findings.some((f) => !f.startsWith('note:') && !f.startsWith('  ')) ? PARTIAL : OK, findings }
+    },
+  },
+]
+
+console.log(`Enforcement layers in ${ROOT}`)
+// A repository is not one directory, and which one you are standing in changes
+// nothing about the answers below except how the paths are spelled. Printing
+// this is how the reader knows that.
+if (COMMON !== null && !samePath(COMMON, join(ROOT, '.git'))) {
+  console.log(`This is a linked worktree. The repository is ${dirname(COMMON)}`)
+}
+if (BOUNDARY.mode === UNRECORDED) {
+  console.log('Write boundary: NOT RECORDED')
+  for (const line of BOUNDARY.why) console.log(`             ${line}`)
+} else {
+  console.log(`Write boundary: ${BOUNDARY.mode}, recorded in ${RECORD_AT}`)
+}
+// Which provider starts this factory's agents is a machine fact beside the
+// boundary (ADR 0074), but unlike the boundary it has a safe default, so an
+// absent line is reported as that default and never as a finding.
+const DISPATCH = /^Dispatch:\s*(\S.*?)\s*$/m.exec(BOUNDARY.record ?? '')?.[1]
+console.log(
+  DISPATCH
+    ? `Dispatch: ${DISPATCH}, recorded in ${RECORD_AT}`
+    : "Dispatch: the harness's own subagents, since no Dispatch: line is recorded",
+)
+if (CHECKLIST === OWNED) {
+  console.log(
+    DEFAULT
+      ? `Default branch: ${DEFAULT}${BRANCH.inferred ? ' (inferred; `git remote set-head origin -a` settles it)' : ''}`
+      : 'Default branch: unknown, so the DEFAULT_BRANCH constants were not compared',
+  )
+}
+console.log('')
+
+// ---------------------------------------------------------------------------
+// A declaration decides the wording before it decides the verdict
+//
+// **The FIX line is what this issue was filed about.** A layer the repository
+// decided against was landing in MISSING and closing with a recipe for doing the
+// thing it decided not to do. So the rule is stated once, here, and it is wider
+// than the new status: **once the repository has written the word "declined"
+// about a layer, this never prints an install recipe for it again**, whether or
+// not the declaration turned out to be usable. Somebody who typed that line was
+// not asking how to install it, and a repository whose declaration is broken
+// wants the declaration fixed, not the argument reopened. Removing the line is
+// what puts the recipe back, and the remedy says so rather than reprinting it.
+//
+// **A declaration is honoured only where the layer is genuinely absent.** Run
+// the layer first and let what is on disk win. A layer that is installed *and*
+// declared declined is a contradiction, and reporting `declined` over an
+// installed layer would be #170's false `ok` rebuilt on purpose: a report saying
+// a control is not there when it is. So the real verdict stands and the
+// contradiction is a finding, which is also what keeps the record from rotting.
+// The repository that reverses a decision and installs the layer is told its
+// declaration is now stale, on the next run, by the tool rather than by
+// somebody remembering.
+const contradicts = (claim) => [
+  `${REPO_FACTS} declares this layer declined${claim.path === undefined ? '' : `, recorded in ${claim.path}`},`,
+  'and the layer is installed here anyway. The declaration is the stale half: it describes',
+  'a decision this repository has since reversed. Remove the line, and say so in the record.',
+]
+
+const declaredButSkipped = [
+  `note: ${REPO_FACTS} declares this layer declined, which changes nothing here. The`,
+  'write boundary already excludes it, and a layer the mode excludes is not one this',
+  'repository had to decide about.',
+]
+
+const rows = []
+let unmet = 0
+let reported = 0
+let declined = 0
+for (const layer of LAYERS) {
+  const applies = layer.modes.includes(CHECKLIST)
+  // Only the owned checklist is declinable. Gate G is refused wherever it is
+  // claimed, for the reason beside `refusedClaim`.
+  const declinable = layer.modes.includes(OWNED)
+  const claim = CLAIMS.get(String(layer.n))
+  let { status, findings } = applies
+    ? layer.run()
+    : { status: 'n/a', findings: layer.skipped(BOUNDARY.mode) }
+  let fix = layer.fix
+
+  if (claim !== undefined && !declinable) {
+    findings = [...findings, ...refusedClaim]
+    // A refused claim in the mode that judges this layer is a real finding, not
+    // a note: somebody believes a control is switched off that is not.
+    if (applies && status === OK) status = PARTIAL
+  } else if (claim !== undefined && !applies) {
+    findings = [...findings, ...declaredButSkipped]
+  } else if (claim !== undefined && status === MISSING) {
+    // Never the install recipe again, per the rule above, and that holds for the
+    // unusable declaration too.
+    fix = `Fix the declaration in ${REPO_FACTS}, or delete the line if this layer is meant to be installed after all. This report prints the way to install it once nothing here claims it was declined.`
+    if (claim.problem === undefined) {
+      status = DECLINED
+      findings = declinedRow(claim)
+    } else {
+      findings = [...findings, ...claim.problem]
+    }
+  } else if (claim !== undefined) {
+    findings = [...findings, ...contradicts(claim)]
+    if (status === OK) status = PARTIAL
+  }
+  // After the declaration, so a row carrying a broken `declined` claim keeps the
+  // remedy for that claim. Either way it is not an install recipe.
+  if (HINTED_GUEST && status === MISSING && claim === undefined) fix = WITHHELD
+
+  if (status === DECLINED) declined += 1
+  else if (applies) {
+    reported += 1
+    if (status !== OK) unmet += 1
+  }
+  rows.push({ layer, status, findings, fix })
+}
+
+// Measured rather than typed, so a run with no declined row prints the column
+// it has always printed and the widest status decides only when it is wider.
+const COLUMN = Math.max(MISSING.length, ...rows.map((r) => r.status.length))
+for (const { layer, status, findings, fix } of rows) {
+  console.log(`[ ${status.padEnd(COLUMN)} ] ${layer.n}. ${layer.name}`)
+  console.log(`             covers ${layer.covers}`)
+  for (const finding of findings) console.log(`             ${finding}`)
+  // Only an absent layer needs the install line. A PARTIAL one is already
+  // installed and its findings say what is left, so repeating "copy the file"
+  // there would be the loudest and least useful thing on the screen. A layer
+  // the mode excludes needs it least of all: installing it is the mistake.
+  if (status === MISSING) console.log(`             FIX: ${fix}`)
+  console.log('')
+}
+
+// ---------------------------------------------------------------------------
+// Linked worktrees, reported and never judged
+//
+// BlakeHastings/b-fac#154. Every dispatch leaves a worktree behind, the harness
+// cleans up only the ones with nothing in them, so the count grows with useful
+// work and nothing reclaims it. One session ended with fourteen. Twelve held a
+// branch whose pull request had merged and were disposable; the same session had
+// opened on one holding a commit that existed nowhere else. **From outside, the
+// two look identical**: a locked directory with a branch checked out.
+//
+// So this prints the facts that tell them apart, one worktree at a time, and
+// decides nothing. It does not say which worktrees are in use, because a lock is
+// taken by whatever created the worktree and is not evidence that anything is
+// still running, and a wrong answer to that question is what deletes a running
+// agent's tree. That is also why this lives here rather than in a hook that
+// cleans up: a report can be wrong out loud and a cleanup cannot.
+//
+// **It sits below the layer table and never moves the exit code.** A worktree
+// is not an enforcement layer and a repository with twelve of them has no layer
+// missing. Counting one would make this report red after every ordinary session,
+// and a line that is red on every run is the one the header says gets switched
+// off. It is printed before the summary rather than after it, so the verdict and
+// what to do about it stay the last thing on the screen, as they always were.
+//
+// **Merged is the one fact this cannot know**, because a pull request lives on
+// the forge and this report makes no network call and runs no `gh`. What it
+// reports instead is the `git branch --merged` test, whether every commit on the
+// branch is already in the default branch, and it says what that misses: a squash
+// or rebase merge writes new commits, so the branch of a squash-merged pull
+// request reads "no" for ever. That is this repository's own merge policy, which
+// is why the limit is printed and not left in this comment.
+//
+// Nothing is printed where there are no linked worktrees, so a repository
+// without any gets the report it always got.
+// ---------------------------------------------------------------------------
+function linkedWorktrees() {
+  let text
+  try {
+    text = git(['worktree', 'list', '--porcelain'])
+  } catch {
+    return []
+  }
+  // The first block is always the main worktree, or the bare repository.
+  return text
+    .split(/\n\s*\n/)
+    .slice(1)
+    .map((block) => {
+      const lines = block.split('\n')
+      const field = (key) => {
+        const line = lines.find((l) => l === key || l.startsWith(`${key} `))
+        return line === undefined ? undefined : line.slice(key.length).trim()
+      }
+      return {
+        path: resolve(field('worktree') ?? ''),
+        head: field('HEAD'),
+        branch: field('branch')?.replace(/^refs\/heads\//, ''),
+        locked: field('locked'),
+        prunable: field('prunable'),
+      }
+    })
+    .filter((w) => w.head !== undefined)
+}
+
+const countOf = (args) => {
+  try {
+    return Number(git(args))
+  } catch {
+    return null
+  }
+}
+const commits = (n) => (n === 1 ? '1 commit' : `${n} commits`)
+
+// The branch these are compared with. The remote-tracking one when there is
+// one, because a local default branch is only as current as whoever last pulled
+// it in this clone.
+function mergeTarget() {
+  const name = (BRANCH ?? defaultBranch())?.name
+  if (!name) return null
+  for (const ref of [`origin/${name}`, name]) {
+    try {
+      git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
+      return ref
+    } catch {
+      /* not in this clone; try the next */
+    }
+  }
+  return null
+}
+
+function worktreeFacts(w, target, remotes) {
+  const facts = []
+  facts.push(`branch: ${w.branch ?? `none, HEAD detached at ${w.head.slice(0, 7)}`}`)
+  facts.push(`locked: ${w.locked === undefined ? 'no' : w.locked === '' ? 'yes' : `yes, "${w.locked}"`}`)
+
+  const unpushed = remotes ? countOf(['rev-list', '--count', w.head, '--not', '--remotes']) : null
+  facts.push(
+    `commits on no remote-tracking ref: ${
+      !remotes ? 'all of them, since this clone has no remote-tracking refs'
+      : unpushed === null ? 'could not be read'
+      : unpushed === 0 ? 'none'
+      : commits(unpushed)
+    }`,
+  )
+
+  if (w.prunable !== undefined) {
+    facts.push('uncommitted or untracked files: not readable, the directory is gone (`git worktree prune` forgets it)')
+  } else {
+    let files = null
+    try {
+      files = git(['-C', w.path, 'status', '--porcelain', '--untracked-files=all']).split('\n').filter(Boolean)
+    } catch {
+      /* reported below as unreadable rather than as clean */
+    }
+    const untrackedCount = files?.filter((line) => line.startsWith('??')).length
+    facts.push(
+      `uncommitted or untracked files: ${
+        files === null ? 'could not be read'
+        : files.length === 0 ? 'none'
+        : `${files.length - untrackedCount} changed, ${untrackedCount} untracked`
+      }`,
+    )
+  }
+
+  const outside = target === null ? null : countOf(['rev-list', '--count', `${target}..${w.head}`])
+  facts.push(
+    `merged into ${target ?? 'the default branch'}: ${
+      target === null ? 'not judged, the default branch is unknown'
+      : outside === null ? 'could not be read'
+      : outside === 0 ? 'yes, every commit on it is there'
+      : `no, ${commits(outside)} ${outside === 1 ? 'is' : 'are'} not`
+    }`,
+  )
+  return facts
+}
+
+const WORKTREES = linkedWorktrees()
+if (WORKTREES.length > 0) {
+  const target = mergeTarget()
+  const remotes = (() => {
+    try {
+      return git(['for-each-ref', '--count=1', 'refs/remotes']) !== ''
+    } catch {
+      return false
+    }
+  })()
+  console.log(
+    `Linked worktrees: ${WORKTREES.length}. Facts, not a layer: nothing below changes the exit code.`,
+  )
+  console.log('')
+  for (const w of WORKTREES) {
+    console.log(`  ${show(w.path)}${samePath(w.path, ROOT) ? '   (this checkout)' : ''}`)
+    for (const fact of worktreeFacts(w, target, remotes)) console.log(`             ${fact}`)
+    console.log('')
+  }
+  for (const line of [
+    `"Merged" is the \`git branch --merged\` test against ${target ?? 'the default branch'}: every commit on the branch`,
+    'is already there. A squash or rebase merge writes new commits, so the branch of a squash-merged',
+    'pull request reads "no" here. Whether a pull request merged is a question for the forge, and',
+    'this report makes no network call. Remote-tracking refs are as of the last fetch.',
+    '',
+    'None of this says which worktrees are still in use: a lock is not proof that anything is',
+    "running. To clear one, first keep what it holds, using the preserve step in the skill's",
+    'references/parallelism.md ("Resuming and recovering"), then unlock it only if you know its',
+    'agent has stopped and remove it with `git worktree remove`, unforced: if git refuses, that',
+    'refusal is the report that something is still in there.',
+    '',
+  ]) console.log(line)
+}
+
+const DECLINED_ROWS = rows.filter((r) => r.status === DECLINED)
+
+// The probe is the only way a session can tell a loaded gate from an inert one,
+// and this script cannot tell them apart either. Say so wherever it reports a
+// gate as installed, or "ok" gets read as "protected".
+//
+// Both modes have a gate and both gates now answer `--probe` as a mode of
+// themselves, so the only thing the boundary decides is which file to ask. This
+// block was guest-only for as long as it was true that the shipped merge guard
+// had no probe, which meant the owned stack could report every layer `ok` with
+// no way to ask the one that matters whether it had loaded. That was the exact
+// state the two lost days above were spent in.
+//
+// Which line to type is the gate's own business, so it is read out of the gate
+// rather than assumed. See `probeCommand` above for what that costs and what it
+// was costing before. The guest side was measured at the same time and is
+// unaffected: `guard-guest-writes.mjs` names itself and takes `--probe`, so the
+// derived line and the old fixed one are the same string.
+const PROBE_SOURCE = CHECKLIST === GUEST ? readCommon(GUEST_GATE) : GUARD.source
+const PROBE_EXISTS = PROBE_SOURCE !== null
+const PROBE_LINE = CHECKLIST === GUEST ? probeCommand(GATE_AT, PROBE_SOURCE) : MERGE_PROBE
+const PROBE = [
+  'Wired is not loaded. Settings are read once at process start, so ask the gate',
+  'itself and put its answer beside this output:',
+  '',
+  `    ${PROBE_LINE}`,
+  '',
+  'Being refused is the answer you want. Ask it from the checkout the work is',
+  'actually happening in, because which sessions a hook is registered for is a',
+  'separate question from whether it is installed.',
+]
+
+// A machine fact whichever way it comes out: ADR 0021 defines it as whether
+// *this* operator on *this* checkout may publish outward, which is not true of
+// anyone else who clones. So it never goes in a committed file, and the
+// AGENTS.md line the skill asks for names the backlog tool rather than this.
+//
+// Both answers are writable, which they were not until #100. The guest one is
+// written by installing the gate, because that installation *is* the
+// declaration; the owned one is written here, because owned mode has no gate to
+// declare it with. Naming only the first is what made this block ask an owned
+// repository for a line nobody could produce, run after run, for ever.
+//
+// **A legacy record already carries the answer, so it gets one command and not a
+// pair.** ADR 0029's rule that a refusal owes a remedy that works has a second
+// half #131 measured the cost of: a remedy that runs and does the wrong thing is
+// worse than one that cannot run. `--install` in a repository recorded owned
+// leaves behind a gate refusing every push, in a repository the operator owns and
+// is supposed to push to, and it is the operator who then has to work out that
+// the report sent them there. Choosing between two commands is a step that can be
+// got wrong, so where the answer is already on disk this does not offer the
+// choice.
+const GUEST_WRITER = '    node <skill>/assets/guard-guest-writes.mjs --install'
+const OWNED_WRITER = `    node ${SELF} --record-owned`
+
+// Following either remedy leaves the old directory behind, because neither
+// writer removes it and neither should: ADR 0037 keeps that decision with the
+// operator, who can see what is in there.
+const LEGACY_LEFTOVERS = [
+  '',
+  `Afterwards, look at what else is in ${LEGACY_FACTORY}/ and remove it along with its`,
+  '/.factory/ line in .git/info/exclude. Nothing reads that directory now.',
+]
+
+function unrecordedRemedy() {
+  if (BOUNDARY.legacy === OWNED) {
+    return [
+      `${LEGACY_RECORD} already answers this question, and the answer is owned. Write`,
+      'that same answer where every checkout of this repository can read it. It records',
+      'and does nothing else: owned mode has no gate, so there is nothing to install.',
+      '',
+      OWNED_WRITER,
+      ...LEGACY_LEFTOVERS,
+    ]
+  }
+  if (BOUNDARY.legacy === GUEST) {
+    return [
+      `${LEGACY_RECORD} already answers this question, and the answer is guest. Do not`,
+      'move that file: in guest mode the record is a byproduct of installing the gate,',
+      'and a guest record with no gate behind it is a declaration and not a control.',
+      'Re-run the install, which writes the gate, the record and the wiring where every',
+      'checkout of this repository reads them:',
+      '',
+      GUEST_WRITER,
+      ...LEGACY_LEFTOVERS,
+    ]
+  }
+  return [
+    'Nobody has recorded the write boundary here. Record it before the loop starts.',
+    'It is a machine fact either way, about this operator on this repository, so it is',
+    `never committed: one line in ${RECORD_AT}, inside the git common`,
+    'directory where every checkout reads it and no clone inherits it. Whichever',
+    'answer is true here, one command writes it:',
+    '',
+    GUEST_WRITER,
+    '        not your repository: the gate, and the record as part of installing it',
+    OWNED_WRITER,
+    '        yours: the record, and nothing else',
+    ...(BOUNDARY.legacy === undefined ? [] : LEGACY_LEFTOVERS),
+  ]
+}
+
+const UNRECORDED_REMINDER = unrecordedRemedy()
+
+// **The exit code follows the decision, which is the observable this is for.**
+// A repository that has declined a layer and installed the rest exits 0, in the
+// same way a guest repository with four `n/a` rows does. What it must not do is
+// exit 0 having said nothing: `declined` is subtracted from the "not applicable"
+// count rather than folded into it, and the layers are named again under the
+// summary, because the summary is the line an orchestrator quotes.
+//
+// The wording with no declined row is unchanged, deliberately and not by luck.
+// The ordinary report is what every repository installing this skill reads, and
+// a design about one repository's decision has no business editing it.
+const declinedSummary = [
+  `${declined === 1 ? 'One layer is' : `${declined} layers are`} declined here rather than absent:`,
+  ...DECLINED_ROWS.map(({ layer }) => `  ${layer.n}. ${layer.name}, in ${CLAIMS.get(String(layer.n)).path}`),
+  `Declared in ${REPO_FACTS} and argued in the records above. What each one leaves`,
+  'uncovered is on its row; a decision is not a mitigation.',
+]
+
+if (unmet === 0) {
+  console.log(
+    declined === 0
+      ? `Every layer that applies here is present and wired: ${reported} reported, ` +
+          `${LAYERS.length - reported} not applicable to this write boundary. Any note above is advisory.`
+      : `Every layer that applies here and was not declined is present and wired: ` +
+          `${reported} reported, ${declined} declined, ${LAYERS.length - reported - declined} not ` +
+          'applicable to this write boundary. Any note above is advisory.',
+  )
+  if (declined > 0) for (const line of ['', ...declinedSummary]) console.log(line)
+  for (const line of ['', ...PROBE]) console.log(line)
+  if (BOUNDARY.mode === UNRECORDED) for (const line of ['', ...UNRECORDED_REMINDER]) console.log(line)
+  process.exit(0)
+}
+
+const subject =
+  reported === 1
+    ? 'The one layer that applies here is'
+    : unmet === 1
+      ? `One of the ${reported} layers that apply here is`
+      : `${unmet} of the ${reported} layers that apply here are`
+const until = unmet === 1 ? 'Until it is,' : 'Until they are,'
+
+console.error(`${subject} absent, unwired, or still unedited.`)
+// Said here as well as in the rows, because the failing summary is the half an
+// orchestrator quotes, and "two of three" over a repository with four layers
+// reads as a miscount rather than as a decision.
+if (declined > 0) for (const line of declinedSummary) console.error(line)
+if (CHECKLIST === GUEST) {
+  console.error(`${until} some session working this repository refuses no outward write`)
+  console.error('into a repository that is not yours: a push, a pull request, a comment on')
+  console.error('their tracker, a `bd init` that commits nineteen files. Read the findings')
+  console.error('above rather than reinstalling by reflex — "the gate is missing" and "the')
+  console.error('gate is not registered for the sessions doing the writing" are different')
+  console.error('states and only one of them is fixed by installing it again. Then restart')
+  console.error('the harness, run the probe, and paste both outputs into your first status')
+  console.error('update.')
+} else if (HINTED_GUEST) {
+  // Still red, and that is the decision rather than an oversight (b-fac ADR 0070).
+  // ADR 0001's objection is to a red nobody can act on, and this one has a single
+  // remedy printed below it: the guest install, after which this repository is
+  // reported against gate G and exits 0. Going green here instead would let an
+  // unrecorded boundary pass as a finished setup, which is the one state this
+  // report exists to make somebody answer.
+  console.error('They are not offered here, and nothing on this screen says how to install them.')
+  console.error(`${LEGACY_RECORD} says this repository is not yours, so each of them would be`)
+  console.error("a change to somebody else's repository and its CI. This report cannot take that")
+  console.error('record as the answer for the whole repository, and it will not argue with it')
+  console.error('either. Record the boundary with the one command below: the layers above then')
+  console.error('stop applying, and the gate that does apply is reported instead.')
+} else {
+  console.error(`${until} nothing here mechanically stops an agent landing code, and`)
+  console.error('nothing tells you afterwards that one did. Install them from the skill\'s')
+  console.error('assets/ directory, then run this again and paste both outputs into your first')
+  console.error('status update, so the difference is on the record rather than assumed.')
+}
+// Only when there is something to probe. A remedy that cannot run is the thing
+// ADR 0029 says gets a gate switched off, and `node` on an absent file fails in
+// a way that reads as the gate being broken rather than absent.
+if (PROBE_EXISTS) for (const line of ['', ...PROBE]) console.error(line)
+if (BOUNDARY.mode === UNRECORDED) for (const line of ['', ...UNRECORDED_REMINDER]) console.error(line)
+process.exit(1)

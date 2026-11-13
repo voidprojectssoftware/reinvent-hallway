@@ -1,0 +1,27 @@
+# Fails a pull request that changes the model or what can be done with it when
+# its description has no diagram for that change (scripts/check-pr-visual.mjs).
+# Reruns when the description is edited, so adding the diagram turns it green.
+name: visual
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      # Base branch only: the rule comes from main, never from the PR it judges.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Each changed area has a diagram in the description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          gh api --paginate "repos/${{ github.repository }}/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
+          node scripts/check-pr-visual.mjs files.txt
