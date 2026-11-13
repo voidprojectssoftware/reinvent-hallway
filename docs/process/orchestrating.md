@@ -41,3 +41,12 @@ payments have failed"). The ruleset requires `checks`, so nothing can merge to
 - The `visual` rule is held by review: check the diagrams are in the PR body.
 - When CI is back: one PR `mvp` → `main` through the real gates, then delete
   this section.
+
+## Reviewing by driving the app
+
+- **Stop `npm run dev` by process group.** Killing the npm pid leaves `workerd`
+  listening on the port and the inspector port (+10000). Start it with
+  `setsid` and stop it with `kill -- -<pgid>`. Seen 2026-11-13 reviewing #28.
+  Never `pkill -f` a pattern: it matched the reviewing shell itself once.
+- Review on the merge result in the landing worktree, on a fixed review port
+  (24601) no builder's path hashes to by accident.
