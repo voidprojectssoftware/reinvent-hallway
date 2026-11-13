@@ -28,9 +28,11 @@ const syncInput = (overrides: Partial<{ sessions: unknown[]; favorites: string[]
 const bindings = { DEV_SIGN_IN: "1" };
 const origin = "http://127.0.0.1:8787";
 let call: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+let clock: Date;
 
 beforeEach(() => {
-  const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
+  clock = new Date("2026-11-13T12:00:00.000Z");
+  const { handlers } = inMemoryHandlers({ now: () => clock });
   const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: noPng });
   // Handlers are built per request; the fake store under them lives for the test.
   call = async (input, init) => app.fetch(new Request(input, init), bindings);
@@ -119,6 +121,25 @@ describe("sync_my_schedule over MCP", () => {
     const entries = (await mySchedule("ana")).entries;
     expect(entries.map((e) => e.sessionId)).not.toContain("s-dev318");
     expect(entries.find((e) => e.sessionId === "s-svs401")?.intent).toBe("reserved");
+  });
+
+  it("records the last sync, read back the same over REST and get_my_schedule", async () => {
+    expect(await mySchedule("ana")).not.toHaveProperty("lastSync");
+    await syncOverMcp("ana", syncInput({ favorites: [...fixture.schedule.favorites, "s-nowhere"] }));
+    const first = { syncedAt: "2026-11-13T12:00:00.000Z", added: 15, removed: 0, changed: 0, unchanged: 0, missingSessions: 1 };
+    expect((await mySchedule("ana")).lastSync).toEqual(first);
+
+    clock = new Date("2026-11-13T12:12:00.000Z");
+    const favorites = fixture.schedule.favorites.filter((id) => id !== "s-dev318");
+    await syncOverMcp("ana", syncInput({ favorites, reserved: [...fixture.schedule.reserved, "s-svs401"] }));
+    const second = { syncedAt: "2026-11-13T12:12:00.000Z", added: 0, removed: 1, changed: 1, unchanged: 13, missingSessions: 0 };
+    expect((await mySchedule("ana")).lastSync).toEqual(second);
+
+    const client = await mcpAs("ana");
+    const overMcp = await client.callTool({ name: "get_my_schedule", arguments: { eventId: "reinvent2026" } });
+    await client.close();
+    expect((overMcp.structuredContent as MySchedule).lastSync).toEqual(second);
+    expect(await mySchedule("bo")).not.toHaveProperty("lastSync");
   });
 
   it("keeps an id without a snapshot when the catalog has it, and reports it when not", async () => {

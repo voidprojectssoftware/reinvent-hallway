@@ -1,5 +1,6 @@
 // GetMySchedule (domain.md): my entries for one event with their sessions,
-// hidden ones included and marked, because they are mine.
+// hidden ones included and marked, because they are mine, and what my agent's
+// last sync did, so I can trust the page shows what it last sent.
 import type { EventScope, MySchedule } from "@hallway/contracts";
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
@@ -14,11 +15,15 @@ export function getMySchedule({ events, schedule, sessionUrlTemplate }: Schedule
     if (!attendeeId) return signInFirst();
     const event = await events.get(eventId);
     if (!event) return fail("not-found", `No event ${eventId}.`);
-    const entries = await schedule.schedule(attendeeId, eventId);
+    const [entries, lastSync] = await Promise.all([
+      schedule.schedule(attendeeId, eventId),
+      schedule.lastSync(attendeeId, eventId),
+    ]);
     return ok({
       eventId,
       timezone: event.timezone,
       entries: entries.map(({ entry, session }) => planEntryResource(entry, session, sessionUrlTemplate)),
+      ...(lastSync && { lastSync }),
     });
   };
 }

@@ -10,7 +10,7 @@ import type { PlanEntry } from "@hallway/domain";
 import { and, asc, eq, getTableColumns, gte, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "../persistence/d1/database.ts";
-import { planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
+import { lastSyncs, planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
 
 /** D1's limit on bound parameters in one statement. */
 export const D1_MAX_PARAMETERS = 100;
@@ -162,9 +162,26 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
       return rows.map((row) => ({ entry: fromEntryRow(row.plan_entries), session: fromSessionRow(row.sessions) }));
     },
 
+    async lastSync(attendeeId, eventId) {
+      const [row] = await db
+        .select()
+        .from(lastSyncs)
+        .where(and(eq(lastSyncs.attendeeId, attendeeId), eq(lastSyncs.eventId, eventId)))
+        .limit(1);
+      if (!row) return undefined;
+      const { attendeeId: _attendee, eventId: _event, ...lastSync } = row;
+      return lastSync;
+    },
+
     async applySync(write) {
       const { attendeeId, eventId } = write;
-      // Order matters: sessions before the entries that reference them.
+      // Order matters: sessions before the entries that reference them. The
+      // last sync is recorded first, so a batch that fails anywhere after it
+      // takes the new record down with it.
+      const recordSync = db
+        .insert(lastSyncs)
+        .values({ attendeeId, eventId, ...write.lastSync })
+        .onConflictDoUpdate({ target: [lastSyncs.attendeeId, lastSyncs.eventId], set: write.lastSync });
       const statements: BatchItem<"sqlite">[] = [
         ...chunk(write.sessions.map(toSessionRow), Math.floor(D1_MAX_PARAMETERS / sessionColumns)).map((rows) =>
           db
@@ -190,8 +207,7 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
           db.insert(planEntries).values(entries.map((entry) => ({ ...entry, eventId }))),
         ),
       ];
-      const [first, ...rest] = statements;
-      if (first) await db.batch([first, ...rest]);
+      await db.batch([recordSync, ...statements]);
     },
 
     async addEntry(eventId, entry) {

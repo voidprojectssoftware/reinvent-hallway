@@ -115,8 +115,8 @@ We store UTC instants and the event timezone, and render in the event timezone
 - **A listed id needs a session.** An id in `favorites` or `reserved` sent
   without a snapshot is kept when the catalog already has that session, and
   otherwise skipped and returned in `missingSessions`; it never fails the sync.
-- **A sync is atomic.** The snapshots and the entry changes land together or
-  not at all (ADR 0009).
+- **A sync is atomic.** The snapshots, the entry changes and the attendee's
+  last sync record land together or not at all (ADR 0009).
 - **Session snapshots merge forward.** A newer snapshot of a session replaces
   its fields; a field absent from the snapshot keeps its old value. A snapshot
   for an unknown event is refused.
@@ -144,7 +144,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SignIn` | anyone | LinkedIn OIDC (or dev sign-in locally); creates the attendee on first sign-in, picking a free handle |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
-| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent), `unchanged`, `sessionsStored`, and `missingSessions` |
+| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent), `unchanged`, `sessionsStored`, and `missingSessions`; when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
 | `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
 | `SetEntryHidden` | me | hide or show one entry |
 | `IssueAgentToken` / `RevokeAgentToken` | me, signed in as a person (not an agent token) | |
@@ -163,7 +163,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetMe` | my attendee, with private fields |
 | `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
 | `GetInvite` | my share link with its invite token, made on first ask, to me signed in as a person (not an agent token) |
-| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in |
+| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync) |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections` / `ListRequests` / `ListSuggestions` | my connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
