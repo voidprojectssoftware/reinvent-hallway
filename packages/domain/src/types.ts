@@ -57,8 +57,15 @@ export type EntrySource = "agent-sync" | "manual";
 export interface PlanEntry {
   attendeeId: string;
   sessionId: string;
+  /** For a `manual` entry, `reserved` while the latest sync reports it reserved, else the attendee's own. */
   intent: Intent;
   source: EntrySource;
+  /** The latest sync had it from AWS `invitedSessions`: the event placed it on the schedule. */
+  invited: boolean;
+  /**
+   * The attendee hid the session. A preference kept apart from the entry, per
+   * attendee and event, so it outlives the entry leaving and coming back.
+   */
   hidden: boolean;
   addedAt: string;
 }
