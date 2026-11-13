@@ -136,11 +136,19 @@
   font: var(--t-subhead);
   color: var(--label);
 }
-/* On a shorter window the share sheet scrolls rather than losing its top
-   off screen. */
+/* On a shorter window a sheet scrolls rather than losing its top off
+   screen; the panel is the dialog that takes focus, so the keyboard scrolls
+   it too (Sheet.tsx, issue #97). */
 .sheet-in {
   max-height: 100dvh;
   overflow-y: auto;
+}
+/* No ring round the panel itself: it takes focus only so the keyboard can
+   scroll it (Tab never lands there), and a ring drawn round the whole sheet
+   on opening would be new to how a sheet looks. Its controls keep theirs. */
+.sheet-in:focus-visible {
+  outline: none;
+  border-radius: 0;
 }
 
 /* The Connections.csv picker: a label drawn as an action row, over a
