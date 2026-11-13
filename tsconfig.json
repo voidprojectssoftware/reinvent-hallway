@@ -10,6 +10,6 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["packages/*/src", "packages/*/*.ts", "*.ts"],
+  "include": ["packages/*/src", "packages/*/*.ts", "*.ts", "e2e"],
   "exclude": ["packages/domain"]
 }
