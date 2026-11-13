@@ -10,12 +10,17 @@
 //   are applied there first, because wrangler dev does not apply them and a
 //   Worker over an empty database fails on its first query.
 //
+// The web app (apps/web) is built into apps/web/dist before wrangler starts,
+// then rebuilt there on every change while wrangler serves it as the Worker's
+// static assets. One origin, and deep links and /api take the same paths they
+// will in production (ADR 0010). Reload the page to see a change.
+//
 // It also copies .dev.vars.example to apps/api/.dev.vars when there is none, so
 // the dev bearer token works locally (src/auth/dev-actor.ts). .dev.vars is
 // git-ignored and never deployed.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +31,8 @@ const api = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const root = resolve(api, "../..");
 const persistTo = join(root, ".wrangler/state");
 const wrangler = join(root, "node_modules/wrangler/bin/wrangler.js");
+const vite = join(root, "node_modules/vite/bin/vite.js");
+const web = join(root, "apps/web");
 
 export function preferredPort(checkout) {
   const hash = createHash("sha256").update(checkout).digest().readUInt32BE(0);
@@ -50,12 +57,11 @@ async function pickPort() {
   throw new Error(`No free port pair near ${start}; set HALLWAY_PORT.`);
 }
 
-// wrangler refuses an assets directory that does not exist, and apps/web is
-// another issue's. An empty one makes every non-Worker path fall through to
-// the Worker's 404 until the web app is built there.
-function ensureAssetsDirectory() {
-  const dist = join(root, "apps/web/dist");
-  if (!existsSync(dist)) mkdirSync(dist, { recursive: true });
+// wrangler refuses an assets directory that does not exist, so the first
+// build finishes before it starts.
+function buildWeb() {
+  const built = spawnSync(process.execPath, [vite, "build"], { cwd: web, stdio: "inherit" });
+  if (built.status !== 0) process.exit(built.status ?? 1);
 }
 
 function ensureDevVars() {
@@ -65,7 +71,7 @@ function ensureDevVars() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = await pickPort();
-  ensureAssetsDirectory();
+  buildWeb();
   ensureDevVars();
 
   const migrated = spawnSync(
@@ -94,6 +100,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ],
     { cwd: api, stdio: "inherit" },
   );
-  for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => dev.kill(signal));
-  dev.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+  // --logLevel warn: the watcher's rebuild lines would bury wrangler's output.
+  const watch = spawn(process.execPath, [vite, "build", "--watch", "--logLevel", "warn"], {
+    cwd: web,
+    stdio: "inherit",
+  });
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      watch.kill(signal);
+      dev.kill(signal);
+    });
+  }
+  watch.on("exit", () => dev.kill("SIGTERM"));
+  dev.on("exit", (code, signal) => {
+    watch.kill("SIGTERM");
+    process.exit(code ?? (signal ? 1 : 0));
+  });
 }

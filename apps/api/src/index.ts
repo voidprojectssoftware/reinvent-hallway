@@ -3,6 +3,7 @@
 import { getEvent } from "@hallway/application";
 import { eventsOnD1, openDatabase } from "@hallway/infrastructure";
 import { createApp } from "./app.ts";
+import { isPersonPage, personPage } from "./person-page.ts";
 
 const app = createApp<Env>({
   handlers: (env) => {
@@ -11,4 +12,9 @@ const app = createApp<Env>({
   },
 });
 
-export default app;
+export default {
+  fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    return isPersonPage(url) ? personPage(url, env.ASSETS) : app.fetch(request, env, ctx);
+  },
+} satisfies ExportedHandler<Env>;
