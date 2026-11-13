@@ -312,6 +312,13 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
         [followsMeBack.id, true],
       ].sort(),
     );
+    // The member list carries the same tie, the owner's follow of me, not mine of them.
+    expect((await world.network.networkOf(me.id)).map((m) => [m.other.id, m.tie.followedByOwner]).sort()).toEqual(
+      [
+        [followed.id, false],
+        [followsMeBack.id, true],
+      ].sort(),
+    );
   });
 });
 

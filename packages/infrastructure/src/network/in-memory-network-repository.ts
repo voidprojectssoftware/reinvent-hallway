@@ -220,7 +220,7 @@ export function networkInMemory({
           other,
           ...(connection && { connection: structuredClone(connection) }),
           follows: mine.sort((a, b) => a.source.localeCompare(b.source)),
-          tie: await tieOf(id, attendeeId),
+          tie: await tieOf(attendeeId, id),
         });
       }
       return members;

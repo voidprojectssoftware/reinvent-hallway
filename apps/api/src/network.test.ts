@@ -11,6 +11,7 @@ import type {
   MeetingGaps,
   Me,
   NetworkAgenda,
+  NetworkList,
   PersonSchedule,
   RequestList,
   RequestResult,
@@ -396,8 +397,17 @@ describe("every read of someone else's schedule goes through the visibility rule
 
     const viaRest = (await (await rest("/api/me/connections?eventId=reinvent2026", ana.id)).json()) as ConnectionList;
     expect(counts(viaRest)).toEqual(expected);
-    const viaMcp = await mcpTool<ConnectionList>(ana.id, "list_my_connections", { eventId: "reinvent2026" });
-    expect(counts(viaMcp.value!)).toEqual(expected);
+    for (const tool of ["list_my_network", "list_my_connections"]) {
+      const viaMcp = await mcpTool<NetworkList>(ana.id, tool, { eventId: "reinvent2026" });
+      expect(viaMcp.value?.people.map((p) => ({ handle: p.person.handle, sessions: p.sessions, sharedWithMe: p.sharedWithMe }))).toEqual(
+        expected,
+      );
+    }
+    const viaNetwork = (await (await rest("/api/me/network?eventId=reinvent2026", ana.id)).json()) as NetworkList;
+    expect(viaNetwork.people.map((p) => [p.person.handle, p.how, p.scheduleVisible])).toEqual([
+      [ben.handle, ["connection"], true],
+      [cat.handle, ["connection"], false],
+    ]);
 
     // Without an event, no counts; an event that does not exist is not found.
     const plain = (await (await rest("/api/me/connections", ana.id)).json()) as ConnectionList;
@@ -428,10 +438,10 @@ describe("every read of someone else's schedule goes through the visibility rule
 });
 
 describe("network MCP tools", () => {
-  it("lists my connections, and describes each tool in planning terms", async () => {
+  it("lists my network, and describes each tool in planning terms", async () => {
     const { ana, ben, cat } = await theirWeek();
-    const listed = await mcpTool<ConnectionList>(ana.id, "list_my_connections");
-    expect(listed.value?.connections.map((c) => c.person.handle)).toEqual([ben.handle, cat.handle]);
+    const listed = await mcpTool<NetworkList>(ana.id, "list_my_network");
+    expect(listed.value?.people.map((p) => p.person.handle)).toEqual([ben.handle, cat.handle]);
 
     const client = new Client({ name: "network-test", version: "0.0.0" });
     await client.connect(new StreamableHTTPClientTransport(new URL("/mcp", origin), { fetch: call }));
