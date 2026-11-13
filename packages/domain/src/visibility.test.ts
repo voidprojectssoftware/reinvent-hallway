@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlanEntry, Visibility } from "./types";
-import { canViewSchedule, visibleEntries } from "./visibility";
+import { canViewSchedule, shareableEntries, visibleEntries } from "./visibility";
 
 const owner = (visibility: Visibility) => ({ id: "owner", visibility });
 
@@ -46,5 +46,27 @@ describe("visibleEntries", () => {
   it("a schedule not visible to the viewer yields nothing", () => {
     expect(visibleEntries("stranger", owner("connections"), entries, false)).toEqual([]);
     expect(visibleEntries("friend", owner("private"), entries, true)).toEqual([]);
+  });
+});
+
+describe("shareableEntries", () => {
+  const entry = (sessionId: string, hidden: boolean): PlanEntry => ({
+    attendeeId: "owner",
+    sessionId,
+    intent: "reserved",
+    source: "manual",
+    hidden,
+    addedAt: "2026-11-13T00:00:00.000Z",
+  });
+  const entries = [entry("shown", false), entry("secret", true)];
+  const ids = (list: PlanEntry[]) => list.map((e) => e.sessionId);
+
+  it("leaves a hidden entry out even for the owner, who is about to show it to others", () => {
+    expect(ids(shareableEntries("owner", owner("private"), entries, false))).toEqual(["shown"]);
+  });
+
+  it("is empty for a viewer who may not see the schedule", () => {
+    expect(shareableEntries(null, owner("connections"), entries, false)).toEqual([]);
+    expect(shareableEntries("friend", owner("connections"), entries, true).map((e) => e.sessionId)).toEqual(["shown"]);
   });
 });

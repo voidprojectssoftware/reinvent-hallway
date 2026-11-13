@@ -61,6 +61,8 @@ export interface CalendarFeedRepository {
   /** Sets the attendee's one feed token, replacing any earlier one. */
   replace(attendeeId: string, token: string, rotatedAt: string): Promise<void>;
   get(attendeeId: string): Promise<{ token: string; rotatedAt: string } | undefined>;
+  /** Whose feed this token opens; undefined once it has been rotated away. */
+  ownerOf(token: string): Promise<string | undefined>;
 }
 
 /** Whether two attendees are connected. The network slice owns the real answer. */

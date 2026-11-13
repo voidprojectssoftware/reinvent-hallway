@@ -19,7 +19,7 @@ Repository: `voidprojectssoftware/reinvent-hallway`, private. Not deployed:
 
 ## Layout (ADR 0002)
 
-`apps/api` (Worker: `/api` REST, `/mcp`, `/cal`, static web), `apps/web` (React
+`apps/api` (Worker: `/api` REST, `/mcp`, `/cal`, `/og` share cards, `/@handle` link previews, static web), `apps/web` (React
 SPA, ADR 0005), `packages/contracts` (zod resources), `packages/domain` (rules,
 imports nothing outside itself), `packages/application` (handlers over
 repository ports), `packages/infrastructure` (D1 repositories and in-memory
