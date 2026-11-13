@@ -18,8 +18,15 @@ https://docs.aws.amazon.com/events/latest/devguide/mcp-server.html
   Callbacks are loopback only, on fixed ports, matched exactly. **A hosted web
   app cannot use this client**, which is why Hallway's import path is the
   attendee's own agent (ADR 0003).
-- Reading reInvent's catalog needs a token **and** registration for the event
-  (403 otherwise). So Hallway cannot crawl it.
+- Reading reInvent's catalog **through the API** needs a token **and**
+  registration for the event (403 otherwise).
+- **The public website shows the catalog to anyone** (measured 2026-11-13,
+  signed out, real browser): 2,588 sessions, each with title, code, type,
+  level, features and full description, at
+  `https://registration.awsevents.com/flow/awsevents/reinvent2026/eventcatalog/page/eventcatalog`.
+  Hallway still never fetches or scrapes it: the AWS Site Terms
+  (https://aws.amazon.com/terms/) prohibit "data mining, robots, or similar
+  data gathering and extraction tools" (ADR 0025's correction, issue #103).
 - Operations (REST and MCP tool names are the same): `ListEvents`, `GetEvent`,
   `ListSessions` (paged by `nextToken`, up to 250, `includeAbstracts=false`
   available), `GetSession`, `GetSchedule`, `ReserveSessions`,
@@ -35,8 +42,10 @@ https://docs.aws.amazon.com/events/latest/devguide/mcp-server.html
   `tracks`, `topics`, `industries`, `areasOfInterest`, `roles`, `services`,
   `segments`, `features`, `customerPersonas`, `experiences`,
   `additionalActivities`, `focusAreas`. Every field but the two ids may be absent.
-- **No session URL in the API.** The public site's deep-link format was not
-  found (owner question).
+- **No session URL in the API.** The public site's search link opens the
+  catalog with that session first:
+  `…/eventcatalog/page/eventcatalog?search=<code>` (tried `ANT319-R1` and
+  `SEC205`, 2026-11-13). It is `SESSION_URL_TEMPLATE`'s default.
 
 ## Adding the server to an agent
 
@@ -50,7 +59,7 @@ Kiro `mcp.json` `"awsevents": { "url": "https://api.awsevents.com/mcp", "oauth":
 ## What Hallway takes from it
 
 The `Session` shape, all of it but `seatAvailability` and `isReservable` (ADR
-0025; the abstract only for verified attendees), and the `Schedule` shape as
+0025; the abstract shown to everyone since #103), and the `Schedule` shape as
 the input to `sync_my_schedule`.
 
 ## Can a browser do the sign-in and the calls itself? (measured 2026-11-13)

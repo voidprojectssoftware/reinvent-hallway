@@ -18,6 +18,7 @@ import { ProviderButtons } from "../signin/ProviderButtons.tsx";
 import { refusalOf, signInRefusalText, type Refusal } from "../signin/providers.ts";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
+import { MadeBy } from "../shell/MadeBy.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, returnPathOf } from "../shell/signed-in.ts";
 
@@ -74,6 +75,8 @@ export function SignIn() {
           This Hallway has no way to sign in set up. Try again later.
         </Empty>
       )}
+
+      <MadeBy />
     </Screen>
   );
 }

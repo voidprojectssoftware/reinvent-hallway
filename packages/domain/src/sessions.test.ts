@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  abstractKey,
-  canReadAbstract,
   consensus,
   foldText,
-  isCorroborated,
   mergeSnapshot,
-  normalizeAbstract,
-  sameAbstract,
   sessionTags,
   sessionUrl,
   toSession,
@@ -100,7 +95,7 @@ describe("toSession: what is kept", () => {
     sessionId: "abc",
     title: "Building agents",
     abbreviation: "AIM3315",
-    abstract: "AWS's content, behind a login",
+    abstract: "AWS's description of the session",
     type: "Chalk talk",
     level: "300 - Advanced",
     venue: "Venetian",
@@ -135,7 +130,7 @@ describe("toSession: what is kept", () => {
       room: "Level 3, Murano 3201",
       isAllDay: false,
       speakers: ["Priya Rao", "Sam Lee"],
-      abstract: "AWS's content, behind a login",
+      abstract: "AWS's description of the session",
       topics: ["Artificial Intelligence"],
       tracks: ["AI"],
       industries: ["Retail"],
@@ -160,55 +155,8 @@ describe("toSession: what is kept", () => {
   it("withoutAbstract is the same session with nothing of the abstract", () => {
     const shown = withoutAbstract(toSession(full, reinvent));
     expect(Object.keys(shown)).not.toContain("abstract");
-    expect(JSON.stringify(shown)).not.toContain("behind a login");
+    expect(JSON.stringify(shown)).not.toContain("description of the session");
     expect(shown.services).toEqual(["Amazon Bedrock"]);
-  });
-});
-
-describe("canReadAbstract (ADR 0025)", () => {
-  it("lets an attendee whose reported abstract is corroborated read abstracts", () => {
-    expect(canReadAbstract({ attendeeId: "a", abstractCorroborated: true })).toBe(true);
-  });
-
-  it("refuses an uncorroborated attendee, and anyone signed out", () => {
-    expect(canReadAbstract({ attendeeId: "a", abstractCorroborated: false })).toBe(false);
-    expect(canReadAbstract(null)).toBe(false);
-  });
-});
-
-describe("corroboration by abstract (ADR 0025, issue #83)", () => {
-  const text = "Learn how agents plan.\n\nBring a laptop.";
-  const report = (attendeeId: string, sessionId: string, abstract?: string): SessionReport => ({
-    sessionId,
-    eventId: "reinvent2026",
-    attendeeId,
-    reportedAt: "2026-11-13T12:00:00.000Z",
-    ...(abstract === undefined ? {} : { abstract }),
-  });
-
-  it("compares trimmed text with whitespace collapsed, and nothing fuzzier", () => {
-    expect(sameAbstract(text, "  Learn how agents   plan. Bring a laptop.\t")).toBe(true);
-    expect(sameAbstract(text, "learn how agents plan. Bring a laptop.")).toBe(false);
-    expect(sameAbstract(text, "Learn how agents plan. Bring a laptop!")).toBe(false);
-    expect(sameAbstract(" ", " ")).toBe(false);
-    expect(sameAbstract(undefined, undefined)).toBe(false);
-  });
-
-  it("gives the same key exactly when the text is the same, and none to a blank one", async () => {
-    expect(await abstractKey(text)).toBe(await abstractKey(normalizeAbstract(` ${text} `)));
-    expect(await abstractKey(text)).toMatch(/^[0-9a-f]{64}$/);
-    expect(await abstractKey(text)).not.toBe(await abstractKey("Learn how agents plan."));
-    expect(await abstractKey(" \n ")).toBeUndefined();
-    expect(await abstractKey(undefined)).toBeUndefined();
-  });
-
-  it("needs another attendee's report of the same session with the same text", () => {
-    expect(isCorroborated("a", [report("a", "s1", text)])).toBe(false);
-    expect(isCorroborated("a", [report("a", "s1", text), report("b", "s1", text)])).toBe(true);
-    expect(isCorroborated("b", [report("a", "s1", text), report("b", "s1", text)])).toBe(true);
-    expect(isCorroborated("a", [report("a", "s1", text), report("b", "s2", text)])).toBe(false);
-    expect(isCorroborated("a", [report("a", "s1", text), report("b", "s1", "Made up")])).toBe(false);
-    expect(isCorroborated("c", [report("a", "s1", text), report("b", "s1", text), report("c", "s1")])).toBe(false);
   });
 });
 

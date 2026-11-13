@@ -67,21 +67,21 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   by:_ the token lives in `linkedInPoster`'s closure and no repository has a
   column for it; `apps/api/src/post.test.ts` checks no token reaches a draft
   or a redirect, and refuses an agent token on every posting route.
-- **A session abstract reaches only a verified attendee, and only through
-  session search and get (ADR 0025).** Verified is the domain's
-  `canReadAbstract`: signed in, and an abstract a sync of theirs kept for one
-  of their own sessions matches another attendee's report of that session
-  (`isCorroborated`, issue #83). _Held by:_ `CatalogSession` has no abstract and every read of a
-  session selects `catalogColumns`, so only the repository's `abstracts`
-  reads it, called by the search and get handlers after asking the rule;
+- **A session abstract is public on Hallway but leaves only through session
+  search and get, and never leaves Hallway (ADR 0025, corrected by #103).**
+  Anyone who can see a session reads its consensus abstract (ADR 0016), and
+  `SHOW_SESSION_DESCRIPTIONS="0"` hides it everywhere at once. Hallway never
+  fetches AWS's catalog page or the service behind it. _Held by:_
+  `CatalogSession` has no abstract and every read of a session selects
+  `catalogColumns`, so only the repository's `abstracts` reads it, called by
+  the search and get handlers while the switch is on;
   `schedule-repository.test.ts` checks every other repository read leaves it
   out; `apps/api/src/schedule.test.ts` runs search and get over REST and MCP
-  for a corroborated reader, the first honest reporter (not yet corroborated),
-  a sync forged from Hallway's public session data, one who never synced, one
-  whose sync kept nothing and a signed-out caller, and every other REST and MCP read for a verified one;
-  `sharing.test.ts` and the e2e suite check the share card, the link preview
-  and the calendar feed. A new read path that returns sessions adds its case
-  there.
+  signed out, for a reporter and for one who never synced, a lone forger
+  against two honest reporters, the switch off, and every other REST and MCP
+  read; `sharing.test.ts` and the e2e suite check the share card, the owner's
+  picture, the link preview and the calendar feed. A new read path that
+  returns sessions adds its case there.
 
 ## Enforcement layers
 
@@ -129,6 +129,16 @@ machine's LAN address (`HALLWAY_LAN_HOST` overrides it); the dashboard link
 carries this run's sign-in token. Never on unless asked. Several agents run
 servers here: pick LAN ports nobody else uses, and never stop what you did not
 start.
+
+**The owner's notes** (ADR 0028): `npm run dev` and `npm run aspire` build
+the web app with the agentation toolbar (`VITE_NOTES=1`; `npm run build`
+never does, and `verify` checks the bundle) and start this checkout's note
+server: 4761 for the main checkout and `reinvent-hallway-live`, a port from
+4800 to 4999 for any other worktree. Read and close notes from the checkout
+they belong to: `npm run notes -- pending`, `show <id>`,
+`resolve <id> "<what changed>"`, `channel`. A browser under automation sees
+the toolbar only with `?annotate` in the URL. Never stop a note server on
+4747 to 4760: they are other projects'. `HALLWAY_NOTES=0` leaves it all out.
 
 `npm run fake:linkedin` runs a fake LinkedIn on 127.0.0.1 and prints the
 `.dev.vars` lines (client id and secret, `LINKEDIN_POSTING=1`,

@@ -84,14 +84,9 @@ export interface ScheduleRepository {
   /** The attendee's own reports of these sessions, those there are, in any order. */
   reports(attendeeId: string, eventId: string, sessionIds: readonly string[]): Promise<SessionReport[]>;
   /**
-   * The domain's `isCorroborated` over the event's reports: whether some
-   * report of the attendee's carries an abstract another attendee's report of
-   * the same session also carries. One read, whatever the reader reported.
-   */
-  hasCorroboratedAbstract(attendeeId: string, eventId: string): Promise<boolean>;
-  /**
    * The catalog's abstract of each of these sessions that has one, by id. The
-   * one read of the abstract: callers ask `canReadAbstract` first (ADR 0025).
+   * one read of the abstract, which only session search and get call, and
+   * only while descriptions are shown (SHOW_SESSION_DESCRIPTIONS, issue #103).
    */
   abstracts(eventId: string, sessionIds: readonly string[]): Promise<Map<string, string>>;
 

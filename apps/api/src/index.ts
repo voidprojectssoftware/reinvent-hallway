@@ -116,6 +116,7 @@ function handlersFor(env: Env): Handlers {
       events,
       schedule,
       sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
+      showSessionDescriptions: env.SHOW_SESSION_DESCRIPTIONS !== "0",
       now,
       connectionsGoing: connectionsGoing(network),
     }),

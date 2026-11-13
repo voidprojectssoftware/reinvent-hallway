@@ -60,7 +60,7 @@ export type SessionTag =
  * One session as anyone who may see it sees it. Every field but the two ids
  * may be absent, as in AWS's own shape. No url: it is derived from `code` by
  * `sessionUrl`. No abstract: that is a `SessionSnapshot`'s, and leaves the
- * catalog only to a reader `canReadAbstract` allows (ADR 0025).
+ * catalog only through session search and get (ADR 0025, issue #103).
  */
 export interface Session extends Partial<Record<SessionTag, string[]>> {
   sessionId: string;

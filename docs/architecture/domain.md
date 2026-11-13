@@ -33,14 +33,17 @@ this file in the same PR.
   app cannot sign people in to it. The attendee's own agent reads AWS and writes
   to us. That is the whole import path, and it is a feature: the agent is the
   user's, the token is the user's, we hold nothing of AWS's.
-- **The catalog is behind registration**, so we cannot crawl it. Hallway's
-  session catalog is built from the sessions attendees' agents send: each
-  snapshot is that attendee's report, and the catalog shows what the reporters
-  agree on (rule below, ADR 0016). We keep every field an agent sends of a
-  session but AWS's live seat state, and **show the abstract only to an
-  attendee whose own agent sent one that another attendee's agent
-  corroborates**: it is AWS's content behind a login (ADR 0025, amending
-  0003; tightened by #83).
+- **The catalog comes only from attendees' agents.** AWS's public catalog
+  page shows every session with its description to anyone, signed out
+  included (measured 2026-11-13, issue #103); only the Events API needs
+  sign-in and registration. Hallway still never fetches or scrapes the page
+  or the service behind it: the AWS Site Terms prohibit "data mining, robots,
+  or similar data gathering and extraction tools". Hallway's session catalog
+  is built from the sessions attendees' agents send: each snapshot is that
+  attendee's report, and the catalog shows what the reporters agree on (rule
+  below, ADR 0016). We keep every field an agent sends of a session but AWS's
+  live seat state, and show all of it, the description included, to anyone
+  who can see the session (ADR 0025, amending 0003; corrected by #103).
 - **LinkedIn will not give us anyone's connections.** Sign In with LinkedIn
   (OpenID Connect) gives a verified identity: `sub`, name, picture, email. The
   Connections API is partner-only and closed. So the network is Hallway's own
@@ -74,8 +77,8 @@ erDiagram
 | **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `network` \| `private`, default `network`; `network` was `connections` before #63). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
 | **Venue** | A building re:Invent sessions are held in, with the walks between venues (issue #93, ADR 0029). Facts measured once and committed, not stored in D1 | `venueId` (`venetian`, `caesars-forum`, ...), `name`, `osm` (the OpenStreetMap element), `center` and `outline` ([lat, lon]), and per ordered pair a `Walk`: `meters`, `minutes` (rounded up). Hand-written list in `packages/domain/src/venue-list.ts`; measurements in `venue-data.ts`, derived from `docs/discovery/venues/` (`docs/discovery/venues.md`) |
-| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `venueId` (derived: the Venue `venue` names, by `venueOf`; absent when Hallway cannot place it), `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, and only to a reader `canReadAbstract` allows (rule below). Never `seatAvailability` or `isReservable` |
-| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`, and (stored only) `abstractKey`, the SHA-256 of the abstract's normalized text, which corroboration compares. One per attendee and session |
+| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `venueId` (derived: the Venue `venue` names, by `venueOf`; absent when Hallway cannot place it), `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, to anyone, while `SHOW_SESSION_DESCRIPTIONS` is on (rule below). Never `seatAvailability` or `isReservable` |
+| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`. One per attendee and session |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation or invitation), `source` (`agent-sync` \| `manual`), `invited` (bool: from AWS `invitedSessions`), `hidden` (bool, from the hidden sessions below), `addedAt` |
 | **Hidden session** | Not served on its own: a session an attendee hid, per event | `attendeeId`, `eventId`, `sessionId`. An entry is hidden while its session is here |
 | **Connection** | Two attendees who agreed to see each other | unordered pair, `since`, `via` (`request` \| `share-link`) |
@@ -90,10 +93,12 @@ erDiagram
 ### Session link
 
 `url` is not stored: the contract resource derives it from `code` with `sessionUrl(code, template)` and one configured template,
-`SESSION_URL_TEMPLATE`. The default is the re:Invent catalog searched for the
-code. **Assumption** (no public deep-link format was found): the template is one
-config value precisely so that it can change without a migration. See issue
-"Confirm the session deep-link format".
+`SESSION_URL_TEMPLATE`. The default is AWS's public catalog searched for the
+code, `https://registration.awsevents.com/flow/awsevents/reinvent2026/eventcatalog/page/eventcatalog?search={code}`,
+which opens the catalog with that session first (measured 2026-11-13 on
+`ANT319-R1` and `SEC205`, issue #103, closing #19). It is one config value so
+that it can change without a migration. Every session carries it, which is how
+someone reads a session nobody has synced yet.
 
 ### Times
 
@@ -202,24 +207,18 @@ We store UTC instants and the event timezone, and render in the event timezone
   counts if others come to agree. The consensus is written to the session's
   catalog row in the sync's own batch, so reading a session never reads
   reports (ADR 0016). A snapshot for an unknown event is refused.
-- **The abstract is for verified attendees (`canReadAbstract`, ADR 0025).**
-  A session's abstract is shown to a signed-in attendee (as a person or
-  through their agent token) once they are corroborated for the event
-  (`isCorroborated`, issue #83): some report of theirs, kept from a sync of
-  one of their own sessions, carries an abstract that another attendee's
-  report of the same session also carries. The texts are compared trimmed
-  and with every run of whitespace as one space (`normalizeAbstract`),
-  nothing fuzzier. Every other field of a session is shown on Hallway, so a
-  sync built from them proves nothing; a matching abstract proves the sender
-  read it where AWS shows it. So the first reporter of a session is not
-  verified by it until a second reports the same text, a reporter whose
-  abstract AWS later rewrites stops being verified by that session until
-  someone else sends the new text, and two people who collude (or one with
-  two accounts) verify each other. It is decided on read, from the reports
-  as they are, in one query. Only session search and get carry it, over REST
-  and MCP. It never appears to anyone else, signed out included, nor on any
-  schedule, agenda, link preview, share image or calendar feed, whoever
-  asks. Search never matches on it. It is plain text and is rendered as text.
+- **The description is public, and comes only from agents (ADR 0025,
+  corrected by #103).** A session's abstract is shown to anyone who can see
+  the session, signed in or not, as the reporters' consensus (above), so one
+  forger cannot rewrite a description that two honest reporters agree on.
+  Only session search and get carry it, over REST and MCP (and so the
+  Session screen), because it is the largest field; never a schedule, agenda,
+  sync result, link preview, share image or calendar feed, which stay title,
+  time and venue by design. Wherever it shows, it is credited "Session details
+  from the AWS re:Invent catalog", linking to the session's `url`. One setting,
+  `SHOW_SESSION_DESCRIPTIONS` (on unless `"0"`), hides it from search and get,
+  and so from every path at once, keeping what is stored. Search never matches
+  on it. It is plain text and is rendered as text.
 - **A connection is mutual and needs consent.** A request becomes a connection
   only when the other side accepts. Connecting via someone's share link forms
   the connection at once: the link's current invite token is their consent
@@ -285,12 +284,12 @@ what they are told (hunt F10).
 | `GetMe` | my attendee, with private fields |
 | `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
 | `GetInvite` | my share link with its invite token, made on first ask, to me signed in as a person (not an agent token) |
-| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync), and `readsAbstracts` (whether `canReadAbstract` lets me read descriptions yet, so a screen can say why it shows none: issue #88) |
+| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync) |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
-| `SearchSessions(eventId, q?, day?, type?, level?, topic?, track?, service?, from?, to?)` | catalog sessions, with how many people in my network are going, and to a verified reader their abstracts. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it), `type` and `level` (exact), `topic`, `track` and `service` (one item of that list, exact) and `limit`, with `total` (how many match) and `truncated` (more match than were returned); open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
-| `GetSession(eventId, sessionId)` | the session, to a signed-in caller `connectionsGoing` as in search, and to a verified reader its abstract |
+| `SearchSessions(eventId, q?, day?, type?, level?, topic?, track?, service?, from?, to?)` | catalog sessions, with how many people in my network are going, and their abstracts. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it), `type` and `level` (exact), `topic`, `track` and `service` (one item of that list, exact) and `limit`, with `total` (how many match) and `truncated` (more match than were returned); open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
+| `GetSession(eventId, sessionId)` | the session, to a signed-in caller `connectionsGoing` as in search, and its abstract |
 | `WhoIsGoing(eventId, sessionIds[])` | per session, the people in my network going (respecting visibility and hidden: a followed person only when they let me see their week), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read, and `unknownSessions`, the asked ids the catalog does not have (absent when there are none). Session search and get carry the same people, intent included |
 | `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day of the event (`from`/`to` as `HH:MM`, `to` up to `24:00`, default the whole day) that people in my network plan to attend, as far as each lets me see, with who and their intent |
 | `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. `to` may be `24:00`. All-day sessions (the expo and the like) do not block a gap, nor do sessions with a start and no length, which are returned as `unplacedSessions` (mine, and theirs I may see) so the asker can decide |
@@ -331,7 +330,7 @@ holds logic the other lacks. Both take and return the contract schemas in
 
 | Tool | Handler |
 | --- | --- |
-| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then the full `GetSession` object per id, or `ListSessions` pages for a large schedule, and `invitedSessions` passed through) |
+| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then the full `GetSession` object per id, or `ListSessions` pages for a large schedule, and `invitedSessions` passed through), and that Hallway accepts only the sessions on the user's own schedule, never a catalog dump |
 | `get_my_schedule` | `GetMySchedule` |
 | `list_my_network` (and `list_my_connections`, its old name, for one release) | `ListMyNetwork` |
 | `get_person_schedule` | `GetAttendeeSchedule` |

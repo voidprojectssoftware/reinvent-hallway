@@ -91,6 +91,7 @@ describe("/@handle", () => {
     expect(meta(html, "og:image:alt")).toBe("Jane &quot;JD&quot; &lt;Doe&gt;&#39;s week at re:Invent 2026");
     expect(meta(html, "og:image")).toBe("https://hallway.example/og/jane.doe.png?v=0123456789abcdef");
     expect(meta(html, "og:url")).toBe("https://hallway.example/@jane.doe");
+    expect(meta(html, "og:site_name")).toBe("Hallway by Void Projects");
     expect(meta(html, "twitter:card")).toBe("summary_large_image");
     expect(meta(html, "robots")).toBeUndefined();
     expect(html).toContain("<title>Jane &quot;JD&quot; &lt;Doe&gt; at re:Invent 2026 · Hallway</title>");

@@ -118,7 +118,7 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
 
   it("reads the abstract only through `abstracts`; every other read of a session leaves it out (ADR 0025)", async () => {
     const repository = make();
-    const [me, other] = [fresh("a"), fresh("b")];
+    const me = fresh("a");
     const withText = report(me, fresh("txt"), { code: "TXT1", title: "Texty", abstract: "ABSTRACT-TEXT-REPO", startsAt: "2026-12-01T16:00:00.000Z" });
     const without = report(me, fresh("none"), { title: "Bare" });
     await repository.applySync(
@@ -139,66 +139,8 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
       expect(JSON.stringify(read)).toContain("Texty");
       expect(JSON.stringify(read)).not.toContain("ABSTRACT-TEXT");
     }
-    // Search never matches on it either: it would tell an unverified asker what it says.
+    // Search matches the code, title and speakers only (domain.md `SearchSessions`).
     expect((await repository.searchSessions(event, { q: "abstract-text-repo", limit: 10 })).sessions).toEqual([]);
-    // A lone reporter is not corroborated, whatever they sent (issue #83).
-    expect(await repository.hasCorroboratedAbstract(me, event)).toBe(false);
-    expect(await repository.hasCorroboratedAbstract(other, event)).toBe(false);
-  });
-
-  describe("corroborates a reader by an abstract another attendee also reported (ADR 0025, issue #83)", () => {
-    const text = "Learn how agents plan.\n\nBring a laptop.";
-    const reportOf = (attendeeId: string, sessionId: string, abstract?: string, reportedAt = seen) =>
-      report(attendeeId, sessionId, abstract === undefined ? { reportedAt } : { abstract, reportedAt });
-    const syncOf = (repository: ScheduleRepository, attendeeId: string, ...reports: SessionReport[]) =>
-      repository.applySync(sync({ attendeeId, reports, synced: reports.map((r) => favorite(r.sessionId)) }));
-
-    it("not the first honest reporter alone; both once a second reports the same text, spacing aside", async () => {
-      const repository = make();
-      const [first, second, id] = [fresh("first"), fresh("second"), fresh("s")];
-      await syncOf(repository, first, reportOf(first, id, text));
-      expect(await repository.hasCorroboratedAbstract(first, event)).toBe(false);
-
-      await syncOf(repository, second, reportOf(second, id, `  Learn how agents   plan.\nBring a laptop. `, later));
-      expect(await repository.hasCorroboratedAbstract(first, event)).toBe(true);
-      expect(await repository.hasCorroboratedAbstract(second, event)).toBe(true);
-      expect(await repository.hasCorroboratedAbstract(first, "other-event")).toBe(false);
-    });
-
-    it("never a forger: no abstract, a made-up one, a blank one, or the right text on another session", async () => {
-      const repository = make();
-      const [honest, other, id, elsewhere] = [fresh("honest"), fresh("other"), fresh("s"), fresh("s")];
-      await syncOf(repository, honest, reportOf(honest, id, text), reportOf(honest, elsewhere, "   "));
-      await syncOf(repository, other, reportOf(other, id, text));
-      const forgers = [
-        [fresh("none"), reportOf("", id)],
-        [fresh("made-up"), reportOf("", id, "Learn how agents plan. Bring a laptop!")],
-        [fresh("blank"), reportOf("", elsewhere, " \n ")],
-        [fresh("wrong-session"), reportOf("", elsewhere, text)],
-      ] as const;
-      for (const [forger, forged] of forgers) {
-        await syncOf(repository, forger, { ...forged, attendeeId: forger });
-        expect(await repository.hasCorroboratedAbstract(forger, event), forger).toBe(false);
-      }
-    });
-
-    it("follows a changed abstract: whoever sent the new text waits for a second reporter of it", async () => {
-      const repository = make();
-      const [a, b, c, id] = [fresh("a"), fresh("b"), fresh("c"), fresh("s")];
-      await syncOf(repository, a, reportOf(a, id, text));
-      await syncOf(repository, b, reportOf(b, id, text));
-      expect(await repository.hasCorroboratedAbstract(a, event)).toBe(true);
-
-      // AWS rewrites the abstract, and A's agent syncs first.
-      await syncOf(repository, a, reportOf(a, id, "Rewritten by AWS.", later));
-      expect(await repository.hasCorroboratedAbstract(a, event)).toBe(false);
-      expect(await repository.hasCorroboratedAbstract(b, event)).toBe(false);
-
-      await syncOf(repository, c, reportOf(c, id, "Rewritten by AWS.", latest));
-      expect(await repository.hasCorroboratedAbstract(a, event)).toBe(true);
-      expect(await repository.hasCorroboratedAbstract(c, event)).toBe(true);
-      expect(await repository.hasCorroboratedAbstract(b, event)).toBe(false);
-    });
   });
 
   it("votes on the abstract and each list whole, as the domain's consensus does", async () => {

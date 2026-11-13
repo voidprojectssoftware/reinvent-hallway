@@ -15,6 +15,13 @@
 // static assets. One origin, and deep links and /api take the same paths they
 // will in production (ADR 0010). Reload the page to see a change.
 //
+// The owner's annotation toolbar (ADR 0028): before the first build this
+// makes sure the checkout's note channel has a server accepting this port's
+// origins (scripts/lib/note-channel.mjs, proved on every start), then builds
+// the web app with VITE_NOTES=1 and that channel's port, which is the only
+// way the toolbar gets into a bundle. `npm run build` never sets them.
+// HALLWAY_NOTES=0 leaves it out; under CI it is always out.
+//
 // It also copies .dev.vars.example to apps/api/.dev.vars when there is none, so
 // dev sign-in works locally (src/auth/dev-sign-in.ts). .dev.vars is
 // git-ignored and never deployed.
@@ -65,14 +72,36 @@ async function pickPort() {
 
 // wrangler refuses an assets directory that does not exist, so the first
 // build finishes before it starts.
-function buildWeb() {
-  const built = spawnSync(process.execPath, [vite, "build"], { cwd: web, stdio: "inherit" });
+function buildWeb(env) {
+  const built = spawnSync(process.execPath, [vite, "build"], { cwd: web, stdio: "inherit", env });
   if (built.status !== 0) process.exit(built.status ?? 1);
   // The share card's fonts go into the same directory after the build has
   // emptied it. Not wrangler's "build" command: with one, wrangler never
   // reloads its assets after a web rebuild (#85, wrangler.jsonc).
   const fonts = spawnSync(process.execPath, [join(api, "scripts/copy-card-fonts.mjs")], { cwd: api, stdio: "inherit" });
   if (fonts.status !== 0) process.exit(fonts.status ?? 1);
+}
+
+/**
+ * The build environment that puts the toolbar in, pointed at this checkout's
+ * note channel, once that channel's server is running and proved. Nothing
+ * (and a line saying why) when there is no channel: a toolbar with nowhere to
+ * post shows a gray pill the owner cannot tell from a broken page.
+ */
+async function noteChannelEnv(port) {
+  if (process.env.CI || process.env.HALLWAY_NOTES === "0") return {};
+  const say = (line) => console.log(`[notes] ${line}`);
+  try {
+    const notes = await import("../../../scripts/lib/note-channel.mjs");
+    const channel = await notes.channelFor(root);
+    const { action, server, proof } = await notes.ensureNoteServer(channel, { devPorts: [port], say });
+    say(`${channel.channel} note server ${action === "kept" ? "already running" : action}, pid ${server.pid} on ${channel.port}, store ${channel.storeFile}`);
+    if (proof) say(`start proof: ${JSON.stringify(proof)}`);
+    return { VITE_NOTES: "1", VITE_NOTE_PORT: String(channel.port) };
+  } catch (error) {
+    console.error(`[notes] no note channel, so no toolbar: ${error instanceof Error ? error.message : error}`);
+    return {};
+  }
 }
 
 function ensureDevVars() {
@@ -82,7 +111,8 @@ function ensureDevVars() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = await pickPort();
-  buildWeb();
+  const webEnv = { ...process.env, ...(await noteChannelEnv(port)) };
+  buildWeb(webEnv);
   ensureDevVars();
 
   const migrated = spawnSync(
@@ -124,7 +154,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const watch = spawn(
     process.execPath,
     [vite, "build", "--watch", "--no-emptyOutDir", "--logLevel", "warn"],
-    { cwd: web, stdio: "inherit" },
+    { cwd: web, stdio: "inherit", env: webEnv },
   );
   for (const signal of ["SIGINT", "SIGTERM"]) {
     process.on(signal, () => {

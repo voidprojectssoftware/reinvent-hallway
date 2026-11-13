@@ -94,9 +94,9 @@ export function unreadableTime(aws: AwsSession): UnreadableTime | undefined {
 }
 
 /**
- * A Hallway session snapshot from AWS's session, its abstract included (who
- * may read that is `canReadAbstract`'s to say). AWS gives a local date, time
- * and length in the event's zone; we keep UTC instants. The event's zone is
+ * A Hallway session snapshot from AWS's session, its abstract included.
+ * AWS gives a local date, time and length in the event's zone; we keep UTC
+ * instants. The event's zone is
  * used even when `sessionTime.timezone` is present, because domain.md fixes
  * session times to the event's zone and AWS documents that field as optional
  * and free-form. A field AWS left out stays absent, so `mergeSnapshot` keeps
@@ -209,82 +209,10 @@ export function consensus(reports: readonly SessionReport[]): SessionSnapshot {
 }
 
 /**
- * Who asks for a session's abstract: an attendee, and whether an abstract
- * their own agent reported is corroborated (`isCorroborated`). `null` is
- * nobody signed in.
+ * A snapshot without its abstract: the session as every read but search and
+ * get carries it. The abstract is the largest field and reaches readers only
+ * through those two (ADR 0025, corrected by issue #103).
  */
-export interface AbstractReader {
-  attendeeId: string;
-  abstractCorroborated: boolean;
-}
-
-/**
- * The abstract rule (ADR 0025, tightened by issue #83). The abstract is AWS's
- * text, and AWS shows it only to a signed-in attendee registered for the
- * event. Every other field of a session is on Hallway for anyone to copy, so a
- * sync built from them proves nothing. The abstract is not: a reader whose
- * report of one of their own sessions carries the same abstract as another
- * attendee's report of it has shown that AWS let them read the catalog. Only
- * such a reader may read abstracts here. Everyone else, signed out included,
- * and everything that leaves Hallway (a link preview, the share image, the
- * calendar feed) gets none.
- */
-export function canReadAbstract(reader: AbstractReader | null): boolean {
-  return reader !== null && reader.abstractCorroborated;
-}
-
-/**
- * An abstract as corroboration compares it: trimmed, every run of whitespace
- * one space. Nothing fuzzier, since a near match is what a forger could make.
- */
-export function normalizeAbstract(abstract: string): string {
-  return abstract.trim().replace(/\s+/g, " ");
-}
-
-/** Whether two abstracts are the same text by `normalizeAbstract`; an absent or blank one matches nothing. */
-export function sameAbstract(a: string | undefined, b: string | undefined): boolean {
-  if (a === undefined || b === undefined) return false;
-  const normalized = normalizeAbstract(a);
-  return normalized !== "" && normalized === normalizeAbstract(b);
-}
-
-/**
- * Whether `attendeeId` is corroborated for the event these reports are of:
- * some report of theirs carries an abstract that another attendee's report of
- * the same session also carries (`sameAbstract`). Independent means another
- * attendee; two people colluding, or one person with two accounts, still pass
- * (ADR 0025). The first reporter of a session is not corroborated by it until
- * a second reports the same text. The D1 repository answers the same in SQL,
- * over `abstractKey`; schedule-repository.test.ts holds the two together.
- */
-export function isCorroborated(attendeeId: string, reports: readonly SessionReport[]): boolean {
-  return reports.some(
-    (mine) =>
-      mine.attendeeId === attendeeId &&
-      reports.some(
-        (other) =>
-          other.attendeeId !== attendeeId &&
-          other.eventId === mine.eventId &&
-          other.sessionId === mine.sessionId &&
-          sameAbstract(mine.abstract, other.abstract),
-      ),
-  );
-}
-
-/**
- * A report's abstract as the D1 repository keeps it for corroboration: the
- * SHA-256 of `normalizeAbstract`, in hex, so the comparison is an index probe
- * on 64 characters rather than on the text. Two abstracts share a key exactly
- * when `sameAbstract` says they match; an absent or blank one has none.
- */
-export async function abstractKey(abstract: string | undefined): Promise<string | undefined> {
-  const normalized = abstract === undefined ? "" : normalizeAbstract(abstract);
-  if (normalized === "") return undefined;
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized)));
-  return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** A snapshot without its abstract: the session anyone who may see it sees. */
 export function withoutAbstract({ abstract: _abstract, ...session }: SessionSnapshot): Session {
   return session;
 }
@@ -304,9 +232,10 @@ export const foldSpeakers = (speakers: readonly string[]) => foldText(speakers.j
 
 /**
  * The link to a session on the re:Invent site: `template` with `{code}`
- * replaced. The template is configuration (SESSION_URL_TEMPLATE) because the
- * site's deep-link format is not confirmed; a template without `{code}` would
- * send every session to the same page, so it is refused loudly.
+ * replaced. The template is configuration (SESSION_URL_TEMPLATE) so the
+ * format can change without a migration; its default is AWS's public catalog
+ * searched for the code (issue #103). A template without `{code}` would send
+ * every session to the same page, so it is refused loudly.
  */
 export function sessionUrl(code: string, template: string): string {
   if (!template.includes("{code}")) {

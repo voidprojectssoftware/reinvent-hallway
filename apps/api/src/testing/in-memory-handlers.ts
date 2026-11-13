@@ -41,6 +41,8 @@ export function inMemoryHandlers(
     identity?: Partial<IdentityPorts>;
     /** Posting to LinkedIn: the poster over a fake LinkedIn, or absent (not set up). */
     poster?: LinkedInPoster;
+    /** SHOW_SESSION_DESCRIPTIONS; on unless a test turns it off (issue #103). */
+    showSessionDescriptions?: boolean;
   } = {},
 ) {
   const now = options.now ?? (() => new Date());
@@ -74,6 +76,7 @@ export function inMemoryHandlers(
       events,
       schedule,
       sessionUrlTemplate: testSessionUrlTemplate,
+      showSessionDescriptions: options.showSessionDescriptions ?? true,
       now,
       connectionsGoing: connectionsGoing(network),
     }),
