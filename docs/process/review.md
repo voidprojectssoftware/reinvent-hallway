@@ -24,11 +24,22 @@ adding it is cheaper than reviewing for it forever.
 **The reviewer drives the running app.** Not the tests, the app.
 
 ```bash
+npm run test:e2e        # first: the agent journey against the real Worker
 npm run dev             # then drive it in a browser (playwright-cli) and over MCP
-npm run test:e2e        # once it exists
 ```
 
 Run the end-to-end suite first: what it covers, you do not have to re-check.
+`npm run test:e2e` (`e2e/`, issue #22) boots the Worker with `wrangler dev`
+on free ports over a fresh local D1, and plays two attendees' agents with the
+MCP SDK client. Each reads its schedule from a fake AWS Events MCP server
+(`GetSchedule`, `GetSession`, its schemas taken from the committed spec) and
+calls `sync_my_schedule` with an agent token; one hides a session, they
+connect through a share link, and the other's agent checks
+`get_person_schedule`, `who_is_going`, `network_agenda`,
+`find_meeting_gaps` and `add_to_plan`, with the hidden session absent from
+every answer. It takes about 15 seconds, needs no network, and runs in
+`npm run verify`. A change to an agent-facing tool or a network read extends
+it.
 
 Then exercise **the change itself** as the actual user would, since no suite
 covers what landed today. Confirm:

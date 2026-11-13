@@ -79,7 +79,8 @@ Node 22.18 or later. From the root of your checkout:
 
 ```bash
 npm ci
-npm run verify   # ADR and script checks, typecheck, boundaries, tests: what CI runs
+npm run verify   # ADR and script checks, typecheck, boundaries, tests, e2e: what CI runs
+npm run test:e2e # two scripted agents against the real Worker (e2e/, review.md Lens 1)
 npm run dev      # the Worker with local D1, migrations applied first; prints its URL
 ```
 

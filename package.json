@@ -10,16 +10,18 @@
     "packages/*"
   ],
   "scripts": {
-    "verify": "npm run verify:factory && npm run typecheck && npm run boundaries && npm test && npm run build",
+    "verify": "npm run verify:factory && npm run typecheck && npm run boundaries && npm test && npm run test:e2e && npm run build",
     "verify:factory": "node scripts/check-adr-numbers.mjs && node --test 'scripts/**/*.test.mjs'",
     "typecheck": "npm run types:check -w @hallway/api && tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/api/tsconfig.node.json && tsc -p apps/web/tsconfig.json",
     "build": "npm run build -w @hallway/web",
     "boundaries": "depcruise apps packages",
     "test": "vitest run",
     "dev": "node apps/api/scripts/dev.mjs",
-    "db:generate": "node scripts/generate-migration.mjs"
+    "db:generate": "node scripts/generate-migration.mjs",
+    "test:e2e": "vitest run --config e2e/vitest.config.ts"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "22.20.5",
     "dependency-cruiser": "18.7.0",
     "esbuild": "0.28.2",

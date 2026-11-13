@@ -94,6 +94,9 @@ export default {
     tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.base.json" },
     doNotFollow: { path: "node_modules" },
+    // The Workers runtime's own module, as `node:fs` is Node's: a builtin, not
+    // unresolvable. The domain rule still refuses it, as it refuses any builtin.
+    builtInModules: { add: ["cloudflare:workers"] },
     // wrangler writes bundles under .wrangler/ and Vite under dist/: build
     // output, not source.
     exclude: { path: "(/\\.wrangler/|/dist/)" },
