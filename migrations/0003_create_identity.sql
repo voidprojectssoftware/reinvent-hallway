@@ -32,12 +32,12 @@ CREATE UNIQUE INDEX `attendees_linkedin_sub_unique` ON `attendees` (`linkedin_su
 CREATE INDEX `attendees_verified_email_sha256` ON `attendees` (`verified_email_sha256`);--> statement-breakpoint
 CREATE TABLE `calendar_feeds` (
 	`attendee_id` text PRIMARY KEY NOT NULL,
-	`token_sha256` text NOT NULL,
+	`token` text NOT NULL,
 	`rotated_at` text NOT NULL,
 	FOREIGN KEY (`attendee_id`) REFERENCES `attendees`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `calendar_feeds_token_sha256_unique` ON `calendar_feeds` (`token_sha256`);--> statement-breakpoint
+CREATE UNIQUE INDEX `calendar_feeds_token_unique` ON `calendar_feeds` (`token`);--> statement-breakpoint
 CREATE TABLE `web_sessions` (
 	`id_sha256` text PRIMARY KEY NOT NULL,
 	`attendee_id` text NOT NULL,

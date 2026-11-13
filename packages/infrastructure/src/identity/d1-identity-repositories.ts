@@ -103,11 +103,19 @@ export function webSessionsOnD1(db: Database): WebSessionRepository {
 
 export function calendarFeedsOnD1(db: Database): CalendarFeedRepository {
   return {
-    async replace(attendeeId, tokenSha256, rotatedAt) {
+    async replace(attendeeId, token, rotatedAt) {
       await db
         .insert(calendarFeeds)
-        .values({ attendeeId, tokenSha256, rotatedAt })
-        .onConflictDoUpdate({ target: calendarFeeds.attendeeId, set: { tokenSha256, rotatedAt } });
+        .values({ attendeeId, token, rotatedAt })
+        .onConflictDoUpdate({ target: calendarFeeds.attendeeId, set: { token, rotatedAt } });
+    },
+    async get(attendeeId) {
+      const [row] = await db
+        .select({ token: calendarFeeds.token, rotatedAt: calendarFeeds.rotatedAt })
+        .from(calendarFeeds)
+        .where(eq(calendarFeeds.attendeeId, attendeeId))
+        .limit(1);
+      return row;
     },
   };
 }

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { fail, ok, type Credential } from "@hallway/application";
+import { fail, ok, type Actor, type Credential, type Outcome } from "@hallway/application";
 import { resolveActor } from "./resolve-actor.ts";
 
 const request = (url: string, authorization?: string) =>
   new Request(url, authorization ? { headers: { authorization } } : {});
 const on = { DEV_SIGN_IN: "1" };
 const seen: Credential[] = [];
-const authenticate = async (credential: Credential) => {
+// Stands in for identity.authenticate: the "via" it reports follows the door.
+const authenticate = async (credential: Credential): Promise<Outcome<Actor>> => {
   seen.push(credential);
   return credential.secret === "hw_good" || credential.secret === "live"
-    ? ok({ kind: "attendee" as const, attendeeId: "alice" })
+    ? ok({ kind: "attendee", attendeeId: "alice", via: credential.kind === "session" ? "session" : "agent-token" })
     : fail("unauthenticated", "no");
 };
 
@@ -22,7 +23,7 @@ describe("resolveActor", () => {
 
   it("hands an hw_ bearer to authenticate as an agent token, and passes its refusal on", async () => {
     expect(await resolveActor(request("https://hallway.example/", "Bearer hw_good"), {}, undefined, authenticate)).toEqual(
-      ok({ kind: "attendee", attendeeId: "alice" }),
+      ok({ kind: "attendee", attendeeId: "alice", via: "agent-token" }),
     );
     expect(seen.at(-1)).toEqual({ kind: "agent-token", secret: "hw_good" });
     expect(await resolveActor(request("https://hallway.example/", "Bearer hw_bad"), {}, undefined, authenticate)).toMatchObject({
@@ -37,7 +38,7 @@ describe("resolveActor", () => {
 
   it("turns an ended session into anonymous rather than an error", async () => {
     expect(await resolveActor(request("http://localhost/"), on, "live", authenticate)).toEqual(
-      ok({ kind: "attendee", attendeeId: "alice" }),
+      ok({ kind: "attendee", attendeeId: "alice", via: "session" }),
     );
     expect(await resolveActor(request("http://localhost/"), on, "ended", authenticate)).toEqual(ok({ kind: "anonymous" }));
   });
@@ -45,7 +46,7 @@ describe("resolveActor", () => {
   it("believes `dev:<id>` on every loopback spelling when DEV_SIGN_IN is 1", async () => {
     for (const host of ["localhost", "127.0.0.1", "[::1]", "hallway.localhost"]) {
       expect(await resolveActor(request(`http://${host}:8787/`, "Bearer dev:alice"), on, undefined, authenticate)).toEqual(
-        ok({ kind: "attendee", attendeeId: "alice" }),
+        ok({ kind: "attendee", attendeeId: "alice", via: "dev" }),
       );
     }
   });

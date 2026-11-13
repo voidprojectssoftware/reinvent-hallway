@@ -36,7 +36,7 @@ export async function resolveActor(
     if (dev?.[1]) {
       const allowed = devSignInAllowed(request, bindings);
       if (!allowed.ok) return fail("unauthenticated", allowed.error.message);
-      return ok({ kind: "attendee", attendeeId: dev[1] });
+      return ok({ kind: "attendee", attendeeId: dev[1], via: "dev" });
     }
     return fail("unauthenticated", "Expected `Authorization: Bearer hw_...`, an agent token from /api/me/tokens.");
   }

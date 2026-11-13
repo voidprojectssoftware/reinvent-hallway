@@ -107,7 +107,9 @@ export type RevokeAgentTokenInput = z.infer<typeof RevokeAgentTokenInput>;
 
 export const CalendarFeed = z
   .object({
-    token: z.string().meta({ description: "The feed's secret. Shown once; rotating replaces it." }),
+    token: z
+      .string()
+      .meta({ description: "The feed's secret, shown only to its owner. Rotating replaces it and the old URL stops working." }),
     path: z.string().meta({ example: "/cal/AbC.ics" }),
     rotatedAt: instant,
   })

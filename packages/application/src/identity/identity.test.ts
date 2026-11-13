@@ -21,7 +21,7 @@ function setup(options: { linkedIn?: IdentityProvider | null } = {}) {
   const attendees = new Map<string, AttendeeRecord>();
   const tokens = new Map<string, AgentTokenRecord>();
   const sessions = new Map<string, WebSessionRecord>();
-  const feeds = new Map<string, string>();
+  const feeds = new Map<string, { token: string; rotatedAt: string }>();
   const connected: [string, string][] = [];
   let clock = new Date("2026-11-13T10:00:00.000Z");
   let vouchFor: VerifiedIdentity | undefined;
@@ -48,7 +48,10 @@ function setup(options: { linkedIn?: IdentityProvider | null } = {}) {
       byIdSha256: async (hash) => sessions.get(hash),
       delete: async (hash) => void sessions.delete(hash),
     },
-    calendarFeeds: { replace: async (id, hash) => void feeds.set(id, hash) },
+    calendarFeeds: {
+      replace: async (id, token, rotatedAt) => void feeds.set(id, { token, rotatedAt }),
+      get: async (id) => feeds.get(id),
+    },
     areConnected: async (a, b) => connected.some(([x, y]) => (x === a && y === b) || (x === b && y === a)),
     linkedIn: options.linkedIn === null ? undefined : (options.linkedIn ?? stubLinkedIn),
     now: () => clock,
@@ -57,7 +60,6 @@ function setup(options: { linkedIn?: IdentityProvider | null } = {}) {
     handlers,
     attendees,
     tokens,
-    feeds,
     connected,
     advance(days: number) {
       clock = new Date(clock.getTime() + days * 86_400_000);
@@ -79,7 +81,8 @@ const jane: VerifiedIdentity = {
   email: "Jane@Example.com",
   emailVerified: true,
 };
-const as = (attendeeId: string): Actor => ({ kind: "attendee", attendeeId });
+/** A person signed in on the web. */
+const as = (attendeeId: string): Actor => ({ kind: "attendee", attendeeId, via: "session" });
 
 describe("SignIn", () => {
   it("creates the attendee on first sign-in, with a handle from the name and LinkedIn's verified facts", async () => {
@@ -200,7 +203,7 @@ describe("Authenticate", () => {
     world.advance(1);
     expect(await world.handlers.authenticate({ kind: "agent-token", secret: issued.value.secret })).toEqual({
       ok: true,
-      value: as(me.id),
+      value: { kind: "attendee", attendeeId: me.id, via: "agent-token" },
     });
     expect(world.tokens.get(issued.value.token.id)?.lastUsedAt).toBe("2026-11-14T10:00:00.000Z");
 
@@ -307,15 +310,58 @@ describe("GetAttendee", () => {
   });
 });
 
-describe("RotateCalendarFeed", () => {
-  it("returns a new secret each time and stores only its hash", async () => {
+describe("calendar feed", () => {
+  it("rotates to a new secret each time, and the owner can read the current one back", async () => {
     const world = setup();
     const { me } = await world.signIn(jane);
+    expect(await world.handlers.getCalendarFeed(as(me.id))).toMatchObject({ error: { kind: "not-found" } });
     const one = await world.handlers.rotateCalendarFeed(as(me.id));
     const two = await world.handlers.rotateCalendarFeed(as(me.id));
     if (!one.ok || !two.ok) throw new Error("expected ok");
     expect(one.value.token).not.toBe(two.value.token);
     expect(two.value.path).toBe(`/cal/${two.value.token}.ics`);
-    expect(world.feeds.get(me.id)).toBe(await sha256Hex(two.value.token));
+    expect(await world.handlers.getCalendarFeed(as(me.id))).toEqual({ ok: true, value: two.value });
+  });
+
+  it("is not in Me or the public card", async () => {
+    const world = setup();
+    const { me } = await world.signIn(jane);
+    const feed = await world.handlers.rotateCalendarFeed(as(me.id));
+    if (!feed.ok) throw new Error("expected ok");
+    const views = [await world.handlers.getMe(as(me.id)), await world.handlers.getAttendee(anonymous, { handle: me.handle })];
+    for (const view of views) expect(JSON.stringify(view)).not.toContain(feed.value.token);
+  });
+});
+
+describe("credential management needs a person, not an agent token", () => {
+  it("refuses an agent token with forbidden on every token and feed handler", async () => {
+    const world = setup();
+    const { me } = await world.signIn(jane);
+    const issued = await world.handlers.issueAgentToken(as(me.id), { label: "laptop" });
+    if (!issued.ok) throw new Error("expected ok");
+    const agent: Actor = { kind: "attendee", attendeeId: me.id, via: "agent-token" };
+    const forbidden = { ok: false, error: { kind: "forbidden" } };
+
+    expect(await world.handlers.issueAgentToken(agent, { label: "another" })).toMatchObject(forbidden);
+    expect(await world.handlers.listAgentTokens(agent)).toMatchObject(forbidden);
+    expect(await world.handlers.revokeAgentToken(agent, { tokenId: issued.value.token.id })).toMatchObject(forbidden);
+    expect(await world.handlers.rotateCalendarFeed(agent)).toMatchObject(forbidden);
+    expect(await world.handlers.getCalendarFeed(agent)).toMatchObject(forbidden);
+    expect(world.tokens.size).toBe(1);
+  });
+
+  it("lets the same attendee act through an agent token everywhere else", async () => {
+    const world = setup();
+    const { me } = await world.signIn(jane);
+    const agent: Actor = { kind: "attendee", attendeeId: me.id, via: "agent-token" };
+    expect(await world.handlers.getMe(agent)).toMatchObject({ ok: true, value: { id: me.id } });
+    expect(await world.handlers.setVisibility(agent, { visibility: "public" })).toMatchObject({ ok: true });
+  });
+
+  it("treats dev sign-in's bearer as a person", async () => {
+    const world = setup();
+    const { me } = await world.signIn(jane);
+    const dev: Actor = { kind: "attendee", attendeeId: me.id, via: "dev" };
+    expect(await world.handlers.issueAgentToken(dev, { label: "curl" })).toMatchObject({ ok: true });
   });
 });

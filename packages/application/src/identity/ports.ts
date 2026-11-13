@@ -56,9 +56,11 @@ export interface WebSessionRepository {
   delete(idSha256: string): Promise<void>;
 }
 
+/** The token is kept readable so its owner can see the link again (ADR 0008). */
 export interface CalendarFeedRepository {
   /** Sets the attendee's one feed token, replacing any earlier one. */
-  replace(attendeeId: string, tokenSha256: string, rotatedAt: string): Promise<void>;
+  replace(attendeeId: string, token: string, rotatedAt: string): Promise<void>;
+  get(attendeeId: string): Promise<{ token: string; rotatedAt: string } | undefined>;
 }
 
 /** Whether two attendees are connected. The network slice owns the real answer. */

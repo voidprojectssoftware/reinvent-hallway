@@ -94,15 +94,15 @@ export function identityInMemory(extra: Partial<IdentityPorts> = {}): IdentityPo
   };
 }
 
-/** The fake keeps its feeds readable, so tests can see what a rotation stored. */
-export function calendarFeedsInMemory(): CalendarFeedRepository & {
-  feeds: Map<string, { tokenSha256: string; rotatedAt: string }>;
-} {
-  const feeds = new Map<string, { tokenSha256: string; rotatedAt: string }>();
+export function calendarFeedsInMemory(): CalendarFeedRepository {
+  const feeds = new Map<string, { token: string; rotatedAt: string }>();
   return {
-    feeds,
-    async replace(attendeeId, tokenSha256, rotatedAt) {
-      feeds.set(attendeeId, { tokenSha256, rotatedAt });
+    async replace(attendeeId, token, rotatedAt) {
+      for (const [other, feed] of feeds) {
+        if (other !== attendeeId && feed.token === token) throw new Error("UNIQUE constraint failed: calendar_feeds.token");
+      }
+      feeds.set(attendeeId, { token, rotatedAt });
     },
+    get: async (attendeeId) => copy(feeds.get(attendeeId)),
   };
 }

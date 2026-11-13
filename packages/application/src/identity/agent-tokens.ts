@@ -11,6 +11,7 @@ import type {
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { AgentTokenRecord, AgentTokenRepository } from "./ports.ts";
+import { personAtKeyboard } from "./person-at-keyboard.ts";
 import { randomSecret, sha256Hex } from "./secrets.ts";
 import { toAgentToken } from "./views.ts";
 
@@ -22,15 +23,16 @@ export type IssueAgentToken = (actor: Actor, input: IssueAgentTokenInput) => Pro
 export type ListAgentTokens = (actor: Actor) => Promise<Outcome<AgentTokenList>>;
 export type RevokeAgentToken = (actor: Actor, input: RevokeAgentTokenInput) => Promise<Outcome<AgentToken>>;
 
-const signInFirst = () => fail("unauthenticated", "Sign in first.");
+// Every handler here is for the person, never their agent (person-at-keyboard.ts).
 
 export function issueAgentToken(tokens: AgentTokenRepository, now: () => Date): IssueAgentToken {
   return async (actor, { label }) => {
-    if (actor.kind !== "attendee") return signInFirst();
+    const person = personAtKeyboard(actor);
+    if (!person.ok) return person;
     const secret = agentTokenPrefix + randomSecret();
     const token: AgentTokenRecord = {
       id: crypto.randomUUID(),
-      attendeeId: actor.attendeeId,
+      attendeeId: person.value,
       label,
       prefix: secret.slice(0, shownLength),
       secretSha256: await sha256Hex(secret),
@@ -43,18 +45,20 @@ export function issueAgentToken(tokens: AgentTokenRepository, now: () => Date): 
 
 export function listAgentTokens(tokens: AgentTokenRepository): ListAgentTokens {
   return async (actor) => {
-    if (actor.kind !== "attendee") return signInFirst();
-    return ok({ tokens: (await tokens.listFor(actor.attendeeId)).map(toAgentToken) });
+    const person = personAtKeyboard(actor);
+    if (!person.ok) return person;
+    return ok({ tokens: (await tokens.listFor(person.value)).map(toAgentToken) });
   };
 }
 
 /** Revoking twice is not an error: the token stays revoked from the first time. */
 export function revokeAgentToken(tokens: AgentTokenRepository, now: () => Date): RevokeAgentToken {
   return async (actor, { tokenId }) => {
-    if (actor.kind !== "attendee") return signInFirst();
+    const person = personAtKeyboard(actor);
+    if (!person.ok) return person;
     const token = await tokens.byId(tokenId);
     // Someone else's token answers exactly as a missing one, so ids cannot be probed.
-    if (!token || token.attendeeId !== actor.attendeeId) return fail("not-found", `No agent token ${tokenId}.`);
+    if (!token || token.attendeeId !== person.value) return fail("not-found", `No agent token ${tokenId}.`);
     if (token.revokedAt) return ok(toAgentToken(token));
     const revokedAt = now().toISOString();
     await tokens.revoke(token.id, revokedAt);

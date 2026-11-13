@@ -244,6 +244,28 @@ describe("agent tokens", () => {
     expect(await me.json()).toMatchObject({ handle: "jane-doe" });
   });
 
+  it("cannot manage tokens or the calendar feed (403), where the session cookie can", async () => {
+    const { browser, call } = await devSignedIn();
+    const issued = (await (await browser.fetch("/api/me/tokens", postJson({ label: "cli" }))).json()) as IssuedAgentToken;
+    const asAgent = (path: string, init: RequestInit = {}) =>
+      call(`${origin}${path}`, {
+        ...init,
+        headers: { ...Object.fromEntries(new Headers(init.headers)), authorization: `Bearer ${issued.secret}` },
+      });
+
+    const minted = await asAgent("/api/me/tokens", postJson({ label: "a second token" }));
+    expect(minted.status).toBe(403);
+    expect(await minted.json()).toMatchObject({ kind: "forbidden" });
+    expect((await asAgent("/api/me/tokens")).status).toBe(403);
+    expect((await asAgent(`/api/me/tokens/${issued.token.id}`, { method: "DELETE" })).status).toBe(403);
+    expect((await asAgent("/api/me/calendar-feed/rotate", { method: "POST" })).status).toBe(403);
+    expect((await asAgent("/api/me/calendar-feed")).status).toBe(403);
+
+    expect((await browser.fetch("/api/me/tokens", postJson({ label: "from the web" }))).status).toBe(200);
+    const listed = (await (await browser.fetch("/api/me/tokens")).json()) as AgentTokenList;
+    expect(listed.tokens.map((token) => token.label)).toEqual(["cli", "from the web"]);
+  });
+
   it("whoami without a credential is a tool error, not a crash", async () => {
     const { call } = world();
     const client = new Client({ name: "identity-test", version: "0.0.0" });
@@ -291,12 +313,19 @@ describe("profile, visibility, attendee card, calendar feed", () => {
     for (const key of ["email", "linkedinSub", "verifiedName", "verifiedEmailSha256"]) expect(card).not.toHaveProperty(key);
   });
 
-  it("rotates the calendar feed to a new secret each time", async () => {
-    const { browser } = await devSignedIn();
+  it("rotates the calendar feed to a new secret each time, and shows the current one again without rotating", async () => {
+    const { browser, call } = await devSignedIn();
+    expect((await browser.fetch("/api/me/calendar-feed")).status).toBe(404);
     const one = (await (await browser.fetch("/api/me/calendar-feed/rotate", { method: "POST" })).json()) as CalendarFeed;
     const two = (await (await browser.fetch("/api/me/calendar-feed/rotate", { method: "POST" })).json()) as CalendarFeed;
     expect(one.token).not.toBe(two.token);
     expect(two.path).toBe(`/cal/${two.token}.ics`);
+    expect(await (await browser.fetch("/api/me/calendar-feed")).json()).toEqual(two);
+
+    const me = await (await browser.fetch("/api/me")).text();
+    const card = await (await call(`${origin}/api/attendees/jane-doe`)).text();
+    expect(me).not.toContain(two.token);
+    expect(card).not.toContain(two.token);
   });
 
   it("refuses every /api/me route to an anonymous caller with 401", async () => {

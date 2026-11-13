@@ -8,9 +8,7 @@ import type {
   CalendarFeedRepository,
   WebSessionRepository,
 } from "@hallway/application";
-import { eq } from "drizzle-orm";
 import { openDatabase } from "../persistence/d1/database.ts";
-import { calendarFeeds } from "../persistence/d1/entities/identity.ts";
 import { startLocalD1, type LocalD1 } from "../persistence/d1/local-d1.ts";
 import { agentTokensOnD1, attendeesOnD1, calendarFeedsOnD1, webSessionsOnD1 } from "./d1-identity-repositories.ts";
 import {
@@ -33,7 +31,6 @@ interface Repositories {
   tokens: AgentTokenRepository;
   sessions: WebSessionRepository;
   feeds: CalendarFeedRepository;
-  storedFeed(attendeeId: string): Promise<{ tokenSha256: string; rotatedAt: string } | undefined>;
 }
 
 const implementations: [string, () => Repositories][] = [
@@ -46,25 +43,17 @@ const implementations: [string, () => Repositories][] = [
         tokens: agentTokensOnD1(db),
         sessions: webSessionsOnD1(db),
         feeds: calendarFeedsOnD1(db),
-        async storedFeed(attendeeId) {
-          const [row] = await db.select().from(calendarFeeds).where(eq(calendarFeeds.attendeeId, attendeeId));
-          return row && { tokenSha256: row.tokenSha256, rotatedAt: row.rotatedAt };
-        },
       };
     },
   ],
   [
     "in memory",
-    () => {
-      const feeds = calendarFeedsInMemory();
-      return {
-        attendees: attendeesInMemory(),
-        tokens: agentTokensInMemory(),
-        sessions: webSessionsInMemory(),
-        feeds,
-        storedFeed: async (attendeeId) => feeds.feeds.get(attendeeId),
-      };
-    },
+    () => ({
+      attendees: attendeesInMemory(),
+      tokens: agentTokensInMemory(),
+      sessions: webSessionsInMemory(),
+      feeds: calendarFeedsInMemory(),
+    }),
   ],
 ];
 
@@ -150,12 +139,22 @@ describe.each(implementations)("identity repositories %s", (_, open) => {
     expect(await sessions.byIdSha256(session.idSha256)).toBeUndefined();
   });
 
-  it("keeps one calendar feed per attendee, the latest rotation winning", async () => {
-    const { attendees, feeds, storedFeed } = open();
+  it("keeps one readable calendar feed per attendee, the latest rotation winning", async () => {
+    const { attendees, feeds } = open();
     const owner = anAttendee();
     await attendees.create(owner);
+    expect(await feeds.get(owner.id)).toBeUndefined();
     await feeds.replace(owner.id, `${owner.id}-old`, "2026-11-13T10:00:00.000Z");
     await feeds.replace(owner.id, `${owner.id}-new`, "2026-11-13T11:00:00.000Z");
-    expect(await storedFeed(owner.id)).toEqual({ tokenSha256: `${owner.id}-new`, rotatedAt: "2026-11-13T11:00:00.000Z" });
+    expect(await feeds.get(owner.id)).toEqual({ token: `${owner.id}-new`, rotatedAt: "2026-11-13T11:00:00.000Z" });
+  });
+
+  it("refuses a feed token another attendee already holds", async () => {
+    const { attendees, feeds } = open();
+    const [one, two] = [anAttendee(), anAttendee()];
+    await attendees.create(one);
+    await attendees.create(two);
+    await feeds.replace(one.id, `${one.id}-shared`, "2026-11-13T10:00:00.000Z");
+    await expect(feeds.replace(two.id, `${one.id}-shared`, "2026-11-13T10:00:00.000Z")).rejects.toThrow();
   });
 });

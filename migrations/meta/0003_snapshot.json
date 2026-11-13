@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0cd6f923-94b6-4728-84e1-d3fa143f1098",
+  "id": "1eaf0cc7-e2c0-4769-8e9d-0cdd574dc1ed",
   "prevId": "2d5a906c-ee06-4a3c-bf6f-bf5f03824985",
   "tables": {
     "events": {
@@ -271,8 +271,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "token_sha256": {
-          "name": "token_sha256",
+        "token": {
+          "name": "token",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -287,10 +287,10 @@
         }
       },
       "indexes": {
-        "calendar_feeds_token_sha256_unique": {
-          "name": "calendar_feeds_token_sha256_unique",
+        "calendar_feeds_token_unique": {
+          "name": "calendar_feeds_token_unique",
           "columns": [
-            "token_sha256"
+            "token"
           ],
           "isUnique": true
         }

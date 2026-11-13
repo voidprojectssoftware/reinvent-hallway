@@ -10,7 +10,12 @@ import {
   type ListAgentTokens,
   type RevokeAgentToken,
 } from "./agent-tokens.ts";
-import { rotateCalendarFeed, type RotateCalendarFeed } from "./calendar-feed.ts";
+import {
+  getCalendarFeed,
+  rotateCalendarFeed,
+  type GetCalendarFeed,
+  type RotateCalendarFeed,
+} from "./calendar-feed.ts";
 import type {
   AgentTokenRepository,
   AreConnected,
@@ -66,6 +71,7 @@ export interface IdentityHandlers {
   listAgentTokens: ListAgentTokens;
   revokeAgentToken: RevokeAgentToken;
   rotateCalendarFeed: RotateCalendarFeed;
+  getCalendarFeed: GetCalendarFeed;
 }
 
 export function identityHandlers(ports: IdentityPorts): IdentityHandlers {
@@ -85,5 +91,6 @@ export function identityHandlers(ports: IdentityPorts): IdentityHandlers {
     listAgentTokens: listAgentTokens(ports.agentTokens),
     revokeAgentToken: revokeAgentToken(ports.agentTokens, now),
     rotateCalendarFeed: rotateCalendarFeed(ports.calendarFeeds, now),
+    getCalendarFeed: getCalendarFeed(ports.calendarFeeds),
   };
 }

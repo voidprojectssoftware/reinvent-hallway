@@ -26,7 +26,7 @@ export function authenticate(
       if (!session || session.expiresAt <= at) {
         return fail("unauthenticated", "The session has ended. Sign in again.");
       }
-      return ok({ kind: "attendee", attendeeId: session.attendeeId });
+      return ok({ kind: "attendee", attendeeId: session.attendeeId, via: "session" });
     }
 
     const token = await tokens.bySecretSha256(hash);
@@ -34,6 +34,6 @@ export function authenticate(
       return fail("unauthenticated", "The agent token is unknown or revoked.");
     }
     await tokens.touch(token.id, at);
-    return ok({ kind: "attendee", attendeeId: token.attendeeId });
+    return ok({ kind: "attendee", attendeeId: token.attendeeId, via: "agent-token" });
   };
 }

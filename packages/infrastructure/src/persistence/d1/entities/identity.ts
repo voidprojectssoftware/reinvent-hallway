@@ -1,7 +1,8 @@
 // The identity tables (Drizzle models): attendees, and the three kinds of
-// secret that act for one. Every secret column holds a SHA-256 hex, never the
-// secret, and is looked up by that hash. Instants are ISO-8601 UTC text, which
-// sorts and compares as time does.
+// secret that act for one. Session and agent token columns hold a SHA-256
+// hex, never the secret, and are looked up by that hash; the calendar feed
+// token is the exception, below. Instants are ISO-8601 UTC text, which sorts
+// and compares as time does.
 import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const attendees = sqliteTable("attendees", {
@@ -51,10 +52,12 @@ export const webSessions = sqliteTable(
   (table) => [index("web_sessions_attendee_id").on(table.attendeeId)],
 );
 
+// The one secret kept readable (ADR 0008): its owner must see the subscribe
+// link again, and the /cal route finds the feed by it.
 export const calendarFeeds = sqliteTable("calendar_feeds", {
   attendeeId: text("attendee_id")
     .primaryKey()
     .references(() => attendees.id),
-  tokenSha256: text("token_sha256").notNull().unique(),
+  token: text("token").notNull().unique(),
   rotatedAt: text("rotated_at").notNull(),
 });

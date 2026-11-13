@@ -72,7 +72,7 @@ erDiagram
 | **Imported contact** | One row of it, reduced | normalized LinkedIn profile URL, SHA-256 of a lowercased email when present, normalized full name. **No other columns are kept** (company, position and the raw email are dropped at parse) |
 | **Suggestion** | Derived, not stored: an attendee who matches one of my imported contacts and is not yet connected | `attendee`, `reason` |
 | **Agent token** | A personal token an agent uses for MCP and REST | `id`, `label`, `prefix` (shown), hash (stored), `createdAt`, `lastUsedAt`, `revokedAt`. Secret shown once |
-| **Calendar feed** | A secret iCalendar URL of my visible schedule | `token` (rotatable; stored as a SHA-256 like every secret, so shown once, on rotation). One per attendee |
+| **Calendar feed** | A secret iCalendar URL of my visible schedule | `token` (rotatable; stored readable so its owner can see the link again, unlike every other secret; shown only to its owner signed in as a person, never in a public resource). One per attendee |
 
 ### Session link
 
@@ -121,7 +121,9 @@ We store UTC instants and the event timezone, and render in the event timezone
   `verifiedName` (accents, case and spacing ignored, nothing fuzzier), or the email hash matches the attendee's verified email. A
   claimed URL alone suggests no one: anyone can claim any URL.
 - **Agent tokens act as their attendee**, for that attendee's data and that
-  attendee's view of others. Never more.
+  attendee's view of others. Never more: an agent token may not issue, list
+  or revoke agent tokens, nor rotate or read the calendar feed (`forbidden`),
+  so a stolen token cannot outlive its own revocation (ADR 0008).
 
 ## Commands
 
@@ -133,8 +135,8 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent), `unchanged`, `sessionsStored`, and `missingSessions` |
 | `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
 | `SetEntryHidden` | me | hide or show one entry |
-| `IssueAgentToken` / `RevokeAgentToken` | me | |
-| `RotateCalendarFeed` | me | |
+| `IssueAgentToken` / `RevokeAgentToken` | me, signed in as a person (not an agent token) | |
+| `RotateCalendarFeed` | me, signed in as a person (not an agent token) | |
 | `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows, replace my previous import |
 | `RequestConnection` / `WithdrawRequest` | me | |
 | `AcceptRequest` / `DeclineRequest` | the recipient | |
@@ -146,6 +148,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | Query | Returns |
 | --- | --- |
 | `GetMe` | my attendee, with private fields |
+| `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
 | `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" |

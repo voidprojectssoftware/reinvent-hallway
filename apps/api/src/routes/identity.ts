@@ -117,7 +117,7 @@ const listTokensRoute = createRoute({
   method: "get",
   path: "/api/me/tokens",
   operationId: "listAgentTokens",
-  summary: "My agent tokens, revoked ones included. Never their secrets",
+  summary: "My agent tokens, revoked ones included. Never their secrets. Web sign-in only: 403 to an agent token",
   tags,
   responses: { 200: json("My tokens.", AgentTokenList), ...errorResponses },
 });
@@ -126,7 +126,7 @@ const issueTokenRoute = createRoute({
   method: "post",
   path: "/api/me/tokens",
   operationId: "issueAgentToken",
-  summary: "Issue an agent token. The secret is in this response and never again",
+  summary: "Issue an agent token; the secret is in this response and never again. Web sign-in only: 403 to an agent token",
   tags,
   request: body(IssueAgentTokenInput),
   responses: { 200: json("The token and its secret.", IssuedAgentToken), ...errorResponses },
@@ -136,7 +136,7 @@ const revokeTokenRoute = createRoute({
   method: "delete",
   path: "/api/me/tokens/{tokenId}",
   operationId: "revokeAgentToken",
-  summary: "Revoke one of my agent tokens",
+  summary: "Revoke one of my agent tokens. Web sign-in only: 403 to an agent token",
   tags,
   request: { params: RevokeAgentTokenInput },
   responses: { 200: json("The token, revoked.", AgentToken), ...errorResponses },
@@ -146,9 +146,18 @@ const rotateFeedRoute = createRoute({
   method: "post",
   path: "/api/me/calendar-feed/rotate",
   operationId: "rotateCalendarFeed",
-  summary: "Make a new secret calendar feed URL; the old one stops working",
+  summary: "Make a new secret calendar feed URL; the old one stops working. Web sign-in only: 403 to an agent token",
   tags,
-  responses: { 200: json("The new feed. Its token is shown once.", CalendarFeed), ...errorResponses },
+  responses: { 200: json("The new feed.", CalendarFeed), ...errorResponses },
+});
+
+const getFeedRoute = createRoute({
+  method: "get",
+  path: "/api/me/calendar-feed",
+  operationId: "getCalendarFeed",
+  summary: "My current calendar feed URL, to subscribe again without rotating. Not to agent tokens",
+  tags,
+  responses: { 200: json("The current feed.", CalendarFeed), ...errorResponses },
 });
 
 const getAttendeeRoute = createRoute({
@@ -216,6 +225,7 @@ export function registerIdentityRoutes<B extends DevSignInBindings>(app: ApiApp<
     respond(c, await c.var.handlers.identity.revokeAgentToken(c.var.actor, c.req.valid("param"))),
   );
   app.openapi(rotateFeedRoute, async (c) => respond(c, await c.var.handlers.identity.rotateCalendarFeed(c.var.actor)));
+  app.openapi(getFeedRoute, async (c) => respond(c, await c.var.handlers.identity.getCalendarFeed(c.var.actor)));
   app.openapi(getAttendeeRoute, async (c) =>
     respond(c, await c.var.handlers.identity.getAttendee(c.var.actor, c.req.valid("param"))),
   );
