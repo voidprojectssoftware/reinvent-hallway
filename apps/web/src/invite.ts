@@ -1,6 +1,5 @@
 // The invite in a share link (/@handle?invite=<token>), from the moment the
-// link is opened until it connects someone, and where to come back to after
-// signing in.
+// link is opened until it connects someone.
 //
 // The token is a secret: whoever has it may connect to its owner (domain.md,
 // "A connection is mutual and needs consent"). So it leaves the address bar
@@ -8,15 +7,15 @@
 // tab's sessionStorage instead: not in the URL, where it would sit in history
 // and be copied with the address; not in a loader's data or a log. It must be
 // kept somewhere that outlives a page load, because signing in with LinkedIn
-// leaves the app and comes back to `/` (the callback takes no return path:
-// #46 asks for one).
+// leaves the app. The way back to this page is the sign-in's own `returnTo`
+// (bound to the OAuth state cookie); the token never rides along in it, so it
+// never reaches LinkedIn, a cookie or a server log.
 //
 // sessionStorage can be missing or refuse (a private window, blocked site
 // data); then the invite is simply not held, and the page offers a plain
 // connection request instead.
 
 const inviteKey = "hallway.invite";
-const returnKey = "hallway.after-sign-in";
 
 interface Held {
   handle: string;
@@ -69,17 +68,3 @@ export function heldInvite(handle: string): string | null {
 export function dropInvite(): void {
   write(inviteKey, null);
 }
-
-/** Come back to this page after signing in. Only a path on this app: never another origin. */
-export function returnAfterSignIn(path: string): void {
-  if (isAppPath(path)) write(returnKey, path);
-}
-
-/** Where to go once signed in, if a page asked; asked once, then forgotten. */
-export function takeReturnPath(): string | null {
-  const path = read(returnKey);
-  write(returnKey, null);
-  return path !== null && isAppPath(path) ? path : null;
-}
-
-const isAppPath = (path: string) => path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");

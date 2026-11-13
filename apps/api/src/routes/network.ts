@@ -9,6 +9,7 @@ import {
   EventScope,
   ImportContactsInput,
   Invite,
+  ListConnectionsInput,
   maxContactsCsvBytes,
   MeetingGaps,
   MeetingGapsQuery,
@@ -36,8 +37,9 @@ const listConnectionsRoute = createRoute({
   method: "get",
   path: "/api/me/connections",
   operationId: "listConnections",
-  summary: "My connections",
+  summary: "My connections; with `eventId`, each with how many of their sessions I may see and share",
   tags,
+  request: { query: ListConnectionsInput },
   responses: { 200: json(ConnectionList, "My connections, by name."), ...errorResponses },
 });
 
@@ -188,7 +190,9 @@ const gapsRoute = createRoute({
 });
 
 export function registerNetworkRoutes<B extends object>(app: ApiApp<B>) {
-  app.openapi(listConnectionsRoute, async (c) => respond(c, await c.var.handlers.network.listConnections(c.var.actor)));
+  app.openapi(listConnectionsRoute, async (c) =>
+    respond(c, await c.var.handlers.network.listConnections(c.var.actor, c.req.valid("query"))),
+  );
   app.openapi(removeConnectionRoute, async (c) =>
     respond(c, await c.var.handlers.network.removeConnection(c.var.actor, c.req.valid("param"))),
   );

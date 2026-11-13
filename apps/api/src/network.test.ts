@@ -72,8 +72,12 @@ const aws = (sessionId: string, time: string, length = "60") => ({
   title: `Session ${sessionId}`,
   sessionTime: { date: "2026-12-01", time, length },
 });
-const sync = (as: string, sessions: ReturnType<typeof aws>[], favorites = sessions.map((s) => s.sessionId)) =>
-  rest("/api/events/reinvent2026/my-schedule", as, post({ sessions, favorites, reserved: [] }, "PUT"));
+const sync = (
+  as: string,
+  sessions: ReturnType<typeof aws>[],
+  favorites = sessions.map((s) => s.sessionId),
+  reserved: string[] = [],
+) => rest("/api/events/reinvent2026/my-schedule", as, post({ sessions, favorites, reserved }, "PUT"));
 const hide = (as: string, sessionId: string) =>
   rest(`/api/events/reinvent2026/my-schedule/entries/${sessionId}`, as, post({ hidden: true }, "PATCH"));
 
@@ -279,8 +283,9 @@ describe("LinkedIn Connections.csv and suggestions", () => {
 
 /**
  * The viewer is Ana. Ben (connections) and Cat (private) are connected to
- * her; Dev (connections) and Eve (public) are not. All five plan s-shared;
- * Ben also plans s-hidden and hides it; Dev plans s-dev.
+ * her; Dev (connections) and Eve (public) are not. All five plan s-shared,
+ * Ben with a seat (reserved), the rest as a favorite; Ben also reserves
+ * s-hidden and hides it; Dev plans s-dev.
  */
 async function theirWeek() {
   const ana = await signIn("Ana Silva", "connections");
@@ -290,7 +295,7 @@ async function theirWeek() {
   const eve = await signIn("Eve Park", "public");
   const shared = aws("s-shared", "10:00");
   await sync(ana.id, [shared]);
-  await sync(ben.id, [shared, aws("s-hidden", "13:00")]);
+  await sync(ben.id, [shared, aws("s-hidden", "13:00")], [], ["s-shared", "s-hidden"]);
   await hide(ben.id, "s-hidden");
   await sync(cat.id, [shared]);
   await sync(dev.id, [shared, aws("s-dev", "15:00")]);
@@ -329,11 +334,12 @@ describe("every read of someone else's schedule goes through the visibility rule
     expect((await card(dev)).scheduleVisible).toBe(false);
   });
 
-  it("who is going, REST and MCP: only visible connections, never a hidden entry", async () => {
+  it("who is going, REST and MCP: only visible connections with their intent, never a hidden entry", async () => {
     const { ana, ben } = await theirWeek();
     const ids = ["s-shared", "s-hidden", "s-dev"];
+    // Ben's hidden s-hidden is reserved too: it lends him neither a place nor an intent.
     const expected = [
-      { sessionId: "s-shared", people: [expect.objectContaining({ handle: ben.handle })] },
+      { sessionId: "s-shared", people: [expect.objectContaining({ handle: ben.handle, intent: "reserved" })] },
       { sessionId: "s-hidden", people: [] },
       { sessionId: "s-dev", people: [] },
     ];
@@ -348,7 +354,9 @@ describe("every read of someone else's schedule goes through the visibility rule
     const viaRest = (await (await rest("/api/events/reinvent2026/network-agenda?day=2026-12-01", ana.id)).json()) as NetworkAgenda;
     const viaMcp = await mcpTool<NetworkAgenda>(ana.id, "network_agenda", { eventId: "reinvent2026", day: "2026-12-01" });
     for (const agenda of [viaRest, viaMcp.value!]) {
-      expect(agenda.items.map((i) => [i.session.sessionId, i.people.map((p) => p.handle)])).toEqual([["s-shared", [ben.handle]]]);
+      expect(agenda.items.map((i) => [i.session.sessionId, i.people.map((p) => [p.handle, p.intent])])).toEqual([
+        ["s-shared", [[ben.handle, "reserved"]]],
+      ]);
     }
   });
 
@@ -358,7 +366,7 @@ describe("every read of someone else's schedule goes through the visibility rule
     const counts = Object.fromEntries(search.sessions.map((s) => [s.sessionId, s.connectionsGoing?.count]));
     expect(counts).toEqual({ "s-shared": 1, "s-hidden": 0, "s-dev": 0 });
     const shared = search.sessions.find((s) => s.sessionId === "s-shared")!;
-    expect(shared.connectionsGoing?.people.map((p) => p.handle)).toEqual([ben.handle]);
+    expect(shared.connectionsGoing?.people.map((p) => [p.handle, p.intent])).toEqual([[ben.handle, "reserved"]]);
 
     const one = (await (await rest("/api/events/reinvent2026/sessions/s-hidden", ana.id)).json()) as Session;
     expect(one.connectionsGoing).toEqual({ count: 0, people: [] });
@@ -367,6 +375,34 @@ describe("every read of someone else's schedule goes through the visibility rule
 
     const anonymous = (await (await rest("/api/events/reinvent2026/sessions/s-shared")).json()) as Session;
     expect(anonymous).not.toHaveProperty("connectionsGoing");
+  });
+
+  it("connection counts, REST and MCP: only sessions I may see, never a hidden entry or a private schedule", async () => {
+    const { ana, ben, cat } = await theirWeek();
+    // Ben adds a session Ana has not planned; his hidden s-hidden stays hidden through the sync.
+    // Ana plans s-hidden too: hidden, it is not one she shares with him.
+    await sync(ana.id, [aws("s-shared", "10:00"), aws("s-hidden", "13:00")]);
+    await sync(ben.id, [aws("s-shared", "10:00"), aws("s-hidden", "13:00"), aws("s-ben", "16:00")], ["s-ben"], [
+      "s-shared",
+      "s-hidden",
+    ]);
+    const expected = [
+      { handle: ben.handle, sessions: 2, sharedWithMe: 1 },
+      // Cat is a connection whose schedule is private: nothing of hers counts.
+      { handle: cat.handle, sessions: 0, sharedWithMe: 0 },
+    ];
+    const counts = (list: ConnectionList) =>
+      list.connections.map((c) => ({ handle: c.person.handle, sessions: c.sessions, sharedWithMe: c.sharedWithMe }));
+
+    const viaRest = (await (await rest("/api/me/connections?eventId=reinvent2026", ana.id)).json()) as ConnectionList;
+    expect(counts(viaRest)).toEqual(expected);
+    const viaMcp = await mcpTool<ConnectionList>(ana.id, "list_my_connections", { eventId: "reinvent2026" });
+    expect(counts(viaMcp.value!)).toEqual(expected);
+
+    // Without an event, no counts; an event that does not exist is not found.
+    const plain = (await (await rest("/api/me/connections", ana.id)).json()) as ConnectionList;
+    expect(plain.connections.every((c) => !("sessions" in c) && !("sharedWithMe" in c))).toBe(true);
+    expect((await rest("/api/me/connections?eventId=reinvent1999", ana.id)).status).toBe(404);
   });
 
   it("meeting gaps, REST and MCP: a hidden entry does not block, an invisible schedule is refused", async () => {

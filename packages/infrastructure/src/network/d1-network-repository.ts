@@ -303,10 +303,12 @@ export function networkOnD1(db: Database): NetworkRepository {
     },
 
     async connectionPlans(viewerId, eventId, scope) {
-      const inScope: SQL =
+      const inScope: SQL | undefined =
         "sessionIds" in scope
           ? sql`${planEntries.sessionId} in ${jsonList(scope.sessionIds)}`
-          : and(gte(sessions.startsAt, scope.startsFrom), lt(sessions.startsAt, scope.startsBefore))!;
+          : "startsFrom" in scope
+            ? and(gte(sessions.startsAt, scope.startsFrom), lt(sessions.startsAt, scope.startsBefore))
+            : undefined;
       const rows = await db
         .select()
         .from(connections)

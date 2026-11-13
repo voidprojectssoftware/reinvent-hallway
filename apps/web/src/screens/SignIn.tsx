@@ -2,38 +2,42 @@
 // Each shows only when the API says it is on (GET /api/auth/options), so a
 // build served anywhere else never offers dev sign-in, and a server without
 // LinkedIn credentials never offers a button that answers 404. A failed or
-// missing answer counts as both off. Someone already signed in goes to their
-// week.
+// missing answer counts as both off.
+//
+// A page that sends someone here to sign in names itself in `?returnTo=`
+// (a person's page, a session): both ways of signing in land back there, and
+// someone already signed in goes straight there (`returnPathOf`).
 import { useState, type FormEvent } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router";
 import { api, ApiFailure, linkedInSignInHref, type SignInOptions } from "../api/client.ts";
 import { Empty } from "../shell/Empty.tsx";
 import { Screen } from "../shell/Screen.tsx";
-import { ifSignedIn } from "../shell/signed-in.ts";
+import { ifSignedIn, returnPathOf } from "../shell/signed-in.ts";
 
-export async function signInLoader(): Promise<SignInOptions> {
+export async function signInLoader({ request }: { request: Request }): Promise<SignInOptions & { returnTo: string | null }> {
+  const returnTo = returnPathOf(new URL(request.url));
   const [me, options] = await Promise.all([
     ifSignedIn(api.me()).catch(() => null),
     api.signInOptions().catch(() => ({ devSignIn: false, linkedIn: false })),
   ]);
-  if (me) throw redirect("/");
-  return options;
+  if (me) throw redirect(returnTo ?? "/");
+  return { ...options, returnTo };
 }
 
 export function SignIn() {
-  const { devSignIn, linkedIn } = useLoaderData<typeof signInLoader>();
+  const { devSignIn, linkedIn, returnTo } = useLoaderData<typeof signInLoader>();
   return (
     <Screen title="Hallway" sub="See where the people you know will be at re:Invent 2026, and let your agent plan around them.">
       {linkedIn && (
         <section className="section">
-          <a className="btn block" href={linkedInSignInHref}>
+          <a className="btn block" href={linkedInSignInHref(returnTo)}>
             Sign in with LinkedIn
           </a>
           <p className="gfoot">Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.</p>
         </section>
       )}
 
-      {devSignIn && <DevSignIn />}
+      {devSignIn && <DevSignIn returnTo={returnTo} />}
 
       {!linkedIn && !devSignIn && (
         <Empty icon="lock" title="Signing in is not open yet">
@@ -44,7 +48,7 @@ export function SignIn() {
   );
 }
 
-function DevSignIn() {
+function DevSignIn({ returnTo }: { returnTo: string | null }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +60,7 @@ function DevSignIn() {
     setError(null);
     try {
       await api.devSignIn(name.trim());
-      await navigate("/");
+      await navigate(returnTo ?? "/");
     } catch (failure) {
       setError(failure instanceof ApiFailure ? failure.message : String(failure));
       setBusy(false);
