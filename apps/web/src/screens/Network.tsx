@@ -1,14 +1,16 @@
 // Network (docs/design/network.html): what needs an answer first (requests
 // to me), then who to add (people from my LinkedIn connections), then the
-// requests I sent, then who is already in. Only mine, so a signed-out visitor
-// is sent to sign in like the other tabs.
-import type { ConnectionList, Person, RequestList, SuggestionList } from "@hallway/contracts";
+// requests I sent, then who is already in, then the people I follow (GitHub,
+// my LinkedIn import: ADR 0019). Only mine, so a signed-out visitor is sent
+// to sign in like the other tabs.
+import type { ConnectionList, Following as FollowingList, Person, RequestList, SuggestionList } from "@hallway/contracts";
 import { useState, type ReactNode } from "react";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
 import { EVENT_ID } from "../event.ts";
 import { ContactsImport } from "../network/ContactsImport.tsx";
 import { sessionCounts } from "../network/counts.ts";
+import { Following } from "../network/Following.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
@@ -21,19 +23,20 @@ export async function networkLoader({
   request,
 }: {
   request: Request;
-}): Promise<{ connections: ConnectionList; requests: RequestList; suggestions: SuggestionList }> {
-  const [connections, requests, suggestions] = await Promise.all([
+}): Promise<{ connections: ConnectionList; requests: RequestList; suggestions: SuggestionList; following: FollowingList }> {
+  const [connections, requests, suggestions, following] = await Promise.all([
     requireSignIn(api.connections(EVENT_ID), request),
     requireSignIn(api.requests(), request),
     requireSignIn(api.suggestions(), request),
+    requireSignIn(api.following(EVENT_ID), request),
   ]);
-  return { connections, requests, suggestions };
+  return { connections, requests, suggestions, following };
 }
 
 const personPath = (person: Person) => `/@${person.handle}`;
 
 export function Network() {
-  const { connections, requests, suggestions } = useLoaderData<typeof networkLoader>();
+  const { connections, requests, suggestions, following } = useLoaderData<typeof networkLoader>();
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<(Failed & { where: string }) | null>(null);
@@ -208,6 +211,8 @@ export function Network() {
           </section>
         )
       )}
+
+      <Following following={following} />
     </Screen>
   );
 }

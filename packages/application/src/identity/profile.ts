@@ -15,7 +15,8 @@ import {
 } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
-import type { AreConnected, AttendeeRecord, AttendeeRepository } from "./ports.ts";
+import type { AttendeeRecord, AttendeeRepository, TieBetween } from "./ports.ts";
+import { viewerTie } from "./tie.ts";
 import { toCard, toMe } from "./views.ts";
 
 /**
@@ -94,14 +95,13 @@ export function setVisibility(attendees: AttendeeRepository): SetVisibility {
  * Anyone may see an attendee's card, even a private one's; whether they may
  * see the schedule is the domain's one visibility rule.
  */
-export function getAttendee(attendees: AttendeeRepository, areConnected: AreConnected): GetAttendee {
+export function getAttendee(attendees: AttendeeRepository, tieBetween: TieBetween): GetAttendee {
   return async (actor, input) => {
     const handle = normalizeHandle(input.handle);
     const attendee = await attendees.byHandle(handle);
     if (!attendee) return fail("not-found", `No attendee @${handle}.`);
     const viewer = actor.kind === "attendee" ? actor.attendeeId : null;
-    const connected = viewer !== null && viewer !== attendee.id && (await areConnected(viewer, attendee.id));
-    return ok(toCard(attendee, canViewSchedule(viewer, attendee, connected)));
+    return ok(toCard(attendee, canViewSchedule(viewer, attendee, await viewerTie(tieBetween, viewer, attendee.id))));
   };
 }
 

@@ -13,9 +13,9 @@ export const attendees = sqliteTable("attendees", {
   headline: text("headline"),
   avatarUrl: text("avatar_url"),
   linkedinProfileUrl: text("linkedin_profile_url"),
-  visibility: text("visibility", { enum: ["public", "connections", "private"] })
+  visibility: text("visibility", { enum: ["public", "network", "private"] })
     .notNull()
-    .default("connections"),
+    .default("network"),
   verifiedName: text("verified_name"),
   email: text("email"),
   createdAt: text("created_at").notNull(),

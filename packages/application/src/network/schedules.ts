@@ -1,11 +1,12 @@
 // The reads of other people's schedules (domain.md): GetAttendeeSchedule,
 // WhoIsGoing, NetworkAgenda, FindMeetingGaps, the "connections going" that
-// session search and get carry, and the session counts ListConnections
-// carries.
+// session search and get carry, and the session counts ListConnections and
+// ListMyNetwork carry.
 //
 // Every one of them filters entries through the domain's `visibleEntries` and
-// nothing else, so the visibility rule and the hidden flag hold on each path
-// without a second copy of either.
+// nothing else, with the tie from the one lookup (`tieBetween`, or the same
+// tie read alongside the plans), so the visibility rule and the hidden flag
+// hold on each path without a second copy of either.
 import type {
   GetPersonScheduleInput,
   GoingPerson,
@@ -33,14 +34,15 @@ import {
 import type { Actor } from "../actor.ts";
 import type { EventRepository } from "../events/event-repository.ts";
 import { noEvent } from "../events/get-event.ts";
-import type { AreConnected, AttendeeRepository } from "../identity/ports.ts";
+import type { AttendeeRepository, TieBetween } from "../identity/ports.ts";
 import { signedInAttendee } from "../identity/profile.ts";
+import { viewerTie } from "../identity/tie.ts";
 import { toCard } from "../identity/views.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ConnectionsGoingLookup } from "../schedule/dependencies.ts";
 import { sessionResource } from "../schedule/resources.ts";
 import type { CatalogSession, ScheduleRepository } from "../schedule/schedule-repository.ts";
-import type { ConnectionPlan, NetworkRepository, PlanScope } from "./ports.ts";
+import type { NetworkPlan, NetworkRepository, PlanScope } from "./ports.ts";
 import { byName, toPerson } from "./views.ts";
 
 export type GetAttendeeSchedule = (actor: Actor, input: GetPersonScheduleInput) => Promise<Outcome<PersonSchedule>>;
@@ -53,21 +55,22 @@ export interface NetworkReadPorts {
   network: NetworkRepository;
   events: EventRepository;
   schedule: ScheduleRepository;
-  areConnected: AreConnected;
+  tieBetween: TieBetween;
   sessionUrlTemplate: string;
 }
 
 /**
  * Why I may not see someone's schedule, said so the asker (often an agent)
  * knows what would change it: nothing for a private one, connecting for one
- * kept to connections (hunt F10).
+ * kept to their network (hunt F10). Following them does not change it
+ * (ADR 0019), so that is said too.
  */
 const notVisible = (owner: Pick<Attendee, "handle" | "visibility">) =>
   fail<never>(
     "forbidden",
     owner.visibility === "private"
       ? `@${owner.handle} keeps their schedule private: only they can see it, and connecting does not change that.`
-      : `@${owner.handle} shares their schedule with their connections only, and you are not connected. Connect on Hallway from their page (/@${owner.handle}) or their share link.`,
+      : `@${owner.handle} shares their schedule with their network only (their connections and the people they follow), and you are not in it. Following them does not change that. Connect on Hallway from their page (/@${owner.handle}) or their share link.`,
   );
 
 /**
@@ -81,45 +84,46 @@ const notAnEventDay = (day: string, event: Event) => {
 };
 
 /**
- * My connections' plans that I may see: one read of all their entries in
- * scope, then `visibleEntries` per owner. Every count and every "going" here
- * comes from this, so a hidden entry, or any entry of a private schedule,
- * never lends anyone a session, an intent or a count. The read is joined
- * through my connections, so `areConnected` is true for every owner.
+ * The plans of my network (connections and people I follow) that I may see:
+ * one read of all their entries in scope, each with how I stand to its
+ * owner, then `visibleEntries` per owner. Every count and every "going" here
+ * comes from this, so a hidden entry, any entry of a private schedule, or a
+ * network-only schedule of someone I follow who does not follow me back,
+ * never lends anyone a session, an intent or a count.
  */
-async function visibleConnectionPlans(
+async function visibleNetworkPlans(
   network: NetworkRepository,
   viewerId: string,
   eventId: string,
   scope: PlanScope,
-): Promise<ConnectionPlan[]> {
-  const plans = await network.connectionPlans(viewerId, eventId, scope);
-  const byOwner = new Map<string, ConnectionPlan[]>();
+): Promise<NetworkPlan[]> {
+  const plans = await network.networkPlans(viewerId, eventId, scope);
+  const byOwner = new Map<string, NetworkPlan[]>();
   for (const plan of plans) {
     const owned = byOwner.get(plan.owner.id);
     if (owned) owned.push(plan);
     else byOwner.set(plan.owner.id, [plan]);
   }
-  const visible: ConnectionPlan[] = [];
+  const visible: NetworkPlan[] = [];
   for (const ownerPlans of byOwner.values()) {
-    const owner = ownerPlans[0]!.owner;
+    const { owner, tie } = ownerPlans[0]!;
     const seen = new Set(
-      visibleEntries(viewerId, owner, ownerPlans.map((plan) => plan.entry), true).map((entry) => entry.sessionId),
+      visibleEntries(viewerId, owner, ownerPlans.map((plan) => plan.entry), tie).map((entry) => entry.sessionId),
     );
     visible.push(...ownerPlans.filter((plan) => seen.has(plan.entry.sessionId)));
   }
   return visible;
 }
 
-/** Per session, my connections going whose entry I may see, each with their intent. */
-async function goingAmongConnections(
+/** Per session, the people in my network going whose entry I may see, each with their intent. */
+async function goingInNetwork(
   network: NetworkRepository,
   viewerId: string,
   eventId: string,
   scope: PlanScope,
 ): Promise<Map<string, { session: CatalogSession; people: GoingPerson[] }>> {
   const going = new Map<string, { session: CatalogSession; people: GoingPerson[] }>();
-  for (const { owner, entry, session } of await visibleConnectionPlans(network, viewerId, eventId, scope)) {
+  for (const { owner, entry, session } of await visibleNetworkPlans(network, viewerId, eventId, scope)) {
     const slot = going.get(entry.sessionId) ?? { session, people: [] };
     slot.people.push({ ...toPerson(owner), intent: entry.intent });
     going.set(entry.sessionId, slot);
@@ -137,18 +141,18 @@ export interface SessionCounts {
 }
 
 /**
- * ListConnections' counts: two reads for all my connections (their entries,
- * my schedule), whatever their number. A connection I may see nothing of is
+ * ListConnections' and ListMyNetwork's counts: two reads for my whole network (their entries,
+ * my schedule), whatever its size. Someone I may see nothing of is
  * absent from the map; the caller counts them as zero.
  */
-export async function connectionSessionCounts(
+export async function networkSessionCounts(
   network: NetworkRepository,
   schedule: ScheduleRepository,
   viewerId: string,
   eventId: string,
 ): Promise<Map<string, SessionCounts>> {
   const [theirs, mine] = await Promise.all([
-    visibleConnectionPlans(network, viewerId, eventId, { wholeEvent: true }),
+    visibleNetworkPlans(network, viewerId, eventId, { wholeEvent: true }),
     schedule.schedule(viewerId, eventId),
   ]);
   const myIds = new Set(mine.map(({ entry }) => entry.sessionId));
@@ -166,7 +170,7 @@ export async function connectionSessionCounts(
 export function connectionsGoing(network: NetworkRepository): ConnectionsGoingLookup {
   return async (actor, eventId, sessionIds) => {
     if (actor.kind !== "attendee" || sessionIds.length === 0) return undefined;
-    const going = await goingAmongConnections(network, actor.attendeeId, eventId, { sessionIds });
+    const going = await goingInNetwork(network, actor.attendeeId, eventId, { sessionIds });
     return new Map([...going].map(([sessionId, { people }]) => [sessionId, people]));
   };
 }
@@ -179,12 +183,12 @@ export function getAttendeeSchedule(ports: NetworkReadPorts): GetAttendeeSchedul
     const event = await ports.events.get(eventId);
     if (!event) return noEvent(eventId);
     const viewer = actor.kind === "attendee" ? actor.attendeeId : null;
-    const connected = viewer !== null && viewer !== owner.id && (await ports.areConnected(viewer, owner.id));
-    if (!canViewSchedule(viewer, owner, connected)) return notVisible(owner);
+    const tie = await viewerTie(ports.tieBetween, viewer, owner.id);
+    if (!canViewSchedule(viewer, owner, tie)) return notVisible(owner);
 
     const scheduled = await ports.schedule.schedule(owner.id, eventId);
     const visible = new Set(
-      visibleEntries(viewer, owner, scheduled.map(({ entry }) => entry), connected).map((entry) => entry.sessionId),
+      visibleEntries(viewer, owner, scheduled.map(({ entry }) => entry), tie).map((entry) => entry.sessionId),
     );
     return ok({
       attendee: toCard(owner, true),
@@ -208,7 +212,7 @@ export function whoIsGoing({ attendees, network, schedule }: NetworkReadPorts): 
     if (!me.ok) return me;
     const asked = [...new Set(sessionIds)];
     const [going, known] = await Promise.all([
-      goingAmongConnections(network, me.value.id, eventId, { sessionIds: asked }),
+      goingInNetwork(network, me.value.id, eventId, { sessionIds: asked }),
       schedule.sessions(eventId, asked),
     ]);
     // "Nobody you know" and "no such session" read the same in `sessions`;
@@ -232,7 +236,7 @@ export function networkAgenda({ attendees, network, events, sessionUrlTemplate }
     if (!window) return fail("invalid", `${day} ${from} to ${to} is not a window of time.`);
     if (!isEventDay(day, event)) return notAnEventDay(day, event);
 
-    const going = await goingAmongConnections(network, me.value.id, eventId, {
+    const going = await goingInNetwork(network, me.value.id, eventId, {
       startsFrom: window.from,
       startsBefore: window.to,
     });
@@ -260,15 +264,15 @@ export function findMeetingGaps(ports: NetworkReadPorts): FindMeetingGaps {
     const window = localWindow(day, from, to, event.timezone);
     if (!window) return fail("invalid", `${day} ${from} to ${to} is not a window of time.`);
     if (!isEventDay(day, event)) return notAnEventDay(day, event);
-    const connected = await ports.areConnected(me.value.id, other.id);
-    if (!canViewSchedule(me.value.id, other, connected)) return notVisible(other);
+    const tie = await ports.tieBetween(me.value.id, other.id);
+    if (!canViewSchedule(me.value.id, other, tie)) return notVisible(other);
 
     const [mine, theirs] = await Promise.all([
       ports.schedule.schedule(me.value.id, eventId),
       ports.schedule.schedule(other.id, eventId),
     ]);
     const theirVisible = new Set(
-      visibleEntries(me.value.id, other, theirs.map(({ entry }) => entry), connected).map((entry) => entry.sessionId),
+      visibleEntries(me.value.id, other, theirs.map(({ entry }) => entry), tie).map((entry) => entry.sessionId),
     );
     const [mySessions, theirSessions] = [
       mine.map(({ session }) => session),

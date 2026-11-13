@@ -74,7 +74,7 @@ beforeEach(() => {
 });
 
 /** Signs in, syncs the fixture's AWS schedule, sets visibility; returns the attendee. */
-async function attendee(name: string, visibility: "public" | "connections" | "private"): Promise<Me> {
+async function attendee(name: string, visibility: "public" | "network" | "private"): Promise<Me> {
   const me = (await (await call("/api/dev/sign-in", { method: "POST", body: JSON.stringify({ name }) })).json()) as Me;
   await call("/api/events/reinvent2026/my-schedule", {
     as: me.id,
@@ -292,8 +292,10 @@ describe("the share card's fonts", () => {
 
 describe("what leaves Hallway never carries an abstract (ADR 0025)", () => {
   it("not the link preview nor the share card of a verified owner, whoever asks", async () => {
-    // Sam's agent synced the fixture, abstracts included: Sam may read them on Hallway.
+    // Sam's agent synced the fixture, abstracts included, and so did Ola's,
+    // which corroborates Sam's: Sam may read them on Hallway.
     const me = await attendee("Sam Okafor", "public");
+    await attendee("Ola Bello", "private");
     const session = await call("/api/events/reinvent2026/sessions/s-aim3315", { as: me.id });
     expect(await session.text()).toContain("ABSTRACT-TEXT-AIM3315");
 

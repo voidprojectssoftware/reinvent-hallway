@@ -1,7 +1,11 @@
 // The resources of docs/architecture/domain.md as the rules see them. Instants
 // are ISO 8601 UTC strings ("2026-12-01T16:00:00.000Z"); ids are opaque strings.
 
-export type Visibility = "public" | "connections" | "private";
+/**
+ * Who may see an attendee's schedule. `network` was `connections` until #63:
+ * the attendee, their connections and the people they follow (ADR 0019).
+ */
+export type Visibility = "public" | "network" | "private";
 
 export interface Attendee {
   id: string;
@@ -120,6 +124,8 @@ export interface ConnectionRequest {
   status: RequestStatus;
   createdAt: string;
 }
+
+export type FollowSource = "github" | "linkedin-import";
 
 /** One row of a LinkedIn Connections.csv, reduced to what matching needs. */
 export interface ImportedContact {

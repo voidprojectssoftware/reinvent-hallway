@@ -7,7 +7,8 @@ import { canViewSchedule, normalizeHandle, shareableEntries, type Intent } from 
 import type { Actor } from "../actor.ts";
 import type { EventRepository } from "../events/event-repository.ts";
 import { personAtKeyboard } from "../identity/person-at-keyboard.ts";
-import type { AreConnected, AttendeeRecord, AttendeeRepository, CalendarFeedRepository } from "../identity/ports.ts";
+import type { AttendeeRecord, AttendeeRepository, CalendarFeedRepository, TieBetween } from "../identity/ports.ts";
+import { viewerTie } from "../identity/tie.ts";
 import { sha256Hex } from "../identity/secrets.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import { sessionResource } from "../schedule/resources.ts";
@@ -21,7 +22,7 @@ export interface SharingDependencies {
   calendarFeeds: CalendarFeedRepository;
   events: EventRepository;
   schedule: ScheduleRepository;
-  areConnected: AreConnected;
+  tieBetween: TieBetween;
   /** SESSION_URL_TEMPLATE, for each session's link out. */
   sessionUrlTemplate: string;
   /**
@@ -109,18 +110,18 @@ export const shareImagePath = (handle: string, version: string) =>
 
 export const calendarFeedPath = (token: string) => `/cal/${token}.ics`;
 
-function sharedScheduleOf({ events, schedule, areConnected, sessionUrlTemplate }: SharingDependencies) {
+function sharedScheduleOf({ events, schedule, tieBetween, sessionUrlTemplate }: SharingDependencies) {
   return async (viewer: string | null, owner: AttendeeRecord): Promise<Outcome<SharedSchedule>> => {
     const event = await events.get(sharedEventId);
     if (!event) return fail("not-found", `No event ${sharedEventId}.`);
-    const connected = viewer !== null && viewer !== owner.id && (await areConnected(viewer, owner.id));
+    const tie = await viewerTie(tieBetween, viewer, owner.id);
     const scheduled = await schedule.schedule(owner.id, event.eventId);
     const shown = new Set(
       shareableEntries(
         viewer,
         owner,
         scheduled.map(({ entry }) => entry),
-        connected,
+        tie,
       ).map((entry) => entry.sessionId),
     );
     const entries = scheduled
@@ -128,7 +129,7 @@ function sharedScheduleOf({ events, schedule, areConnected, sessionUrlTemplate }
       .map(({ entry, session }) => ({ intent: entry.intent, session: sessionResource(session, sessionUrlTemplate) }));
     const attendee: SharedSchedule["attendee"] = { id: owner.id, handle: owner.handle, displayName: owner.displayName };
     if (owner.headline !== undefined) attendee.headline = owner.headline;
-    const scheduleVisible = canViewSchedule(viewer, owner, connected);
+    const scheduleVisible = canViewSchedule(viewer, owner, tie);
     return ok({
       attendee,
       event,

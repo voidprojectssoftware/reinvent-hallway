@@ -72,6 +72,43 @@ export const inviteTokens = sqliteTable("invite_tokens", {
   rotatedAt: text("rotated_at").notNull(),
 });
 
+/**
+ * One-way follows (ADR 0019): `follower_id` follows someone, and so lets them
+ * see a `network` schedule. A GitHub follow names the GitHub account
+ * (`github_id`, GitHub's numeric id), which is whoever links that account in
+ * `identities`, now or later; so a follow of someone not yet on Hallway
+ * starts pointing at them the moment they link GitHub, with no write. A
+ * LinkedIn import follow names the attendee the contact matched
+ * (`followee_id`). Exactly one of the two is set, by source.
+ */
+export const follows = sqliteTable(
+  "follows",
+  {
+    followerId: text("follower_id")
+      .notNull()
+      .references(() => attendees.id),
+    source: text("source", { enum: ["github", "linkedin-import"] }).notNull(),
+    followeeId: text("followee_id").references(() => attendees.id),
+    githubId: text("github_id"),
+    since: text("since").notNull(),
+  },
+  (table) => [
+    uniqueIndex("follows_github")
+      .on(table.followerId, table.githubId)
+      .where(sql`${table.source} = 'github'`),
+    uniqueIndex("follows_linkedin_import")
+      .on(table.followerId, table.followeeId)
+      .where(sql`${table.source} = 'linkedin-import'`),
+    // "Who follows me": a tie is read from the followee's side too.
+    index("follows_by_followee").on(table.followeeId),
+    index("follows_by_github_id").on(table.githubId),
+    check(
+      "follows_target",
+      sql`(${table.source} = 'github' and ${table.githubId} is not null and ${table.followeeId} is null) or (${table.source} = 'linkedin-import' and ${table.followeeId} is not null and ${table.githubId} is null)`,
+    ),
+  ],
+);
+
 /** One per attendee: an upload replaces the last one. */
 export const contactImports = sqliteTable("contact_imports", {
   id: text("id").primaryKey(),

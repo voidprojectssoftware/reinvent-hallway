@@ -20,6 +20,8 @@ import {
   Connection,
   ConnectionList,
   ContactImport,
+  Following,
+  GitHubRoundTrip,
   Event,
   IdentityList,
   IssuedAgentToken,
@@ -169,6 +171,11 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
     /** LinkedIn's Connections.csv, as the file reads; it replaces my last upload. */
     importContacts: (csv: string) => request("POST", "/api/me/contacts", ContactImport, new RawBody(csv, "text/csv")),
     suggestions: () => request("GET", "/api/me/suggestions", SuggestionList),
+    /** Who I follow, by source; with an event, each carries how many of their sessions I may see there. */
+    following: (eventId: string) => request("GET", `/api/me/following?eventId=${encodeURIComponent(eventId)}`, Following),
+    /** Starts the GitHub round trip that reads who I follow again; the browser goes to the URL it returns. */
+    refreshGitHubFollows: (returnTo: string) =>
+      request("POST", "/api/me/following/github/refresh", GitHubRoundTrip, { returnTo }),
 
     /** Per session, my connections going. At most 200 ids a call (the contract's limit). */
     whoIsGoing: (eventId: string, sessionIds: readonly string[]) =>

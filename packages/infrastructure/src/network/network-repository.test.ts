@@ -13,7 +13,7 @@ import { connectionBetween, hashEmail, parseConnectionsCsv, type SessionReport }
 import { attendeesOnD1 } from "../identity/d1-identity-repositories.ts";
 import { attendeesInMemory } from "../identity/in-memory-identity-repositories.ts";
 import { openDatabase } from "../persistence/d1/database.ts";
-import { startLocalD1, type LocalD1 } from "../persistence/d1/local-d1.ts";
+import { applyMigration, startLocalD1, type LocalD1 } from "../persistence/d1/local-d1.ts";
 import { scheduleOnD1 } from "../schedule/d1-schedule-repository.ts";
 import { scheduleInMemory } from "../schedule/in-memory-schedule-repository.ts";
 import { contactBytesPerStatement, contactChunks, networkOnD1 } from "./d1-network-repository.ts";
@@ -70,7 +70,7 @@ async function person(
     handle: id,
     handlePlaceholder: false,
     displayName: name,
-    visibility: "connections",
+    visibility: "network",
     createdAt: at,
     ...extra,
   };
@@ -219,26 +219,141 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
       lastSync: { syncedAt: at, added: 1, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
     });
 
-    const listed = await world.network.connectionPlans(me.id, event, { sessionIds: [morning, afternoon] });
+    const listed = await world.network.networkPlans(me.id, event, { sessionIds: [morning, afternoon] });
     expect(listed.map((p) => [p.owner.id, p.entry.sessionId, p.entry.hidden]).sort()).toEqual(
       [
         [friend.id, morning, false],
         [friend.id, afternoon, true],
       ].sort(),
     );
-    const window = await world.network.connectionPlans(me.id, event, {
+    const window = await world.network.networkPlans(me.id, event, {
       startsFrom: "2026-12-01T20:00:00.000Z",
       startsBefore: "2026-12-02T08:00:00.000Z",
     });
     expect(window.map((p) => p.session.sessionId)).toEqual([afternoon]);
-    const whole = await world.network.connectionPlans(me.id, event, { wholeEvent: true });
+    const whole = await world.network.networkPlans(me.id, event, { wholeEvent: true });
     expect(whole.map((p) => [p.owner.id, p.entry.sessionId]).sort()).toEqual(
       [
         [friend.id, morning],
         [friend.id, afternoon],
       ].sort(),
     );
-    expect(await world.network.connectionPlans(me.id, "other-event", { sessionIds: [morning] })).toEqual([]);
+    expect(await world.network.networkPlans(me.id, "other-event", { sessionIds: [morning] })).toEqual([]);
+  });
+
+  it("points a GitHub follow at whoever links that account, now or later, and only the follower's follow ties them", async () => {
+    const world = make();
+    const [me, octo, later] = [await person(world, "me"), await person(world, "octo"), await person(world, "later")];
+    const [octoGitHub, laterGitHub, nobodyGitHub] = [fresh("gh"), fresh("gh"), fresh("gh")];
+    await world.attendees.link({ attendeeId: octo.id, provider: "github", subject: octoGitHub, emailVerified: false, linkedAt: at });
+    await world.network.replaceGitHubFollows(me.id, [octoGitHub, laterGitHub, nobodyGitHub, octoGitHub], at);
+
+    expect((await world.network.networkOf(me.id)).map((m) => m.other.id)).toEqual([octo.id]);
+    expect(await world.network.gitHubFollowsNotOnHallway(me.id)).toBe(2);
+    // I follow Octo: that ties Octo to my schedule, never me to Octo's.
+    expect(await world.network.tie(octo.id, me.id)).toEqual({ connected: false, followedByOwner: true });
+    expect(await world.network.tie(me.id, octo.id)).toEqual({ connected: false, followedByOwner: false });
+
+    await world.attendees.link({ attendeeId: later.id, provider: "github", subject: laterGitHub, emailVerified: false, linkedAt: at });
+    expect((await world.network.networkOf(me.id)).map((m) => m.other.id).sort()).toEqual([octo.id, later.id].sort());
+    expect(await world.network.gitHubFollowsNotOnHallway(me.id)).toBe(1);
+    expect((await world.network.tie(later.id, me.id)).followedByOwner).toBe(true);
+  });
+
+  it("replaces follows per source, keeping when a kept follow began, and lists each person once with how", async () => {
+    const world = make();
+    const [me, ana, ben] = [await person(world, "me"), await person(world, "ana"), await person(world, "ben")];
+    const anaGitHub = fresh("gh");
+    await world.attendees.link({ attendeeId: ana.id, provider: "github", subject: anaGitHub, emailVerified: false, linkedAt: at });
+    await world.network.replaceGitHubFollows(me.id, [anaGitHub], at);
+    await world.network.replaceImportFollows(me.id, [ana.id, ben.id], at);
+    await world.network.connect(connectionBetween(me.id, ben.id, "request", at), at);
+    const later = "2026-11-14T12:00:00.000Z";
+    await world.network.replaceImportFollows(me.id, [ana.id], later);
+
+    const members = await world.network.networkOf(me.id);
+    const byId = Object.fromEntries(members.map((m) => [m.other.id, m]));
+    expect(byId[ana.id]?.follows).toEqual([
+      { source: "github", since: at },
+      { source: "linkedin-import", since: at },
+    ]);
+    expect(byId[ana.id]?.connection).toBeUndefined();
+    expect(byId[ben.id]?.follows).toEqual([]);
+    expect(byId[ben.id]?.connection?.via).toBe("request");
+    expect(byId[ben.id]?.tie).toEqual({ connected: true, followedByOwner: false });
+
+    // A later GitHub list replaces only GitHub follows.
+    await world.network.replaceGitHubFollows(me.id, [], later);
+    expect((await world.network.networkOf(me.id)).find((m) => m.other.id === ana.id)?.follows).toEqual([
+      { source: "linkedin-import", since: at },
+    ]);
+  });
+
+  it("reads the plans of people I follow too, each with how I stand to them", async () => {
+    const world = make();
+    const [me, followed, followsMeBack] = [await person(world, "me"), await person(world, "followed"), await person(world, "back")];
+    await world.network.replaceImportFollows(me.id, [followed.id, followsMeBack.id], at);
+    await world.network.replaceImportFollows(followsMeBack.id, [me.id], at);
+    const session = fresh("s");
+    for (const owner of [followed, followsMeBack]) {
+      await world.schedule.applySync({
+        attendeeId: owner.id,
+        eventId: event,
+        reports: [report(owner.id, session, "2026-12-01T17:00:00.000Z")],
+        synced: [favorite(session)],
+        at,
+        lastSync: { syncedAt: at, added: 1, removed: 0, changed: 0, unchanged: 0, missingSessions: 0 },
+      });
+    }
+    const plans = await world.network.networkPlans(me.id, event, { sessionIds: [session] });
+    expect(plans.map((p) => [p.owner.id, p.tie.followedByOwner]).sort()).toEqual(
+      [
+        [followed.id, false],
+        [followsMeBack.id, true],
+      ].sort(),
+    );
+    // The member list carries the same tie, the owner's follow of me, not mine of them.
+    expect((await world.network.networkOf(me.id)).map((m) => [m.other.id, m.tie.followedByOwner]).sort()).toEqual(
+      [
+        [followed.id, false],
+        [followsMeBack.id, true],
+      ].sort(),
+    );
+  });
+});
+
+describe("migration 0012_add_follows_and_network_visibility", () => {
+  it("turns `connections` into `network`, and rebuilds attendees without losing a row that points at them", async () => {
+    const old = await startLocalD1({ before: "0012" });
+    try {
+      const insert = old.d1.prepare(
+        "insert into attendees (id, handle, display_name, visibility, created_at) values (?, ?, ?, ?, '2026-11-01T00:00:00.000Z')",
+      );
+      await old.d1.batch([
+        insert.bind("a1", "ana", "Ana", "connections"),
+        insert.bind("b2", "ben", "Ben", "public"),
+        insert.bind("c3", "cat", "Cat", "private"),
+        old.d1.prepare("insert into identities (provider, subject, attendee_id, linked_at) values ('dev', 'ana', 'a1', 'x')"),
+        old.d1.prepare("insert into connections (a, b, since, via) values ('a1', 'b2', 'x', 'request')"),
+      ]);
+      await applyMigration(old.d1, "0012_add_follows_and_network_visibility.sql");
+
+      const visibility = await old.d1.prepare("select id, visibility from attendees order by id").all();
+      expect(visibility.results).toEqual([
+        { id: "a1", visibility: "network" },
+        { id: "b2", visibility: "public" },
+        { id: "c3", visibility: "private" },
+      ]);
+      const db = openDatabase(old.d1);
+      expect(await networkOnD1(db).areConnected("a1", "b2")).toBe(true);
+      expect(await attendeesOnD1(db).identity("dev", "ana")).toMatchObject({ attendeeId: "a1" });
+      expect((await old.d1.prepare("pragma foreign_key_check").all()).results).toEqual([]);
+      // A new attendee row with no visibility gets the new default.
+      await old.d1.prepare("insert into attendees (id, handle, display_name, created_at) values ('d4', 'dee', 'Dee', 'x')").run();
+      expect(await old.d1.prepare("select visibility from attendees where id = 'd4'").first("visibility")).toBe("network");
+    } finally {
+      await old.dispose();
+    }
   });
 });
 
@@ -323,6 +438,46 @@ describe("NetworkRepository on D1, at export size", () => {
       .bind(me.id)
       .first<{ n: number }>();
     expect(stored?.n).toBe(30_000);
+  });
+
+  it("stores 4,000 GitHub follows (the adapter's cap) as one batch of two statements", async () => {
+    const { d1, log } = recorded(local.d1);
+    const db = openDatabase(d1);
+    const network = networkOnD1(db);
+    const me = await person({ attendees: attendeesOnD1(db), schedule: scheduleOnD1(db), network }, "many");
+    const ids = Array.from({ length: 4000 }, (_, i) => String(10_000_000 + i));
+
+    log.batches.length = 0;
+    log.parameters.length = 0;
+    await network.replaceGitHubFollows(me.id, ids, at);
+    expect(log.batches).toEqual([2]);
+    expect(Math.max(...log.parameters)).toBeLessThanOrEqual(10);
+    expect(await network.gitHubFollowsNotOnHallway(me.id)).toBe(4000);
+
+    // Again with half of them: the rest go, the half kept keep their row.
+    await network.replaceGitHubFollows(me.id, ids.slice(0, 2000), "2026-11-20T00:00:00.000Z");
+    const rows = await local.d1
+      .prepare("select count(*) as n, min(since) as since from follows where follower_id = ?")
+      .bind(me.id)
+      .first<{ n: number; since: string }>();
+    expect(rows).toEqual({ n: 2000, since: at });
+  });
+
+  it("refuses a follow naming both a GitHub account and an attendee, or neither", async () => {
+    const db = openDatabase(local.d1);
+    const me = await person({ attendees: attendeesOnD1(db), schedule: scheduleOnD1(db), network: networkOnD1(db) }, "checked");
+    for (const [source, followee, github] of [
+      ["github", me.id, "1"],
+      ["github", null, null],
+      ["linkedin-import", null, "1"],
+    ] as const) {
+      await expect(
+        local.d1
+          .prepare("insert into follows (follower_id, source, followee_id, github_id, since) values (?, ?, ?, ?, ?)")
+          .bind(me.id, source, followee, github, at)
+          .run(),
+      ).rejects.toThrow(/CHECK/);
+    }
   });
 
   it("is all or nothing: a replacement that fails keeps the previous import", async () => {

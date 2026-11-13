@@ -45,25 +45,30 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
 - **One visibility rule for every read path (domain.md).** _Held by:_
   every read of another attendee's entries filters them through the domain's
   `visibleEntries` (`packages/application/src/network/schedules.ts`), with
-  `areConnected` from the one network repository wired in `apps/api/src/index.ts`;
+  the tie from `tieBetween` (connected, followed by the owner: ADR 0019), the
+  one network repository lookup wired in `apps/api/src/index.ts`;
   and `apps/api/src/network.test.ts` ("every read of someone else's schedule
   goes through the visibility rule"), which runs each REST and MCP read path
   (person schedule, attendee card, who is going and its intents, network
   agenda, session search and get, connection counts, meeting gaps) against a private attendee, a non-connection
-  and a hidden entry. A new read path adds its case there. What leaves
+  and a hidden entry, and `apps/api/src/follows.test.ts` runs them for follows
+  (following someone never shows you their week; their following you does).
+  A new read path adds its case there. What leaves
   Hallway (calendar feed, share image, link preview) goes through
-  `shareableEntries` with the same `areConnected`, held by
+  `shareableEntries` with the same `tieBetween`, held by
   `apps/api/src/sharing.test.ts` and `person-page.test.ts` (ADR 0012).
 - **A session abstract reaches only a verified attendee, and only through
   session search and get (ADR 0025).** Verified is the domain's
-  `canReadAbstract`: signed in, and a sync of theirs kept one of their own
-  sessions. _Held by:_ `CatalogSession` has no abstract and every read of a
+  `canReadAbstract`: signed in, and an abstract a sync of theirs kept for one
+  of their own sessions matches another attendee's report of that session
+  (`isCorroborated`, issue #83). _Held by:_ `CatalogSession` has no abstract and every read of a
   session selects `catalogColumns`, so only the repository's `abstracts`
   reads it, called by the search and get handlers after asking the rule;
   `schedule-repository.test.ts` checks every other repository read leaves it
   out; `apps/api/src/schedule.test.ts` runs search and get over REST and MCP
-  for a verified reader, one who never synced, one whose sync kept nothing and
-  a signed-out caller, and every other REST and MCP read for a verified one;
+  for a corroborated reader, the first honest reporter (not yet corroborated),
+  a sync forged from Hallway's public session data, one who never synced, one
+  whose sync kept nothing and a signed-out caller, and every other REST and MCP read for a verified one;
   `sharing.test.ts` and the e2e suite check the share card, the link preview
   and the calendar feed. A new read path that returns sessions adds its case
   there.
@@ -134,7 +139,11 @@ you started), never with a pattern that matches other worktrees' servers.
   sets the session cookie; then `curl -b jar.txt <url>/api/me`. An agent
   token from `POST /api/me/tokens` goes in `Authorization: Bearer hw_...` on
   `/api` and `/mcp`. `Authorization: Bearer dev:<attendeeId>` still acts as
-  that attendee without a sign-in. Dev sign-in and the `dev:` bearer work only
+  that attendee without a sign-in. `POST /api/dev/github` with
+  `{ "id": 1001, "login": "jane", "following": [{ "id": 1002, "login": "sam" }] }`
+  links that GitHub account and who it follows to the person signed in, as a
+  GitHub round trip would (follows, ADR 0019). Dev sign-in, the `dev:` bearer
+  and `/api/dev/github` work only
   with `DEV_SIGN_IN=1` in `apps/api/.dev.vars` (copied from
   `.dev.vars.example` on first run) and only on a loopback host. Each of
   Google, Microsoft, LinkedIn and GitHub sign-in answers 404 until its
