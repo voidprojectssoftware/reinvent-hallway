@@ -33,7 +33,7 @@ describe("GET /api/events/{eventId}", () => {
   it("answers 404 with the Error resource for an unknown event", async () => {
     const response = await call(`${origin}/api/events/summit-nowhere`);
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ kind: "not-found", message: "No event summit-nowhere." });
+    expect(await response.json()).toEqual({ kind: "not-found", message: "No event summit-nowhere. Hallway knows re:Invent 2026, `reinvent2026`." });
   });
 
   it("answers 400 when the id breaks the contract", async () => {
@@ -65,7 +65,7 @@ describe("MCP get_event", () => {
     const result = await client.callTool({ name: "get_event", arguments: { eventId: "summit-nowhere" } });
     expect(result.isError).toBe(true);
     expect(result.content).toEqual([
-      { type: "text", text: JSON.stringify({ kind: "not-found", message: "No event summit-nowhere." }) },
+      { type: "text", text: JSON.stringify({ kind: "not-found", message: "No event summit-nowhere. Hallway knows re:Invent 2026, `reinvent2026`." }) },
     ]);
     await client.close();
   });

@@ -17,9 +17,22 @@ import type {
   WhoIsGoing,
   WhoIsGoingInput,
 } from "@hallway/contracts";
-import { canViewSchedule, findGaps, localWindow, normalizeHandle, visibleEntries } from "@hallway/domain";
+import {
+  canViewSchedule,
+  eventDays,
+  findGaps,
+  isEventDay,
+  localWindow,
+  normalizeHandle,
+  toLocal,
+  unplacedInWindow,
+  visibleEntries,
+  type Attendee,
+  type Event,
+} from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import type { EventRepository } from "../events/event-repository.ts";
+import { noEvent } from "../events/get-event.ts";
 import type { AreConnected, AttendeeRepository } from "../identity/ports.ts";
 import { signedInAttendee } from "../identity/profile.ts";
 import { toCard } from "../identity/views.ts";
@@ -44,8 +57,28 @@ export interface NetworkReadPorts {
   sessionUrlTemplate: string;
 }
 
-const notVisible = (handle: string) =>
-  fail<never>("forbidden", `@${handle}'s schedule is not visible to you: it is private, or for their connections only.`);
+/**
+ * Why I may not see someone's schedule, said so the asker (often an agent)
+ * knows what would change it: nothing for a private one, connecting for one
+ * kept to connections (hunt F10).
+ */
+const notVisible = (owner: Pick<Attendee, "handle" | "visibility">) =>
+  fail<never>(
+    "forbidden",
+    owner.visibility === "private"
+      ? `@${owner.handle} keeps their schedule private: only they can see it, and connecting does not change that.`
+      : `@${owner.handle} shares their schedule with their connections only, and you are not connected. Connect on Hallway from their page (/@${owner.handle}) or their share link.`,
+  );
+
+/**
+ * A day outside the event is refused rather than answered: a model that
+ * reaches for last year's dates would otherwise tell the user that everyone
+ * is free all day (hunt F9).
+ */
+const notAnEventDay = (day: string, event: Event) => {
+  const { first, last } = eventDays(event);
+  return fail<never>("invalid", `${day} is not a day of ${event.name}, which runs ${first} to ${last} (Las Vegas time).`);
+};
 
 /**
  * My connections' plans that I may see: one read of all their entries in
@@ -144,10 +177,10 @@ export function getAttendeeSchedule(ports: NetworkReadPorts): GetAttendeeSchedul
     const owner = await ports.attendees.byHandle(handle);
     if (!owner) return fail("not-found", `No attendee @${handle}.`);
     const event = await ports.events.get(eventId);
-    if (!event) return fail("not-found", `No event ${eventId}.`);
+    if (!event) return noEvent(eventId);
     const viewer = actor.kind === "attendee" ? actor.attendeeId : null;
     const connected = viewer !== null && viewer !== owner.id && (await ports.areConnected(viewer, owner.id));
-    if (!canViewSchedule(viewer, owner, connected)) return notVisible(owner.handle);
+    if (!canViewSchedule(viewer, owner, connected)) return notVisible(owner);
 
     const scheduled = await ports.schedule.schedule(owner.id, eventId);
     const visible = new Set(
@@ -169,13 +202,23 @@ export function getAttendeeSchedule(ports: NetworkReadPorts): GetAttendeeSchedul
   };
 }
 
-export function whoIsGoing({ attendees, network }: NetworkReadPorts): WhoIsGoingQuery {
+export function whoIsGoing({ attendees, network, schedule }: NetworkReadPorts): WhoIsGoingQuery {
   return async (actor, { eventId, sessionIds }) => {
     const me = await signedInAttendee(attendees, actor);
     if (!me.ok) return me;
     const asked = [...new Set(sessionIds)];
-    const going = await goingAmongConnections(network, me.value.id, eventId, { sessionIds: asked });
-    return ok({ sessions: asked.map((sessionId) => ({ sessionId, people: going.get(sessionId)?.people ?? [] })) });
+    const [going, known] = await Promise.all([
+      goingAmongConnections(network, me.value.id, eventId, { sessionIds: asked }),
+      schedule.sessions(eventId, asked),
+    ]);
+    // "Nobody you know" and "no such session" read the same in `sessions`;
+    // naming the second lets an agent fix an id or a code it passed (hunt F13).
+    const inCatalog = new Set(known.map((session) => session.sessionId));
+    const unknownSessions = asked.filter((sessionId) => !inCatalog.has(sessionId));
+    return ok({
+      sessions: asked.map((sessionId) => ({ sessionId, people: going.get(sessionId)?.people ?? [] })),
+      ...(unknownSessions.length > 0 ? { unknownSessions } : {}),
+    });
   };
 }
 
@@ -184,9 +227,10 @@ export function networkAgenda({ attendees, network, events, sessionUrlTemplate }
     const me = await signedInAttendee(attendees, actor);
     if (!me.ok) return me;
     const event = await events.get(eventId);
-    if (!event) return fail("not-found", `No event ${eventId}.`);
+    if (!event) return noEvent(eventId);
     const window = localWindow(day, from, to, event.timezone);
     if (!window) return fail("invalid", `${day} ${from} to ${to} is not a window of time.`);
+    if (!isEventDay(day, event)) return notAnEventDay(day, event);
 
     const going = await goingAmongConnections(network, me.value.id, eventId, {
       startsFrom: window.from,
@@ -212,12 +256,12 @@ export function findMeetingGaps(ports: NetworkReadPorts): FindMeetingGaps {
     if (!other) return fail("not-found", `No attendee @${handle}.`);
     if (other.id === me.value.id) return fail("invalid", "Name someone else to meet.");
     const event = await ports.events.get(eventId);
-    if (!event) return fail("not-found", `No event ${eventId}.`);
-    if (!localWindow(day, from, to, event.timezone)) {
-      return fail("invalid", `${day} ${from} to ${to} is not a window of time.`);
-    }
+    if (!event) return noEvent(eventId);
+    const window = localWindow(day, from, to, event.timezone);
+    if (!window) return fail("invalid", `${day} ${from} to ${to} is not a window of time.`);
+    if (!isEventDay(day, event)) return notAnEventDay(day, event);
     const connected = await ports.areConnected(me.value.id, other.id);
-    if (!canViewSchedule(me.value.id, other, connected)) return notVisible(other.handle);
+    if (!canViewSchedule(me.value.id, other, connected)) return notVisible(other);
 
     const [mine, theirs] = await Promise.all([
       ports.schedule.schedule(me.value.id, eventId),
@@ -226,16 +270,27 @@ export function findMeetingGaps(ports: NetworkReadPorts): FindMeetingGaps {
     const theirVisible = new Set(
       visibleEntries(me.value.id, other, theirs.map(({ entry }) => entry), connected).map((entry) => entry.sessionId),
     );
-    const gaps = findGaps(
+    const [mySessions, theirSessions] = [
       mine.map(({ session }) => session),
       theirs.filter(({ entry }) => theirVisible.has(entry.sessionId)).map(({ session }) => session),
+    ];
+    const gaps = findGaps(mySessions, theirSessions, day, from, to, minMinutes, event.timezone);
+    const unplaced = (whose: "mine" | "theirs", sessions: CatalogSession[]) =>
+      unplacedInWindow(sessions, window).map((session) => ({
+        whose,
+        sessionId: session.sessionId,
+        ...(session.code === undefined ? {} : { code: session.code }),
+        ...(session.title === undefined ? {} : { title: session.title }),
+        startsAt: session.startsAt!,
+        start: toLocal(session.startsAt!, event.timezone).time,
+      }));
+    return ok({
+      with: toPerson(other),
       day,
-      from,
-      to,
-      minMinutes,
-      event.timezone,
-    );
-    return ok({ with: toPerson(other), day, timezone: event.timezone, gaps });
+      timezone: event.timezone,
+      gaps,
+      unplacedSessions: [...unplaced("mine", mySessions), ...unplaced("theirs", theirSessions)],
+    });
   };
 }
 

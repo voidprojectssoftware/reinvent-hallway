@@ -17,6 +17,7 @@ import type {
 import { connectionBetween, decideRequest, normalizeHandle, type RequestDecision } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import type { EventRepository } from "../events/event-repository.ts";
+import { noEvent } from "../events/get-event.ts";
 import type { AttendeeRecord, AttendeeRepository } from "../identity/ports.ts";
 import { signedInAttendee } from "../identity/profile.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
@@ -180,7 +181,7 @@ export function listConnections({ attendees, network, events, schedule }: ListCo
   return async (actor, { eventId } = {}) => {
     const me = await signedInAttendee(attendees, actor);
     if (!me.ok) return me;
-    if (eventId !== undefined && !(await events.get(eventId))) return fail("not-found", `No event ${eventId}.`);
+    if (eventId !== undefined && !(await events.get(eventId))) return noEvent(eventId);
     const [connected, counts] = await Promise.all([
       network.connectionsOf(me.value.id),
       eventId === undefined ? undefined : connectionSessionCounts(network, schedule, me.value.id, eventId),

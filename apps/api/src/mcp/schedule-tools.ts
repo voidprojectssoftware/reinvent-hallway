@@ -9,6 +9,7 @@ import {
   Session,
   SessionList,
   SessionScope,
+  SetEntryHiddenInput,
   SyncResult,
   SyncScheduleInput,
 } from "@hallway/contracts";
@@ -27,6 +28,7 @@ export const syncMyScheduleDescription = [
   "2. Call AWS `GetSession` for each id in `favorites` and `reserved`, and keep each full `session` object. For a large schedule you may instead page through AWS `ListSessions` (it includes abstracts by default) and keep the sessions whose ids are in the two lists.",
   "3. Call this tool once, with eventId `reinvent2026`, every session object in `sessions` exactly as AWS returned it, the two id lists exactly as `GetSchedule` gave them, and `invitedSessions` exactly as `GetSchedule` gave it.",
   "Send whole session objects, `abstract`, speakers and every list (`topics`, `tracks`, `services`, `roles` and the rest) included: Hallway keeps them so people can see what a session is. The abstract is shown only to attendees whose own agent has synced, never publicly. If one call would be too large for your tool input, send both id lists in full every time and split the session objects across calls: Hallway keeps the sessions it already has, so the last call leaves the whole schedule.",
+  "Hallway reads `sessionTime` as AWS gives it, in Las Vegas time: `date` as `YYYY-MM-DD`, `time` as 24-hour `HH:MM`, `length` as whole minutes. A session whose time does not read is kept without one and listed in `unreadableTimes`: re-send AWS's values unchanged, or tell the user which sessions show no time.",
   "Each call replaces what your last sync put on Hallway: un-favorited sessions are removed, reservations and invitations show as reserved (invitations marked `invited`), and sessions the user added or hid on Hallway are kept. The same input twice changes nothing. An id sent without a session object that Hallway has never seen is skipped and listed in `missingSessions`; call `GetSession` for those and sync again.",
   "Send only the user's own sessions, copied from AWS. A session object for an id in none of the lists is ignored. The session details everyone sees are what most attendees' agents report, so one agent's copying mistake does not change a session for others.",
   "Hallway never reserves, cancels or favorites anything on AWS, and writes nothing back to AWS. To reserve a seat, use AWS `ReserveSessions` or follow the session's `url`.",
@@ -42,7 +44,7 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
       outputSchema: asToolOutput(SyncResult),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.syncSchedule(actor, input)),
+    (input) => toolResult(() => handlers.syncSchedule(actor, input)),
   );
 
   server.registerTool(
@@ -55,7 +57,7 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
       outputSchema: asToolOutput(MySchedule),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.getMySchedule(actor, input)),
+    (input) => toolResult(() => handlers.getMySchedule(actor, input)),
   );
 
   server.registerTool(
@@ -63,12 +65,12 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Search sessions",
       description:
-        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker, ignoring case and accents), by `day` in Las Vegas time (`2026-12-01`), and by exact `type`, `level`, `topic`, `track` or `service` as sessions carry them. Times are UTC instants. Each session's `url` opens it on the re:Invent site. Sessions carry their `abstract` only once the user's own agent has synced their schedule (`sync_my_schedule`).",
+        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker, ignoring case and accents), by `day` in Las Vegas time (`2026-12-01`), and by exact `type`, `level`, `topic`, `track` or `service` as sessions carry them. Returns at most `limit` sessions (default 50, up to 200); `total` is how many match and `truncated` is true when you saw only some, so narrow the search or raise `limit`. Times are UTC instants. Each session's `url` opens it on the re:Invent site. Sessions carry their `abstract` only once the user's own agent has synced their schedule (`sync_my_schedule`).",
       inputSchema: SearchSessionsInput,
       outputSchema: asToolOutput(SessionList),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.searchSessions(actor, input)),
+    (input) => toolResult(() => handlers.searchSessions(actor, input)),
   );
 
   server.registerTool(
@@ -81,7 +83,7 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
       outputSchema: asToolOutput(Session),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.getSession(actor, input)),
+    (input) => toolResult(() => handlers.getSession(actor, input)),
   );
 
   server.registerTool(
@@ -89,12 +91,12 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Add a session to my schedule",
       description:
-        "Add a session from Hallway's catalog to the user's Hallway schedule by hand, as `interested`. Adding one already there changes nothing. This does not favorite or reserve it on AWS.",
+        "Add a session from Hallway's catalog to the user's Hallway schedule by hand, as `interested`. `sessionId` takes AWS's session id or the session's code (`AIM3315`). Adding one already there changes nothing. This does not favorite or reserve it on AWS.",
       inputSchema: SessionScope,
       outputSchema: asToolOutput(PlanEntry),
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.addToPlan(actor, input)),
+    (input) => toolResult(() => handlers.addToPlan(actor, input)),
   );
 
   server.registerTool(
@@ -102,11 +104,24 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Remove a session I added by hand",
       description:
-        "Remove a session the user added on Hallway by hand. A session that came from their AWS schedule is refused, because the next sync would bring it back: remove it on AWS and sync again instead.",
+        "Remove a session the user added on Hallway by hand (by id or code). A session that came from their AWS schedule is refused, because the next sync would bring it back: hide it with set_entry_hidden, or remove it on AWS and sync again.",
       inputSchema: SessionScope,
       outputSchema: asToolOutput(PlanEntry),
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.removeFromPlan(actor, input)),
+    (input) => toolResult(() => handlers.removeFromPlan(actor, input)),
+  );
+
+  server.registerTool(
+    "set_entry_hidden",
+    {
+      title: "Hide or show a session on my schedule",
+      description:
+        "Hide (`hidden: true`) or show again one session on the user's Hallway schedule, by id or code. A hidden session stays on the user's own schedule and still blocks their meeting gaps, but nobody else sees it, counts it or finds the user going to it, on Hallway, in shared links or in the calendar feed. Hiding outlasts syncs, even if the session leaves AWS and comes back. It changes nothing on AWS. Use it when the user wants a session kept to themselves, including one from AWS that remove_from_plan refuses.",
+      inputSchema: SetEntryHiddenInput,
+      outputSchema: asToolOutput(PlanEntry),
+      annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    (input) => toolResult(() => handlers.setEntryHidden(actor, input)),
   );
 }

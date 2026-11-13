@@ -19,11 +19,13 @@ export {
   foldText,
   foldSpeakers,
   sessionUrl,
+  unreadableTime,
+  type UnreadableTime,
   type AwsSession,
   type SessionReport,
   type AbstractReader,
 } from "./sessions";
-export { toLocal, dayBounds, localWindow } from "./time";
+export { toLocal, dayBounds, localWindow, eventDays, isEventDay } from "./time";
 export {
   parseConnectionsCsv,
   normalizeProfileUrl,
@@ -35,7 +37,7 @@ export {
   type Suggestion,
   type SuggestionReason,
 } from "./contacts";
-export { findGaps, type Gap, type Placed } from "./gaps";
+export { findGaps, unplacedInWindow, type Gap, type Placed } from "./gaps";
 export { normalizeHandle, isValidHandle, isReservedHandle, handleFromName, placeholderHandle } from "./handles";
 export {
   connectionBetween,

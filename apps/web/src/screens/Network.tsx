@@ -11,17 +11,21 @@ import { ContactsImport } from "../network/ContactsImport.tsx";
 import { sessionCounts } from "../network/counts.ts";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
-import { Foot, failureText } from "../shell/Foot.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { eventDate, formatDate } from "../time.ts";
 
-export async function networkLoader(): Promise<{ connections: ConnectionList; requests: RequestList; suggestions: SuggestionList }> {
+export async function networkLoader({
+  request,
+}: {
+  request: Request;
+}): Promise<{ connections: ConnectionList; requests: RequestList; suggestions: SuggestionList }> {
   const [connections, requests, suggestions] = await Promise.all([
-    requireSignIn(api.connections(EVENT_ID)),
-    requireSignIn(api.requests()),
-    requireSignIn(api.suggestions()),
+    requireSignIn(api.connections(EVENT_ID), request),
+    requireSignIn(api.requests(), request),
+    requireSignIn(api.suggestions(), request),
   ]);
   return { connections, requests, suggestions };
 }
@@ -32,7 +36,7 @@ export function Network() {
   const { connections, requests, suggestions } = useLoaderData<typeof networkLoader>();
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<{ where: string; text: string } | null>(null);
+  const [error, setError] = useState<(Failed & { where: string }) | null>(null);
   const [query, setQuery] = useState("");
 
   /** One action at a time, keyed by the row it came from so its refusal shows under its own group. */
@@ -43,12 +47,12 @@ export function Network() {
       await call();
       await revalidator.revalidate();
     } catch (failure) {
-      setError({ where, text: failureText(failure) });
+      setError({ where, failure, retry: () => void act(where, key, call) });
     } finally {
       setBusy(null);
     }
   }
-  const errorIn = (where: string) => (error?.where === where ? error.text : null);
+  const errorIn = (where: string) => (error?.where === where ? error : null);
 
   const nothingYet =
     connections.connections.length === 0 &&
@@ -108,7 +112,7 @@ export function Network() {
               </li>
             ))}
           </ul>
-          <Foot error={errorIn("incoming")}>Accept and you see each other's weeks.</Foot>
+          <Foot failed={errorIn("incoming")}>Accept and you see each other's weeks.</Foot>
         </section>
       )}
 
@@ -137,7 +141,7 @@ export function Network() {
               ))
             )}
           </ul>
-          <Foot error={errorIn("suggestions")}>
+          <Foot failed={errorIn("suggestions")}>
             People on Hallway whose LinkedIn profile and name, or email, match a row of the file you imported on{" "}
             {formatDate(eventDate(suggestions.contactImport.importedAt))}. <Link to="/settings">Import again</Link>
           </Foot>
@@ -165,7 +169,7 @@ export function Network() {
               </PersonRow>
             ))}
           </ul>
-          <Foot error={errorIn("outgoing")}>Waiting for them to accept.</Foot>
+          <Foot failed={errorIn("outgoing")}>Waiting for them to accept.</Foot>
         </section>
       )}
 

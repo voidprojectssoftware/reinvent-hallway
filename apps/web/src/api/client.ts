@@ -8,6 +8,9 @@
 // signed in" by the same names the handlers use. Two more kinds cover what no
 // handler said: the server could not be reached, or it answered with
 // something the contract does not describe (a proxy's HTML page, a 500).
+// Their messages are for a developer (method, path, status, the exception);
+// a screen never shows them, it says what happened in its own words
+// (shell/Problem.tsx) and logs this message to the console.
 import {
   AgentToken,
   AgentTokenList,
@@ -27,6 +30,7 @@ import {
   RequestList,
   RequestResult,
   Session,
+  SessionList,
   ShareLinks,
   SignInOptions,
   SuggestionList,
@@ -176,6 +180,36 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
 
     session: (eventId: string, sessionId: string) =>
       request("GET", `/api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`, Session),
+    /** The catalog agents have synced, matching `q` (code, title, speaker) and starting on `day`; both optional. */
+    searchSessions: (eventId: string, filter: { q?: string; day?: string; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (filter.limit) query.set("limit", String(filter.limit));
+      if (filter.q) query.set("q", filter.q);
+      if (filter.day) query.set("day", filter.day);
+      const search = query.size > 0 ? `?${query}` : "";
+      return request("GET", `/api/events/${encodeURIComponent(eventId)}/sessions${search}`, SessionList);
+    },
+
+    /**
+     * The share card as an anonymous visitor gets it, which is what LinkedIn
+     * fetches for the link preview (ADR 0012): without the cookie, so the
+     * owner sees what others will. It is asked for under its own URL (an
+     * extra `view` the server ignores) so the browser's cache never hands
+     * this public card to the owner's signed-in `<img>` of the same picture.
+     * TODO(#70): a preview URL from ShareLinks would make this a plain `<img>`.
+     */
+    publicShareCard: async (imageUrl: string): Promise<Blob> => {
+      const url = new URL(imageUrl);
+      url.searchParams.set("view", "public");
+      let response: Response;
+      try {
+        response = await send(url.pathname + url.search, { credentials: "omit" });
+      } catch (cause) {
+        throw new ApiFailure("unreachable", `Could not reach Hallway: ${String(cause)}`);
+      }
+      if (!response.ok) throw new ApiFailure("unexpected", `GET ${url.pathname} answered ${response.status}.`, response.status);
+      return response.blob();
+    },
   };
 }
 

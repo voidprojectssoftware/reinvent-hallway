@@ -7,6 +7,7 @@
 import { goingFacesShown, type SearchSessionsInput, type Session, type SessionList, type SessionScope } from "@hallway/contracts";
 import { canReadAbstract, dayBounds, type AbstractReader } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
+import { noEvent } from "../events/get-event.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleDependencies } from "./dependencies.ts";
 import { sessionResource } from "./resources.ts";
@@ -19,7 +20,7 @@ export function searchSessions(dependencies: ScheduleDependencies): SearchSessio
   const { events, schedule } = dependencies;
   return async (actor, { eventId, q, day, limit, ...exact }) => {
     const event = await events.get(eventId);
-    if (!event) return fail("not-found", `No event ${eventId}.`);
+    if (!event) return noEvent(eventId);
     const filter: SessionFilter = { limit };
     if (q !== undefined) filter.q = q;
     for (const [key, value] of Object.entries(exact)) {
@@ -31,8 +32,12 @@ export function searchSessions(dependencies: ScheduleDependencies): SearchSessio
       filter.startsFrom = bounds.from;
       filter.startsBefore = bounds.to;
     }
-    const sessions = await schedule.searchSessions(eventId, filter);
-    return ok({ sessions: await asResources(dependencies, actor, eventId, sessions) });
+    const { sessions, total } = await schedule.searchSessions(eventId, filter);
+    return ok({
+      sessions: await asResources(dependencies, actor, eventId, sessions),
+      total,
+      truncated: total > sessions.length,
+    });
   };
 }
 

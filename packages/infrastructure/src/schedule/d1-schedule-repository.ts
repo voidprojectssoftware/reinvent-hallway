@@ -289,13 +289,15 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
       ] as const) {
         if (value !== undefined) conditions.push(sql`exists (select 1 from json_each(${list}) where value = ${value})`);
       }
+      // `count(*) over ()` is taken before the limit, so one read gives the
+      // page and how many match in all (hunt F12).
       const rows = await db
-        .select(catalogColumns)
+        .select({ row: catalogColumns, total: sql<number>`count(*) over ()` })
         .from(sessions)
         .where(and(...conditions))
         .orderBy(...sessionOrder)
         .limit(filter.limit);
-      return rows.map(fromSessionRow);
+      return { sessions: rows.map(({ row }) => fromSessionRow(row)), total: rows[0]?.total ?? 0 };
     },
 
     async reports(attendeeId, eventId, sessionIds) {

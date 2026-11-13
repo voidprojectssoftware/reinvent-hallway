@@ -18,7 +18,19 @@ export const SessionId = z
   .max(128)
   .meta({ description: "AWS's session id, stable across requests." });
 
-const taxonomy = z.array(z.string()).max(100).optional();
+// AWS types every field below as a string (or a list, or a flag) and never
+// documents null, but models re-serialize ("60" becomes 60) and other MCP
+// bridges send null for a field they have no value for. One such field used
+// to fail a whole sync (hunt F11). So null reads as absent, and a number where
+// AWS gives minutes reads as its digits; any other wrong type is still
+// refused, with the path of the field.
+const orAbsent = <T extends z.ZodType>(schema: T) =>
+  schema
+    .nullish()
+    .transform((value) => value ?? undefined)
+    .optional();
+const text = () => orAbsent(z.string());
+const taxonomy = orAbsent(z.array(z.string()).max(100));
 
 /**
  * Far above any abstract AWS writes (about a thousand characters), so a real
@@ -30,35 +42,32 @@ const abstractMaxLength = 20_000;
 export const AwsSession = z
   .object({
     sessionId: SessionId,
-    title: z.string().optional(),
-    abbreviation: z.string().optional().meta({ description: "The public session code, e.g. `AIM3315`." }),
-    abstract: z
-      .string()
-      .max(abstractMaxLength)
-      .optional()
-      .meta({
-        description:
-          "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees whose own agent has synced sessions.",
+    title: text(),
+    abbreviation: text().meta({ description: "The public session code, e.g. `AIM3315`." }),
+    abstract: orAbsent(z.string().max(abstractMaxLength)).meta({
+      description:
+        "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees whose own agent has synced sessions.",
+    }),
+    type: text(),
+    level: text(),
+    venue: text(),
+    room: text(),
+    isAllDaySession: orAbsent(z.boolean()),
+    isReservable: orAbsent(z.boolean()),
+    seatAvailability: text(),
+    sessionTime: orAbsent(
+      z.object({
+        date: text().meta({ description: "Local date, `YYYY-MM-DD`, e.g. `2026-12-02`." }),
+        time: text().meta({ description: "Local start time, 24-hour `HH:MM` (or `HH:MM:SS`), e.g. `16:00`." }),
+        length: orAbsent(
+          z
+            .union([z.string(), z.number()], { error: "Expected whole minutes, as a string (\"60\") or a number" })
+            .transform((minutes) => (typeof minutes === "number" ? String(minutes) : minutes)),
+        ).meta({ description: "Whole minutes, e.g. `\"60\"` (a number is read too)." }),
+        timezone: text(),
       }),
-    type: z.string().optional(),
-    level: z.string().optional(),
-    venue: z.string().optional(),
-    room: z.string().optional(),
-    isAllDaySession: z.boolean().optional(),
-    isReservable: z.boolean().optional(),
-    seatAvailability: z.string().optional(),
-    sessionTime: z
-      .object({
-        date: z.string().optional().meta({ description: "Local date, e.g. `2026-12-02`." }),
-        time: z.string().optional().meta({ description: "Local start time, e.g. `16:00`." }),
-        length: z.string().optional().meta({ description: "Minutes, e.g. `60`." }),
-        timezone: z.string().optional(),
-      })
-      .optional(),
-    speakers: z
-      .array(z.object({ name: z.string().optional() }))
-      .max(100)
-      .optional(),
+    ),
+    speakers: orAbsent(z.array(z.object({ name: text() })).max(100)),
     topics: taxonomy,
     tracks: taxonomy,
     industries: taxonomy,
@@ -72,7 +81,7 @@ export const AwsSession = z
     additionalActivities: taxonomy,
     focusAreas: taxonomy,
   })
-  .meta({ description: "A session exactly as the AWS Events API gives it." });
+  .meta({ description: "A session exactly as the AWS Events API gives it. A null field is read as absent." });
 export type AwsSession = z.infer<typeof AwsSession>;
 
 export const Intent = z
@@ -233,6 +242,16 @@ export type SyncScheduleBody = z.infer<typeof SyncScheduleBody>;
 export const SyncScheduleInput = EventScope.extend(SyncScheduleBody.shape);
 export type SyncScheduleInput = z.infer<typeof SyncScheduleInput>;
 
+export const UnreadableTime = z
+  .object({
+    sessionId: SessionId,
+    date: z.string().optional().meta({ description: "The `date` as sent, when it is not `YYYY-MM-DD`." }),
+    time: z.string().optional().meta({ description: "The `time` as sent, when it is not 24-hour `HH:MM`." }),
+    length: z.string().optional().meta({ description: "The `length` as sent, when it is not whole minutes." }),
+  })
+  .meta({ id: "UnreadableTime", description: "A session whose time Hallway could not read, with those parts as sent." });
+export type UnreadableTime = z.infer<typeof UnreadableTime>;
+
 export const SyncResult = z
   .object({
     added: count.meta({ description: "Sessions newly on the schedule." }),
@@ -245,6 +264,10 @@ export const SyncResult = z
     missingSessions: z.array(SessionId).meta({
       description:
         "Listed ids sent without a session object that Hallway has never seen. They were skipped: send their `GetSession` output and sync again.",
+    }),
+    unreadableTimes: z.array(UnreadableTime).meta({
+      description:
+        "Sessions kept without a time because a part of their `sessionTime` is not in a form Hallway reads. Such a session shows as time not announced (or keeps a time an earlier sync gave it) and does not block meeting gaps. Send AWS's values unchanged and sync again.",
     }),
   })
   .meta({ id: "SyncResult", description: "What one sync did." });
@@ -285,6 +308,12 @@ export const SearchSessionsInput = EventScope.extend(SearchSessionsQuery.shape);
 export type SearchSessionsInput = z.infer<typeof SearchSessionsInput>;
 
 export const SessionList = z
-  .object({ sessions: z.array(Session) })
+  .object({
+    sessions: z.array(Session),
+    total: count.meta({ description: "How many sessions match; `sessions` holds the first `limit` of them." }),
+    truncated: z.boolean().meta({
+      description: "True when more sessions match than were returned: narrow the search (`q`, `day`) or raise `limit` (up to 200).",
+    }),
+  })
   .meta({ id: "SessionList", description: "Catalog sessions, in start order." });
 export type SessionList = z.infer<typeof SessionList>;

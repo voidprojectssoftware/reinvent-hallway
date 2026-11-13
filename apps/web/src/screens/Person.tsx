@@ -21,7 +21,7 @@ import { firstName as firstWord } from "../schedule/going.ts";
 import { useMe } from "../shell/AppLayout.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
-import { Foot, failureText } from "../shell/Foot.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
@@ -96,7 +96,9 @@ const sessionIds = (schedule: MySchedule) => new Set(schedule.entries.map((entry
 export function Person() {
   const loaded = useLoaderData<typeof personLoader>();
   const me = useMe();
-  const back = me ? { to: "/network", label: "Network" } : undefined;
+  // Back to where I came from (a session, someone's week); with no such
+  // screen, Network, or for a signed-out visitor nothing (they have no tabs).
+  const back = me ? { to: "/network", label: "Network" } : null;
 
   if (loaded.kind === "not-a-handle") return <NotFound />;
   if (loaded.kind === "no-one") {
@@ -147,17 +149,17 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
   const name = firstName(card);
 
   async function act(call: () => Promise<unknown>) {
     setBusy(true);
-    setError(null);
+    setFailed(null);
     try {
       await call();
       await revalidator.revalidate();
     } catch (failure) {
-      setError(failureText(failure));
+      setFailed({ failure, retry: () => void act(call) });
     } finally {
       setBusy(false);
     }
@@ -167,7 +169,7 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
     const token = heldInvite(card.handle);
     if (!token) return act(() => api.requestConnection(card.handle));
     setBusy(true);
-    setError(null);
+    setFailed(null);
     try {
       await api.connectWithInvite(card.handle, token);
       dropInvite();
@@ -178,9 +180,9 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
         // words: the server's message is not shown, and the token never is.
         dropInvite();
         await revalidator.revalidate();
-        setError(`This invite link no longer works: ${name} has reset it. You can still ask to connect.`);
+        setFailed({ failure: `This invite link no longer works: ${name} has reset it. You can still ask to connect.` });
       } else {
-        setError(failureText(failure));
+        setFailed({ failure, retry: () => void connectWithInvite() });
       }
     } finally {
       setBusy(false);
@@ -278,7 +280,7 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
         {children}
         <div className="person-actions">{actions}</div>
       </div>
-      <Foot error={error}>{note}</Foot>
+      <Foot failed={failed}>{note}</Foot>
     </div>
   );
 }

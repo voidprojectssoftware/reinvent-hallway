@@ -11,7 +11,8 @@ import { IntentBadge, sessionName } from "../schedule/EntryCell.tsx";
 import { whoIsGoing } from "../schedule/going.ts";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
-import { Foot, failureText } from "../shell/Foot.tsx";
+import { useMe } from "../shell/AppLayout.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
@@ -47,11 +48,12 @@ export async function sessionLoader({ params }: { params: { sessionId?: string }
   };
 }
 
-const back = { to: "/", label: "My week" };
-
 export function Session() {
   const loaded = useLoaderData<typeof sessionLoader>();
   const { sessionId = "" } = useParams();
+  // Back to where I came from; with no such screen, my week, or for a
+  // signed-out visitor nothing, since they have no week.
+  const back = useMe() ? { to: "/", label: "My week" } : null;
   if (!loaded.found) {
     return (
       <Screen title="Session" back={back}>
@@ -157,16 +159,16 @@ function when(session: SessionResource): string {
 function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | null }) {
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
 
   async function change(call: () => Promise<unknown>) {
     setBusy(true);
-    setError(null);
+    setFailed(null);
     try {
       await call();
       await revalidator.revalidate();
     } catch (failure) {
-      setError(failureText(failure));
+      setFailed({ failure, retry: () => void change(call) });
     } finally {
       setBusy(false);
     }
@@ -183,7 +185,7 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
             </button>
           </li>
         </ul>
-        <Foot error={error}>It goes on your week as interested. Reserve a seat on re:Invent.</Foot>
+        <Foot failed={failed}>It goes on your week as interested. Reserve a seat on re:Invent.</Foot>
       </section>
     );
   }
@@ -231,7 +233,7 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
           </li>
         )}
       </ul>
-      <Foot error={error}>
+      <Foot failed={failed}>
         A hidden session stays on your week and calendar, and no one else sees it or counts it.
         {synced && " Your agent put it here: to remove it, drop it on re:Invent and sync again."}
       </Foot>

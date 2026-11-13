@@ -10,10 +10,12 @@ import {
   planSync,
   syncedSessions,
   toSession,
+  unreadableTime,
   type AwsSession,
   type SessionReport,
 } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
+import { noEvent } from "../events/get-event.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleDependencies } from "./dependencies.ts";
 import { attendeeOf, signInFirst } from "./resources.ts";
@@ -25,7 +27,7 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
     const attendeeId = attendeeOf(actor);
     if (!attendeeId) return signInFirst();
     const event = await events.get(input.eventId);
-    if (!event) return fail("not-found", `No event ${input.eventId}.`);
+    if (!event) return noEvent(input.eventId);
     const at = now().toISOString();
 
     const invited = input.invitedSessions.map((aws) => aws.sessionId);
@@ -34,11 +36,16 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
     // (ADR 0016): a snapshot of anything else is dropped unread, so no agent
     // can rewrite a session it does not hold. The last snapshot of a session
     // wins when an agent sends one twice.
-    const snapshots = new Map(
-      [...input.sessions, ...input.invitedSessions]
-        .filter((aws) => listed.has(aws.sessionId))
-        .map((aws) => [aws.sessionId, toSession(asDomainSession(aws), event)] as const),
-    );
+    const kept = [...input.sessions, ...input.invitedSessions]
+      .filter((aws) => listed.has(aws.sessionId))
+      .map(asDomainSession);
+    const snapshots = new Map(kept.map((aws) => [aws.sessionId, toSession(aws, event)] as const));
+    // A time that does not read is kept as no time, and said (hunt F2): the
+    // agent can tell the user, or send AWS's own values, rather than report a
+    // session placed that is not.
+    const unreadableTimes = [
+      ...new Map(kept.map((aws) => [aws.sessionId, unreadableTime(aws)] as const)).entries(),
+    ].flatMap(([sessionId, unreadable]) => (unreadable ? [{ sessionId, ...unreadable }] : []));
     const known = new Set(
       (await schedule.sessions(event.eventId, [...listed])).map((session) => session.sessionId),
     );
@@ -80,13 +87,14 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
       lastSync: { syncedAt: at, ...counts, missingSessions: missingSessions.length },
     });
 
-    return ok({ ...counts, sessionsStored: reports.length, missingSessions });
+    return ok({ ...counts, sessionsStored: reports.length, missingSessions, unreadableTimes });
   };
 }
 
-// The contract's parsed value is the domain's AwsSession at runtime: zod drops
-// absent keys rather than writing `undefined`, so the only difference is the
-// `| undefined` that exactOptionalPropertyTypes adds to zod's optional fields.
+// The contract's parsed value is the domain's AwsSession at runtime, but for
+// `undefined` where the agent sent null (the contract reads null as absent),
+// which every reader of AwsSession treats as absent; the types differ only by
+// the `| undefined` that exactOptionalPropertyTypes adds to zod's optional fields.
 // The fields toSession does not read (AWS's live seat state) are carried
 // into it and ignored there; it copies only the fields Hallway keeps.
 const asDomainSession = (aws: AwsSessionInput) => aws as AwsSession;

@@ -7,14 +7,23 @@ import { ApiFailure } from "../api/client.ts";
 
 const signedOut = (failure: unknown) => failure instanceof ApiFailure && failure.kind === "unauthenticated";
 
-/** For a screen that is only mine: signed out goes to the sign-in screen. */
-export async function requireSignIn<T>(load: Promise<T>): Promise<T> {
+/**
+ * For a screen that is only mine: signed out goes to the sign-in screen,
+ * which brings me back to this one (`request` is the loader's).
+ */
+export async function requireSignIn<T>(load: Promise<T>, request: Request): Promise<T> {
   try {
     return await load;
   } catch (failure) {
-    if (signedOut(failure)) throw redirect("/sign-in");
+    if (signedOut(failure)) throw redirect(signInPath(pathOf(request)));
     throw failure;
   }
+}
+
+/** The path and query a loader's request is for, to come back to. */
+export function pathOf(request: Request): string {
+  const url = new URL(request.url);
+  return url.pathname + url.search;
 }
 
 /** For a screen anyone may open: signed out is `null`, not a failure. */
@@ -27,8 +36,8 @@ export async function ifSignedIn<T>(load: Promise<T>): Promise<T | null> {
   }
 }
 
-/** The sign-in screen, coming back to `path` once signed in (both ways of signing in honour it). */
-export const signInPath = (path: string) => `/sign-in?returnTo=${encodeURIComponent(path)}`;
+/** The sign-in screen, coming back to `path` once signed in (every way of signing in honours it). */
+export const signInPath = (path: string) => (path === "/" ? "/sign-in" : `/sign-in?returnTo=${encodeURIComponent(path)}`);
 
 /**
  * Where to land once signed in, from the sign-in screen's `?returnTo=`, or

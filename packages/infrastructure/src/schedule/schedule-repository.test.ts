@@ -140,7 +140,7 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
       expect(JSON.stringify(read)).not.toContain("ABSTRACT-TEXT");
     }
     // Search never matches on it either: it would tell an unverified asker what it says.
-    expect(await repository.searchSessions(event, { q: "abstract-text-repo", limit: 10 })).toEqual([]);
+    expect((await repository.searchSessions(event, { q: "abstract-text-repo", limit: 10 })).sessions).toEqual([]);
     expect(await repository.hasReported(me, event)).toBe(true);
     expect(await repository.hasReported(me, "other-event")).toBe(false);
     expect(await repository.hasReported(other, event)).toBe(false);
@@ -177,7 +177,7 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
     const lambda = report(me, fresh("f"), { type: `Workshop ${tag}`, level: "200 - Intermediate", topics: [tag], services: ["AWS Lambda"] });
     await repository.applySync(sync({ attendeeId: me, reports: [bedrock, lambda] }));
     const ids = async (filter: Omit<Parameters<ScheduleRepository["searchSessions"]>[1], "limit">) =>
-      (await repository.searchSessions(event, { ...filter, limit: 50 })).map((s) => s.sessionId);
+      (await repository.searchSessions(event, { ...filter, limit: 50 })).sessions.map((s) => s.sessionId);
     expect(await ids({ topic: tag })).toEqual(expect.arrayContaining([bedrock.sessionId, lambda.sessionId]));
     expect(await ids({ topic: tag, service: "Amazon Bedrock" })).toEqual([bedrock.sessionId]);
     expect(await ids({ type: `Workshop ${tag}` })).toEqual([lambda.sessionId]);
@@ -339,7 +339,7 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
     const speaker = report(me, fresh("sp"), { speakers: [`Dr ${tag}`] });
     const accented = report(me, fresh("acc"), { title: `Émilie on ${tag}`, speakers: ["Zoë Ångström", "李小龙"] });
     await repository.applySync(sync({ attendeeId: me, reports: [speaker, tuesday, monday, accented] }));
-    const ids = (found: CatalogSession[]) => found.map((s) => s.sessionId);
+    const ids = (found: { sessions: CatalogSession[] }) => found.sessions.map((s) => s.sessionId);
 
     expect(ids(await repository.searchSessions(event, { q: tag.toLowerCase(), limit: 50 }))).toEqual([
       monday.sessionId,
@@ -360,8 +360,12 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
         }),
       ),
     ).toEqual([tuesday.sessionId]);
-    expect(await repository.searchSessions(event, { q: tag, limit: 1 })).toHaveLength(1);
-    expect(await repository.searchSessions(event, { q: "%", limit: 50 })).toEqual([]);
+    // The page is the first `limit`; the total counts every match (hunt F12).
+    expect(await repository.searchSessions(event, { q: tag.toLowerCase(), limit: 1 })).toEqual({
+      sessions: [expect.objectContaining({ sessionId: monday.sessionId })],
+      total: 4,
+    });
+    expect(await repository.searchSessions(event, { q: "%", limit: 50 })).toEqual({ sessions: [], total: 0 });
   });
 
   it("keeps the last sync per attendee and event, each sync replacing the one before", async () => {
