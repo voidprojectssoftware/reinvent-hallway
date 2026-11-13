@@ -26,3 +26,18 @@ teaches, and say what you saw when you change it.
 - Hot files for every later wave: root `package.json`, `package-lock.json`,
   `AGENTS.md` "Running things", the contracts index, the route and tool
   registries, the migrations directory. Assign migration numbers in the brief.
+
+## While Actions is blocked by billing (#21)
+
+Observed 2026-11-13: every job in the org fails before starting ("recent account
+payments have failed"). The ruleset requires `checks`, so nothing can merge to
+`main`. Until #21 closes:
+
+- PRs target `mvp`, an integration branch with no ruleset. Retarget with
+  `gh pr edit <n> --base mvp`.
+- Landing: in a throwaway worktree on `mvp`, `git merge --no-ff origin/<branch>`,
+  run `npm ci && npm run verify`, push `mvp` only if it passed. A merge commit
+  (not a squash) so GitHub marks the PR merged. Post the verify output on the PR.
+- The `visual` rule is held by review: check the diagrams are in the PR body.
+- When CI is back: one PR `mvp` → `main` through the real gates, then delete
+  this section.
