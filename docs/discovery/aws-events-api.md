@@ -52,3 +52,16 @@ Kiro `mcp.json` `"awsevents": { "url": "https://api.awsevents.com/mcp", "oauth":
 The `Session` shape, all of it but `seatAvailability` and `isReservable` (ADR
 0025; the abstract only for verified attendees), and the `Schedule` shape as
 the input to `sync_my_schedule`.
+
+## Can a browser do the sign-in and the calls itself? (measured 2026-11-13)
+
+The owner asked whether a client-side-only Hallway could sign attendees in to AWS and call the Events API from the browser. **No**, for two independent reasons:
+
+1. **The redirect.** AWS only redirects to `http://localhost:8484` to `8489` `/callback`, matched exactly. A page served from Hallway's origin cannot receive it. A popup that lands on `localhost` is cross-origin, so its address cannot be read.
+2. **CORS on the API (decisive).** Measured with curl:
+   - `OPTIONS https://oauth.awsevents.com/oauth2/token` with any `Origin` returns 200 and echoes the origin. The token exchange alone would work in a browser.
+   - `OPTIONS https://api.awsevents.com/v1/events/reinvent2026/schedule` with `Access-Control-Request-Method: GET` and `Access-Control-Request-Headers: authorization` returns **403**, for `https://hallway.example` and for `http://localhost:8484` alike.
+   - Browsers always send that preflight before a request carrying `Authorization`, so no web page can read a signed-in response.
+   - Unsigned requests (`GET /v1/events`) return `access-control-allow-origin: *`.
+
+Signed-in use of the API is therefore limited to programs outside a browser: a CLI, a desktop app, or an agent through the MCP server. Relaying through Hallway's server would mean holding the attendee's token, which ADR 0003 rules out.
