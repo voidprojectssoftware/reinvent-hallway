@@ -2,10 +2,11 @@
 // (issue #48). It sends them to the profile form, where the handle is, rather
 // than holding a second form: one place edits a handle.
 import type { Me } from "@hallway/contracts";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router";
 import { Icon } from "../shell/Icon.tsx";
+import { useModal } from "../shell/modal.ts";
 import { dismissHandlePrompt, handlePromptDismissed, shouldAskForHandle } from "./handle-prompt.ts";
 
 export function HandlePrompt({ me }: { me: Me }) {
@@ -18,18 +19,21 @@ export function HandlePrompt({ me }: { me: Me }) {
     setDismissed(true);
   }
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && notNow();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  const dialog = useRef<HTMLDivElement>(null);
+  useModal(dialog, notNow, open);
 
   if (!open) return null;
   // Into body, as the share sheet: the nav bar's backdrop-filter would pin a
   // fixed element inside it to the bar.
   return createPortal(
-    <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="handle-t" onClick={(event) => event.target === event.currentTarget && notNow()}>
+    <div
+      className="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="handle-t"
+      tabIndex={-1}
+      ref={dialog}
+      onClick={(event) => event.target === event.currentTarget && notNow()}>
       <div className="sheet-in">
         <div className="sheet-grab" aria-hidden="true" />
         <div className="sheet-g">
@@ -43,7 +47,7 @@ export function HandlePrompt({ me }: { me: Me }) {
             Choose a handle
           </Link>
         </div>
-        <button className="sheet-cancel" type="button" onClick={notNow} autoFocus>
+        <button className="sheet-cancel" type="button" onClick={notNow}>
           Not now
         </button>
       </div>

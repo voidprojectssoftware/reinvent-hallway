@@ -72,7 +72,7 @@ type Structured = Record<string, any>;
 class Agent {
   private constructor(
     readonly hallway: Client,
-    private readonly aws: Client,
+    readonly aws: Client,
   ) {}
 
   static async start(name: string, token: string, awsData: AwsScheduleFixture) {
@@ -307,6 +307,83 @@ describe("two agents sync from AWS and plan around each other", () => {
     } finally {
       await cyAgent.close();
     }
+  });
+
+  // Issue #54: the mistakes models make most, each answered with a refusal or
+  // a field the agent can act on with its own tools, and the recovery that follows.
+  describe("an agent recovers from the mistakes models make", () => {
+    const refusal = async (agent: Agent, name: string, args: Structured) => {
+      const result = await agent.hallway.callTool({ name, arguments: args });
+      expect(result.isError, `${name} should refuse`).toBe(true);
+      return JSON.parse((result.content as { text: string }[])[0]!.text) as { kind: string; message: string };
+    };
+
+    it("last year's date is refused with the event's dates, and the right year answers", async () => {
+      const refused = await refusal(adaAgent, "find_meeting_gaps", { eventId, handle: ben.handle, day: "2025-12-01" });
+      expect(refused).toMatchObject({ kind: "invalid", message: expect.stringContaining("2026-11-30 to 2026-12-04") });
+      const gaps = await adaAgent.tool("find_meeting_gaps", { eventId, handle: ben.handle, day: tuesday, to: "24:00" });
+      expect(gaps.gaps.at(-1).end).toBe("24:00");
+      expect(gaps.unplacedSessions).toEqual([]);
+    });
+
+    it("a code where an id belongs is named, found with search_sessions, and accepted where it is unambiguous", async () => {
+      const going = await adaAgent.tool("who_is_going", { eventId, sessionIds: ["IOT220"] });
+      expect(going.unknownSessions).toEqual(["IOT220"]);
+      const found = await adaAgent.tool("search_sessions", { eventId, q: "IOT220" });
+      expect(found).toMatchObject({ total: 1, truncated: false });
+      const id = found.sessions[0].sessionId;
+      expect(names((await adaAgent.tool("who_is_going", { eventId, sessionIds: [id] })).sessions[0].people)).toEqual([ben.name]);
+
+      expect(await adaAgent.tool("add_to_plan", { eventId, sessionId: "IOT220" })).toMatchObject({ sessionId: id, source: "manual" });
+      expect(await adaAgent.tool("remove_from_plan", { eventId, sessionId: "IOT220" })).toMatchObject({ sessionId: id });
+    });
+
+    it("removing a synced session is refused toward set_entry_hidden, which keeps it from Ben", async () => {
+      const refused = await refusal(adaAgent, "remove_from_plan", { eventId, sessionId: "s-aim3315" });
+      expect(refused).toMatchObject({ kind: "conflict", message: expect.stringContaining("set_entry_hidden") });
+      expect(await adaAgent.tool("set_entry_hidden", { eventId, sessionId: "s-aim3315", hidden: true })).toMatchObject({
+        hidden: true,
+      });
+      const going = await benAgent.tool("who_is_going", { eventId, sessionIds: ["s-aim3315"] });
+      expect(going.sessions[0].people).toEqual([]);
+      await adaAgent.tool("set_entry_hidden", { eventId, sessionId: "s-aim3315", hidden: false });
+      expect(names((await benAgent.tool("who_is_going", { eventId, sessionIds: ["s-aim3315"] })).sessions[0].people)).toEqual([
+        ada.name,
+      ]);
+    });
+
+    it("a re-serialized AWS session syncs: numbers for minutes and nulls read, a 12-hour time is reported", async () => {
+      const dee = await signIn("Dee Marsh");
+      const deeAgent = await Agent.start("dee", await issueAgentToken(dee), benAws);
+      try {
+        const { schedule } = await Agent.call(deeAgent.aws, "GetSchedule", { eventId });
+        const [first, second] = schedule.favorites as string[];
+        const sessions = await Promise.all(
+          [first, second].map(async (sessionId) => (await Agent.call(deeAgent.aws, "GetSession", { eventId, sessionId })).session),
+        );
+        // What a model hands on after reading AWS's JSON into its own notes.
+        const remade = [
+          { ...sessions[0], venue: null, sessionTime: { ...sessions[0].sessionTime, length: Number(sessions[0].sessionTime.length) } },
+          { ...sessions[1], sessionTime: { ...sessions[1].sessionTime, time: "4:00 PM" } },
+        ];
+        const result = await deeAgent.tool("sync_my_schedule", { eventId, sessions: remade, favorites: [first, second], reserved: [] });
+        expect(result).toMatchObject({ added: 2, unreadableTimes: [{ sessionId: second, time: "4:00 PM" }] });
+      } finally {
+        await deeAgent.close();
+      }
+    });
+
+    it("an agent with no token is told how to get one", async () => {
+      const anonymous = new Client({ name: "no-token-agent", version: "0.0.0" });
+      await anonymous.connect(new StreamableHTTPClientTransport(new URL(`${hallway}/mcp`)));
+      try {
+        const result = await anonymous.callTool({ name: "get_my_schedule", arguments: { eventId } });
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain("Connect your agent");
+      } finally {
+        await anonymous.close();
+      }
+    });
   });
 
   it("an agent token cannot mint another token", async () => {

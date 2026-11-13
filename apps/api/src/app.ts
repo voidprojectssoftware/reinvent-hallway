@@ -2,6 +2,7 @@
 // over D1, tests pass handlers over the in-memory fakes. REST routes and MCP
 // tools both reach the same handlers through `c.var.handlers` (ADR 0002).
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { HTTPException } from "hono/http-exception";
 import type { Actor, GetEvent, IdentityHandlers } from "@hallway/application";
 import type { NetworkHandlers, ScheduleHandlers } from "@hallway/application";
 import type { SharingHandlers } from "@hallway/application";
@@ -10,7 +11,7 @@ import { readSessionCookie } from "./auth/cookies.ts";
 import type { DevSignInBindings } from "./auth/dev-sign-in.ts";
 import { resolveActor } from "./auth/resolve-actor.ts";
 import { registerMcp } from "./mcp/server.ts";
-import { httpStatus } from "./outcome-http.ts";
+import { httpStatus, unavailable } from "./outcome-http.ts";
 import { registerDocsRoutes } from "./routes/docs.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerIdentityRoutes } from "./routes/identity.ts";
@@ -58,7 +59,21 @@ export function createApp<Bindings extends DevSignInBindings>(
   app.use("*", async (c, next) => {
     c.set("handlers", dependencies.handlers(c.env));
     const actor = await resolveActor(c.req.raw, c.env, readSessionCookie(c), c.var.handlers.identity.authenticate);
-    if (!actor.ok) return c.json(actor.error, httpStatus[actor.error.kind]);
+    if (!actor.ok) {
+      // Only a bearer the caller sent is refused here (resolve-actor.ts), and
+      // what it can do about that is get a new one. The header is RFC 6750's,
+      // so an MCP client reports a bad token instead of starting OAuth
+      // discovery (hunt F13).
+      const { kind, message } = actor.error;
+      c.header("WWW-Authenticate", 'Bearer realm="hallway", error="invalid_token"');
+      return c.json(
+        {
+          kind,
+          message: `${message} Ask the user for a new agent token from Hallway's Connect your agent page (/connect), sent as \`Authorization: Bearer hw_...\`.`,
+        } satisfies ApiError,
+        httpStatus[kind],
+      );
+    }
     c.set("actor", actor.value);
     await next();
   });
@@ -78,6 +93,17 @@ export function createApp<Bindings extends DevSignInBindings>(
       version: "0.0.0",
       description: "See where the people you know will be at AWS re:Invent 2026.",
     },
+  });
+
+  // A throw no handler meant (a D1 failure, a bug) is logged here with its
+  // detail and answered with the generic Error resource: the driver's text,
+  // with table and column names, is for the log, not the caller (#68). MCP
+  // tools catch their own, in mcp/outcome-mcp.ts.
+  app.onError((error, c) => {
+    // Hono's own refusals (a body that is not JSON) keep their status and text.
+    if (error instanceof HTTPException) return error.getResponse();
+    console.error(`${c.req.method} ${c.req.path} failed unexpectedly`, error);
+    return c.json(unavailable, httpStatus.unavailable);
   });
 
   // Only the Worker's own paths reach here (wrangler.jsonc run_worker_first);

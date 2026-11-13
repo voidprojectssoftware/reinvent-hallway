@@ -4,21 +4,26 @@
 // server, Hallway's /mcp with a fresh token, and the prompt. The token's
 // secret is in the one answer that issues it and nowhere after (ADR 0008),
 // so it lives in this screen's state and is gone on reload.
+//
+// This is where a person waits for their agent's first sync, so the last
+// sync is re-read without a reload (which would lose the token): whenever
+// the window comes back into view, and every few seconds while the sync it
+// asks for has not arrived.
 import type { IssuedAgentToken, MySchedule } from "@hallway/contracts";
-import { useState, type FormEvent } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useLoaderData, useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
 import { copyText } from "../copy.ts";
 import { EVENT_ID } from "../event.ts";
-import { Foot, failureText } from "../shell/Foot.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { sessions, syncCounts } from "../schedule/sync.ts";
 import { formatAgo } from "../time.ts";
 
-export function connectAgentLoader(): Promise<MySchedule> {
-  return requireSignIn(api.mySchedule(EVENT_ID));
+export function connectAgentLoader({ request }: { request: Request }): Promise<MySchedule> {
+  return requireSignIn(api.mySchedule(EVENT_ID), request);
 }
 
 // AWS's sign-in has one shared public client, which accepts only fixed
@@ -38,7 +43,9 @@ const agents: Record<Agent, { name: string; label: string; awsSetup: string; hal
     // AWS's command in AWS's order, broken so no line wraps at 390 px.
     awsSetup: `claude mcp add --transport http \\\n  --scope user awsevents \\\n  ${AWS_EVENTS_MCP} \\\n  --callback-port 8484 \\\n  --client-id ${AWS_CLIENT_ID}`,
     hallwaySetup: (url, secret) =>
-      `claude mcp add --transport http \\\n  hallway ${url} \\\n  --header "Authorization: Bearer ${secret}"`,
+      // User scope, as AWS's: the default (this folder only) would leave
+      // Hallway out of every other project the person asks from.
+      `claude mcp add --transport http \\\n  --scope user hallway ${url} \\\n  --header "Authorization: Bearer ${secret}"`,
     where: "Run it in a terminal.",
   },
   kiro: {
@@ -65,6 +72,7 @@ export function ConnectAgent() {
   const [agent, setAgent] = useState<Agent>("claude");
   const [issued, setIssued] = useState<IssuedAgentToken | null>(null);
   const chosen = agents[agent];
+  useSyncWatch(schedule, issued);
 
   return (
     <Screen
@@ -116,16 +124,16 @@ function HallwayStep({ agent, issued, onIssued }: { agent: Agent; issued: Issued
   const chosen = agents[agent];
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
 
-  async function issue(event: FormEvent) {
-    event.preventDefault();
+  async function issue(event?: FormEvent) {
+    event?.preventDefault();
     setBusy(true);
-    setError(null);
+    setFailed(null);
     try {
       onIssued(await api.issueAgentToken(label.trim() || chosen.label));
     } catch (failure) {
-      setError(failureText(failure));
+      setFailed({ failure, retry: () => void issue() });
     } finally {
       setBusy(false);
     }
@@ -148,7 +156,7 @@ function HallwayStep({ agent, issued, onIssued }: { agent: Agent; issued: Issued
             </button>
           </li>
         </ul>
-        <Foot error={error}>Name it for the agent and the machine, so you know which to revoke. The token acts as you and nothing more.</Foot>
+        <Foot failed={failed}>Name it for the agent and the machine, so you know which to revoke. The token acts as you and nothing more.</Foot>
       </form>
     );
   }
@@ -192,12 +200,43 @@ function CopyCell({ text, label }: { text: string; label: string }) {
   );
 }
 
+/** Every so often while waiting: a sync takes an agent a minute or two. */
+const pollEvery = 5_000;
+
+/**
+ * Re-reads the schedule when the window comes back into view, and on a timer
+ * while a sync is awaited: none yet, or none since the token just made.
+ */
+function useSyncWatch(schedule: MySchedule, issued: IssuedAgentToken | null): void {
+  const revalidator = useRevalidator();
+  const again = useRef(revalidator.revalidate);
+  again.current = revalidator.revalidate;
+  const last = schedule.lastSync;
+  const waiting = !last || (issued !== null && Date.parse(last.syncedAt) < Date.parse(issued.token.createdAt));
+
+  useEffect(() => {
+    const reread = () => {
+      if (document.visibilityState === "visible") void again.current();
+    };
+    window.addEventListener("focus", reread);
+    document.addEventListener("visibilitychange", reread);
+    const timer = waiting ? setInterval(reread, pollEvery) : undefined;
+    return () => {
+      window.removeEventListener("focus", reread);
+      document.removeEventListener("visibilitychange", reread);
+      clearInterval(timer);
+    };
+  }, [waiting]);
+}
+
 function SyncedSoFar({ schedule }: { schedule: MySchedule }) {
   const last = schedule.lastSync;
+  const total = last ? last.added + last.changed + last.unchanged : 0;
   return (
     <section className="section">
       <h2 className="ghead">Last sync</h2>
-      <ul className="group">
+      {/* Announced when it changes by itself, as it does once the agent syncs. */}
+      <ul className="group" aria-live="polite">
         <li>
           <div className="cell lead-ico">
             <span className={last ? "ico green" : "ico gray"}>
@@ -207,14 +246,16 @@ function SyncedSoFar({ schedule }: { schedule: MySchedule }) {
               {last ? (
                 <>
                   <span>
-                    {sessions(last.added + last.changed + last.unchanged)}, {formatAgo(last.syncedAt)}
+                    {sessions(total)}, {formatAgo(last.syncedAt)}
                   </span>
-                  <span className="cellsub">{syncCounts(last)}</span>
+                  <span className="cellsub">
+                    {total === 0 ? "Your agent found no favorites or reservations on re:Invent." : syncCounts(last)}
+                  </span>
                 </>
               ) : (
                 <>
                   <span>Nothing synced yet</span>
-                  <span className="cellsub">Ask your agent once the steps above are done.</span>
+                  <span className="cellsub">Ask your agent once the steps above are done. This updates by itself.</span>
                 </>
               )}
             </div>

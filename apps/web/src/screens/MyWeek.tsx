@@ -19,8 +19,8 @@ import { dayChip, eventDate, eventDates, formatAgo, formatDate, zoneAbbreviation
 
 type GoingBySession = Map<string, Person[]>;
 
-export async function myWeekLoader(): Promise<{ event: Event; schedule: MySchedule; going: GoingBySession }> {
-  const [event, schedule] = await Promise.all([api.getEvent(EVENT_ID), requireSignIn(api.mySchedule(EVENT_ID))]);
+export async function myWeekLoader({ request }: { request: Request }): Promise<{ event: Event; schedule: MySchedule; going: GoingBySession }> {
+  const [event, schedule] = await Promise.all([api.getEvent(EVENT_ID), requireSignIn(api.mySchedule(EVENT_ID), request)]);
   const going: GoingBySession =
     schedule.entries.length > 0 ? await whoIsGoing(api, EVENT_ID, schedule.entries.map((entry) => entry.sessionId)) : new Map();
   return { event, schedule, going };
@@ -41,19 +41,42 @@ export function MyWeek() {
   );
 
   if (schedule.entries.length === 0) {
+    // An agent that synced and found nothing is not one that never
+    // connected: the next step is on re:Invent, not here.
+    const synced = schedule.lastSync;
     return (
       <Screen title="My week" sub={sub} action={share}>
-        <Empty
-          icon="week"
-          title="Nothing on your week yet"
-          action={
-            <Link className="btn" to="/connect">
-              Connect your agent
-            </Link>
-          }
-        >
-          Ask your agent to put your re:Invent favorites and reservations here, or add a session from its page.
-        </Empty>
+        {synced ? (
+          <Empty
+            icon="week"
+            title="Your agent found nothing to add"
+            action={
+              <Link className="btn" to="/sessions">
+                Find a session
+              </Link>
+            }
+          >
+            Your agent synced {formatAgo(synced.syncedAt)} and found no favorites or reservations on re:Invent. Favorite or reserve
+            sessions there and ask your agent again, or find a session here and add it.
+          </Empty>
+        ) : (
+          <Empty
+            icon="week"
+            title="Nothing on your week yet"
+            action={
+              <>
+                <Link className="btn" to="/connect">
+                  Connect your agent
+                </Link>
+                <Link className="btn gray" to="/sessions">
+                  Find a session
+                </Link>
+              </>
+            }
+          >
+            Ask your agent to put your re:Invent favorites and reservations here, or find a session and add it.
+          </Empty>
+        )}
       </Screen>
     );
   }
@@ -98,7 +121,9 @@ export function MyWeek() {
           <div className="group">
             <div className="empty">
               <b>Nothing on this day</b>
-              <p>Pick another day, or add a session from someone's week.</p>
+              <p>
+                Pick another day, or <Link to={`/sessions?day=${chosen}`}>find a session</Link> on this one.
+              </p>
             </div>
           </div>
         )}

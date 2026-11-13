@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 /** Signs in, syncs the fixture's AWS schedule, sets visibility; returns the attendee. */
-async function attendee(name: string, visibility: "public" | "connections" | "private"): Promise<Me> {
+async function attendee(name: string, visibility: "public" | "network" | "private"): Promise<Me> {
   const me = (await (await call("/api/dev/sign-in", { method: "POST", body: JSON.stringify({ name }) })).json()) as Me;
   await call("/api/events/reinvent2026/my-schedule", {
     as: me.id,

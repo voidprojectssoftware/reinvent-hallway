@@ -256,7 +256,7 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
     const speaker = report(me, fresh("sp"), { speakers: [`Dr ${tag}`] });
     const accented = report(me, fresh("acc"), { title: `Émilie on ${tag}`, speakers: ["Zoë Ångström", "李小龙"] });
     await repository.applySync(sync({ attendeeId: me, reports: [speaker, tuesday, monday, accented] }));
-    const ids = (found: CatalogSession[]) => found.map((s) => s.sessionId);
+    const ids = (found: { sessions: CatalogSession[] }) => found.sessions.map((s) => s.sessionId);
 
     expect(ids(await repository.searchSessions(event, { q: tag.toLowerCase(), limit: 50 }))).toEqual([
       monday.sessionId,
@@ -277,8 +277,12 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
         }),
       ),
     ).toEqual([tuesday.sessionId]);
-    expect(await repository.searchSessions(event, { q: tag, limit: 1 })).toHaveLength(1);
-    expect(await repository.searchSessions(event, { q: "%", limit: 50 })).toEqual([]);
+    // The page is the first `limit`; the total counts every match (hunt F12).
+    expect(await repository.searchSessions(event, { q: tag.toLowerCase(), limit: 1 })).toEqual({
+      sessions: [expect.objectContaining({ sessionId: monday.sessionId })],
+      total: 4,
+    });
+    expect(await repository.searchSessions(event, { q: "%", limit: 50 })).toEqual({ sessions: [], total: 0 });
   });
 
   it("keeps the last sync per attendee and event, each sync replacing the one before", async () => {

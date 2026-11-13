@@ -7,10 +7,14 @@
 // A page that sends someone here to sign in names itself in `?returnTo=`
 // (a person's page, a session): both ways of signing in land back there, and
 // someone already signed in goes straight there (`returnPathOf`).
+//
+// The provider buttons are a list drawn from the options, so a provider the
+// server adds is one more row in `providers`, not another branch here.
 import { useState, type FormEvent } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router";
-import { api, ApiFailure, linkedInSignInHref, type SignInOptions } from "../api/client.ts";
+import { api, linkedInSignInHref, type SignInOptions } from "../api/client.ts";
 import { Empty } from "../shell/Empty.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, returnPathOf } from "../shell/signed-in.ts";
 
@@ -24,22 +28,40 @@ export async function signInLoader({ request }: { request: Request }): Promise<S
   return { ...options, returnTo };
 }
 
+/** Each way to sign in that leaves for a provider, when the server says it is on. */
+const providers: { on: (options: SignInOptions) => boolean; label: string; href: (returnTo: string | null) => string; note: string }[] = [
+  {
+    on: (options) => options.linkedIn,
+    label: "Sign in with LinkedIn",
+    href: linkedInSignInHref,
+    note: "Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.",
+  },
+];
+
 export function SignIn() {
-  const { devSignIn, linkedIn, returnTo } = useLoaderData<typeof signInLoader>();
+  const { returnTo, ...options } = useLoaderData<typeof signInLoader>();
+  const offered = providers.filter((provider) => provider.on(options));
   return (
-    <Screen title="Hallway" sub="See where the people you know will be at re:Invent 2026, and let your agent plan around them.">
-      {linkedIn && (
-        <section className="section">
-          <a className="btn block" href={linkedInSignInHref(returnTo)}>
-            Sign in with LinkedIn
+    <Screen
+      title="Hallway"
+      sub={
+        returnTo
+          ? "Sign in and you go straight back to the page you were on."
+          : "See where the people you know will be at re:Invent 2026, and let your agent plan around them."
+      }
+    >
+      {offered.map((provider) => (
+        <section className="section" key={provider.label}>
+          <a className="btn block" href={provider.href(returnTo)}>
+            {provider.label}
           </a>
-          <p className="gfoot">Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.</p>
+          <p className="gfoot">{provider.note}</p>
         </section>
-      )}
+      ))}
 
-      {devSignIn && <DevSignIn returnTo={returnTo} />}
+      {options.devSignIn && <DevSignIn returnTo={returnTo} />}
 
-      {!linkedIn && !devSignIn && (
+      {offered.length === 0 && !options.devSignIn && (
         <Empty icon="lock" title="Signing in is not open yet">
           This Hallway has no way to sign in set up. Try again later.
         </Empty>
@@ -51,18 +73,20 @@ export function SignIn() {
 function DevSignIn({ returnTo }: { returnTo: string | null }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit(event?: FormEvent) {
+    event?.preventDefault();
     setBusy(true);
-    setError(null);
+    setFailed(null);
     try {
       await api.devSignIn(name.trim());
-      await navigate(returnTo ?? "/");
+      // In place of the sign-in screen, so Back from where I land does not
+      // come here again (and the back button names where I was before).
+      await navigate(returnTo ?? "/", { replace: true });
     } catch (failure) {
-      setError(failure instanceof ApiFailure ? failure.message : String(failure));
+      setFailed({ failure, retry: () => void submit() });
       setBusy(false);
     }
   }
@@ -87,13 +111,7 @@ function DevSignIn({ returnTo }: { returnTo: string | null }) {
           Sign in as this name
         </button>
       </div>
-      {error ? (
-        <p className="gfoot error" role="alert">
-          {error}
-        </p>
-      ) : (
-        <p className="gfoot">Only on this machine: the API has dev sign-in on (DEV_SIGN_IN=1 in apps/api/.dev.vars).</p>
-      )}
+      <Foot failed={failed}>Only on this machine: the API has dev sign-in on (DEV_SIGN_IN=1 in apps/api/.dev.vars).</Foot>
     </form>
   );
 }

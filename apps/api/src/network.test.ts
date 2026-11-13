@@ -288,10 +288,10 @@ describe("LinkedIn Connections.csv and suggestions", () => {
  * s-hidden and hides it; Dev plans s-dev.
  */
 async function theirWeek() {
-  const ana = await signIn("Ana Silva", "connections");
-  const ben = await signIn("Ben Ode", "connections");
+  const ana = await signIn("Ana Silva", "network");
+  const ben = await signIn("Ben Ode", "network");
   const cat = await signIn("Cat Ng", "private");
-  const dev = await signIn("Dev Rao", "connections");
+  const dev = await signIn("Dev Rao", "network");
   const eve = await signIn("Eve Park", "public");
   const shared = aws("s-shared", "10:00");
   await sync(ana.id, [shared]);

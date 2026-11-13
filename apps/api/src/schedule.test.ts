@@ -78,6 +78,7 @@ describe("sync_my_schedule over MCP", () => {
       unchanged: 0,
       sessionsStored: 15,
       missingSessions: [],
+      unreadableTimes: [],
     } satisfies SyncResult);
     const schedule = await mySchedule("ana");
     expect(schedule.timezone).toBe("America/Los_Angeles");
