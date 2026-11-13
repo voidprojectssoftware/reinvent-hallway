@@ -8,11 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --root ../.. packages/domain/",
     "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "typescript": "5.9.3",
-    "vitest": "4.0.18"
   }
 }
