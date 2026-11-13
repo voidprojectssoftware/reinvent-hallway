@@ -51,3 +51,25 @@
 .seg button:disabled {
   cursor: default;
 }
+
+/* The share sheet's destructive action (reset the invite link), in the red
+   the grouped lists use for one (.cell.action.danger), AA on the cell. */
+.sheet-b.danger {
+  color: var(--red);
+}
+.sheet-b:disabled {
+  color: var(--label2);
+  cursor: default;
+}
+/* What the last action in the sheet did, or why it failed, under its title. */
+.sheet-note {
+  display: block;
+  margin-top: var(--sp-1);
+  color: var(--label);
+}
+.sheet-note.error {
+  color: var(--red);
+}
+.sheet-preview {
+  height: auto;
+}

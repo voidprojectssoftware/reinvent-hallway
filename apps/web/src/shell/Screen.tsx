@@ -15,10 +15,12 @@ interface ScreenProps {
   long?: boolean;
   sub?: ReactNode;
   back?: { to: string; label: string } | undefined;
+  /** A button on the right of the bar (My week's Share). */
+  action?: ReactNode;
   children: ReactNode;
 }
 
-export function Screen({ title, navTitle = title, large = true, long = false, sub, back, children }: ScreenProps) {
+export function Screen({ title, navTitle = title, large = true, long = false, sub, back, action, children }: ScreenProps) {
   const scrolled = useScrolledPast(40);
   return (
     <>
@@ -35,7 +37,7 @@ export function Screen({ title, navTitle = title, large = true, long = false, su
           <div className="nav-title" aria-hidden="true">
             {navTitle}
           </div>
-          <div className="nav-side right" />
+          <div className="nav-side right">{action}</div>
         </div>
       </header>
       <main className="col gutter">

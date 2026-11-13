@@ -1,30 +1,54 @@
 // My week (docs/design/my-week.html): my schedule one day at a time, in Las
 // Vegas time, said once under the title. The chosen day is in the URL
 // (?day=2026-12-01) so a reload or a shared link keeps it.
-import type { Event, MySchedule, PlanEntry } from "@hallway/contracts";
-import { Link, useLoaderData, useSearchParams } from "react-router";
+import type { Event, MySchedule, Person, PlanEntry } from "@hallway/contracts";
+import { useState } from "react";
+import { Link, redirect, useLoaderData, useSearchParams } from "react-router";
 import { api } from "../api/client.ts";
 import { clashes, clashLabel } from "../clash.ts";
 import { EVENT_ID } from "../event.ts";
+import { takeReturnPath } from "../invite.ts";
 import { EntryCell } from "../schedule/EntryCell.tsx";
+import { Going } from "../schedule/Going.tsx";
+import { whoIsGoing } from "../schedule/going.ts";
+import { ShareSheet } from "../share/ShareSheet.tsx";
 import { Empty } from "../shell/Empty.tsx";
+import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { dayChip, eventDate, eventDates, formatDate, zoneAbbreviation } from "../time.ts";
 
-export async function myWeekLoader(): Promise<{ event: Event; schedule: MySchedule }> {
+type GoingBySession = Map<string, Person[]>;
+
+export async function myWeekLoader(): Promise<{ event: Event; schedule: MySchedule; going: GoingBySession }> {
   const [event, schedule] = await Promise.all([api.getEvent(EVENT_ID), requireSignIn(api.mySchedule(EVENT_ID))]);
-  return { event, schedule };
+  // Signed in, then. Signing in with LinkedIn comes back here, to /; a page
+  // that sent me to sign in (a person's, maybe with an invite) asked to be
+  // returned to.
+  const back = takeReturnPath();
+  if (back) throw redirect(back);
+  const going: GoingBySession =
+    schedule.entries.length > 0 ? await whoIsGoing(api, EVENT_ID, schedule.entries.map((entry) => entry.sessionId)) : new Map();
+  return { event, schedule, going };
 }
 
 export function MyWeek() {
-  const { event, schedule } = useLoaderData<typeof myWeekLoader>();
+  const { event, schedule, going } = useLoaderData<typeof myWeekLoader>();
   const [search, setSearch] = useSearchParams();
+  const [sharing, setSharing] = useState(false);
   const sub = `${event.name} · times are Las Vegas time (${zoneAbbreviation(event.startDate)})`;
+  const share = (
+    <>
+      <button className="navbtn icon" type="button" aria-label="Share my week" onClick={() => setSharing(true)}>
+        <Icon name="share" />
+      </button>
+      {sharing && <ShareSheet onClose={() => setSharing(false)} />}
+    </>
+  );
 
   if (schedule.entries.length === 0) {
     return (
-      <Screen title="My week" sub={sub}>
+      <Screen title="My week" sub={sub} action={share}>
         <Empty
           icon="week"
           title="Nothing on your week yet"
@@ -49,7 +73,7 @@ export function MyWeek() {
   const clashing = clashes(schedule.entries);
 
   return (
-    <Screen title="My week" sub={sub}>
+    <Screen title="My week" sub={sub} action={share}>
       <div className="days" role="group" aria-label="Day">
         {dates.map((date) => {
           const { weekday, day } = dayChip(date);
@@ -75,7 +99,7 @@ export function MyWeek() {
           {formatDate(chosen)} <small>{count(entries.length)}</small>
         </h2>
         {entries.length > 0 ? (
-          <ul className="group">{entries.map((entry) => cell(entry, clashing))}</ul>
+          <ul className="group">{entries.map((entry) => cell(entry, clashing, going))}</ul>
         ) : (
           <div className="group">
             <div className="empty">
@@ -84,23 +108,24 @@ export function MyWeek() {
             </div>
           </div>
         )}
-        {/* TODO: "Synced from your agent 12 minutes ago" needs a last-sync
-            time, which MySchedule does not carry yet. */}
+        {/* TODO(#37): "Synced from your agent 12 minutes ago", from
+            lastSync on GET /api/events/{eventId}/my-schedule once #37 lands. */}
         <p className="gfoot">Reserving happens on re:Invent; Hallway shows what you reserved there.</p>
       </section>
 
       {untimed.length > 0 && (
         <section className="section">
           <h2 className="ghead">Time not announced yet</h2>
-          <ul className="group">{untimed.map((entry) => cell(entry, clashing))}</ul>
+          <ul className="group">{untimed.map((entry) => cell(entry, clashing, going))}</ul>
         </section>
       )}
     </Screen>
   );
 }
 
-function cell(entry: PlanEntry, clashing: Map<string, string[]>) {
+function cell(entry: PlanEntry, clashing: Map<string, string[]>, going: GoingBySession) {
   const names = clashing.get(entry.sessionId);
+  const people = going.get(entry.sessionId);
   return (
     <EntryCell
       key={entry.sessionId}
@@ -108,6 +133,8 @@ function cell(entry: PlanEntry, clashing: Map<string, string[]>) {
       intent={entry.intent}
       hidden={entry.hidden}
       clash={names && clashLabel(names)}
+      // A hidden entry is mine alone, so the design leaves who is going off it.
+      going={!entry.hidden && people && <Going people={people} />}
     />
   );
 }
