@@ -78,13 +78,6 @@
       "when": 1794601903393,
       "tag": "0010_add_identities",
       "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1794603621846,
-      "tag": "0011_add_linkedin_post_drafts",
-      "breakpoints": true
     }
   ]
 }
