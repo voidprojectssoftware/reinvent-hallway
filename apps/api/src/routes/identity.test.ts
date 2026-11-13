@@ -260,7 +260,11 @@ describe("agent tokens", () => {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "whoami", arguments: {} } }),
     });
     expect(refused.status).toBe(401);
-    expect(await refused.json()).toEqual({ kind: "unauthenticated", message: "The agent token is unknown or revoked." });
+    expect(refused.headers.get("www-authenticate")).toMatch(/^Bearer /);
+    expect(await refused.json()).toEqual({
+      kind: "unauthenticated",
+      message: expect.stringMatching(/^The agent token is unknown or revoked\. Ask the user for a new agent token from Hallway.s Connect your agent page/),
+    });
   });
 
   it("works as a bearer on REST too, and acts only as its attendee", async () => {

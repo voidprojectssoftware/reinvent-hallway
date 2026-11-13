@@ -3,6 +3,7 @@
 // last sync did, so I can trust the page shows what it last sent.
 import type { EventScope, MySchedule } from "@hallway/contracts";
 import type { Actor } from "../actor.ts";
+import { noEvent } from "../events/get-event.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleDependencies } from "./dependencies.ts";
 import { attendeeOf, planEntryResource, signInFirst } from "./resources.ts";
@@ -14,7 +15,7 @@ export function getMySchedule({ events, schedule, sessionUrlTemplate }: Schedule
     const attendeeId = attendeeOf(actor);
     if (!attendeeId) return signInFirst();
     const event = await events.get(eventId);
-    if (!event) return fail("not-found", `No event ${eventId}.`);
+    if (!event) return noEvent(eventId);
     const [entries, lastSync] = await Promise.all([
       schedule.schedule(attendeeId, eventId),
       schedule.lastSync(attendeeId, eventId),

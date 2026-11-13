@@ -69,7 +69,8 @@ export interface ScheduleRepository {
   session(eventId: string, sessionId: string): Promise<CatalogSession | undefined>;
   /** The ones of these ids the catalog has, in any order. */
   sessions(eventId: string, sessionIds: readonly string[]): Promise<CatalogSession[]>;
-  searchSessions(eventId: string, filter: SessionFilter): Promise<CatalogSession[]>;
+  /** The first `limit` matching sessions in session order, and how many match in all. */
+  searchSessions(eventId: string, filter: SessionFilter): Promise<{ sessions: CatalogSession[]; total: number }>;
   /** The attendee's own reports of these sessions, those there are, in any order. */
   reports(attendeeId: string, eventId: string, sessionIds: readonly string[]): Promise<SessionReport[]>;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findGaps, type Placed } from "./gaps";
+import { findGaps, unplacedInWindow, type Placed } from "./gaps";
 
 const TZ = "America/Los_Angeles";
 
@@ -68,5 +68,20 @@ describe("findGaps", () => {
     expect(findGaps([], [], "2026-12-01", "18:00", "08:00", 30, TZ)).toEqual([]);
     expect(findGaps([], [], "2026-12-01", "8am", "18:00", 30, TZ)).toEqual([]);
     expect(findGaps([], [], "Tuesday", "08:00", "18:00", 30, TZ)).toEqual([]);
+  });
+});
+
+describe("findGaps up to 24:00, and the sessions it cannot place", () => {
+  it("reads 24:00 as the end of the day and labels it so", () => {
+    const gaps = findGaps([block("19:00", "20:00")], [], "2026-12-01", "18:00", "24:00", 30, TZ);
+    expect(gaps.map((g) => `${g.start}-${g.end}`)).toEqual(["18:00-19:00", "20:00-24:00"]);
+  });
+
+  it("names the sessions in the window with a start and no end, leaving out all-day ones", () => {
+    const noLength = { startsAt: at("11:00") };
+    const outside = { startsAt: at("19:00") };
+    const expo = { startsAt: at("00:00"), isAllDay: true };
+    const window = { from: at("08:00"), to: at("18:00") };
+    expect(unplacedInWindow([block("09:00", "10:00"), noLength, outside, expo], window)).toEqual([noLength]);
   });
 });

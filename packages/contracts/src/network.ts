@@ -151,7 +151,7 @@ export type SuggestionList = z.infer<typeof SuggestionList>;
 const localDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .meta({ description: "A day in the event's timezone (Las Vegas).", example: "2026-12-01" });
+  .meta({ description: "A day of the event, in its timezone (Las Vegas): 2026-11-30 to 2026-12-04.", example: "2026-12-01" });
 /** "HH:MM", 00:00 to 23:59; an agenda's end may also be 24:00, the end of the day. */
 const localTime = (description: string, example: string, endOfDay = false) =>
   z
@@ -209,7 +209,13 @@ export const SessionGoing = z.object({
 });
 
 export const WhoIsGoing = z
-  .object({ sessions: z.array(SessionGoing).meta({ description: "One per asked id, in the order asked." }) })
+  .object({
+    sessions: z.array(SessionGoing).meta({ description: "One per asked id, in the order asked." }),
+    unknownSessions: z.array(SessionId).min(1).optional().meta({
+      description:
+        "Present when some asked ids are not in Hallway's catalog: those ids, which nobody can be going to here. Ids are AWS's `sessionId`, not the code (`AIM3315`): find a session's id with search_sessions.",
+    }),
+  })
   .meta({ id: "WhoIsGoing", description: "Per session, which of my connections plan to be there." });
 export type WhoIsGoing = z.infer<typeof WhoIsGoing>;
 
@@ -245,11 +251,23 @@ export const MeetingGapsQuery = z.object({
   handle: Handle,
   day: localDay,
   from: localTime("Earliest start, Las Vegas time. Default 08:00.", "08:00").default("08:00"),
-  to: localTime("Latest end, Las Vegas time. Default 18:00.", "18:00").default("18:00"),
+  to: localTime("Latest end, Las Vegas time; 24:00 is the end of the day. Default 18:00.", "18:00", true).default("18:00"),
   minMinutes: z.coerce.number().int().min(5).max(600).default(30).meta({ description: "Shortest gap worth listing." }),
 });
 export const MeetingGapsInput = EventScope.extend(MeetingGapsQuery.shape);
 export type MeetingGapsInput = z.infer<typeof MeetingGapsInput>;
+
+export const UnplacedSession = z
+  .object({
+    whose: z.enum(["mine", "theirs"]).meta({ description: "On my schedule, or on the other person's." }),
+    sessionId: SessionId,
+    code: z.string().optional(),
+    title: z.string().optional(),
+    startsAt: instant,
+    start: z.string().meta({ description: "Las Vegas time, HH:MM.", example: "11:00" }),
+  })
+  .meta({ id: "UnplacedSession", description: "A session with a start and no length: when it ends is unknown." });
+export type UnplacedSession = z.infer<typeof UnplacedSession>;
 
 export const MeetingGaps = z
   .object({
@@ -264,10 +282,14 @@ export const MeetingGaps = z
         end: z.string().meta({ description: "Las Vegas time, HH:MM.", example: "15:30" }),
       }),
     ),
+    unplacedSessions: z.array(UnplacedSession).meta({
+      description:
+        "Sessions starting in the window that have no length, so they do not block any gap. A gap that begins at one of their starts is not really free: check the session before proposing it.",
+    }),
   })
   .meta({
     id: "MeetingGaps",
     description:
-      "Windows on a day when neither of us has a session on the schedule I can see. All-day sessions (expo, lounges) do not block.",
+      "Windows on a day when neither of us has a session on the schedule I can see. All-day sessions (expo, lounges) and sessions with no length do not block; the latter are listed in `unplacedSessions`.",
   });
 export type MeetingGaps = z.infer<typeof MeetingGaps>;

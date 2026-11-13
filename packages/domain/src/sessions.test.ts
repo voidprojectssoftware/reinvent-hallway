@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { consensus, foldText, mergeSnapshot, sessionUrl, toSession, type AwsSession, type SessionReport } from "./sessions";
+import {
+  consensus,
+  foldText,
+  mergeSnapshot,
+  sessionUrl,
+  toSession,
+  unreadableTime,
+  type AwsSession,
+  type SessionReport,
+} from "./sessions";
 import { toLocal } from "./time";
 import type { Session } from "./types";
 
@@ -240,5 +249,23 @@ describe("foldText", () => {
     expect(foldText("Zoë Ångström")).toBe("zoe angstrom");
     expect(foldText("ÉMILIE Šimon Özil")).toBe("emilie simon ozil");
     expect(foldText("李小龙")).toBe("李小龙");
+  });
+});
+
+describe("unreadableTime", () => {
+  const at = (sessionTime: AwsSession["sessionTime"], extra: Partial<AwsSession> = {}): AwsSession => ({
+    sessionId: "s",
+    ...(sessionTime ? { sessionTime } : {}),
+    ...extra,
+  });
+  it("names each sent part toSession cannot read, as sent", () => {
+    expect(unreadableTime(at({ date: "2026-12-02", time: "4:00 PM", length: "1h" }))).toEqual({ time: "4:00 PM", length: "1h" });
+    expect(unreadableTime(at({ date: "2026-12-1", time: "16:00" }))).toEqual({ date: "2026-12-1" });
+  });
+  it("is undefined when every sent part reads, or for an all-day session's time", () => {
+    expect(unreadableTime(at({ date: "2026-12-02", time: "16:00:00", length: " 60 " }))).toBeUndefined();
+    expect(unreadableTime(at({ date: "2026-12-02" }))).toBeUndefined();
+    expect(unreadableTime(at({ date: "2026-12-02", time: "all day" }, { isAllDaySession: true }))).toBeUndefined();
+    expect(unreadableTime(at(undefined))).toBeUndefined();
   });
 });

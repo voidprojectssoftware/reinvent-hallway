@@ -1,4 +1,4 @@
-import { localToEpoch, parseLocalTime, toLocal } from "./time";
+import { localToEpoch, parseWindowEdge, toLocal } from "./time";
 import type { Session } from "./types";
 
 /** What a busy block needs: the session's place in time. */
@@ -13,14 +13,15 @@ export interface Gap {
 }
 
 /**
- * Windows on `day` between `dayStart` and `dayEnd` (event-local "HH:MM")
- * when neither list has a session, at least `minMinutes` long. Pass each
- * side's entries as the asker may see them: mine all, theirs visible and not
- * hidden (`visibleEntries`).
+ * Windows on `day` between `dayStart` and `dayEnd` (event-local "HH:MM",
+ * "24:00" for the end of the day) when neither list has a session, at least
+ * `minMinutes` long. Pass each side's entries as the asker may see them: mine
+ * all, theirs visible and not hidden (`visibleEntries`).
  *
  * All-day sessions do not block: they are drop-in (expo, lounges), and
  * counting them would leave no gap on any day either of us favorited one.
- * A session with no start or no end cannot be placed and does not block.
+ * A session with no start or no end cannot be placed and does not block;
+ * `unplacedInWindow` names the ones that start in the window, for the asker.
  * Sessions are clipped to the window, so one that crosses midnight blocks
  * only its own part of `day`.
  */
@@ -33,8 +34,8 @@ export function findGaps(
   minMinutes: number,
   timezone: string,
 ): Gap[] {
-  const from = parseLocalTime(dayStart);
-  const to = parseLocalTime(dayEnd);
+  const from = parseWindowEdge(dayStart);
+  const to = parseWindowEdge(dayEnd);
   if (from === undefined || to === undefined || from >= to) return [];
   const windowStart = localToEpoch(day, from, timezone);
   const windowEnd = localToEpoch(day, to, timezone);
@@ -57,7 +58,8 @@ export function findGaps(
       startsAt: new Date(start).toISOString(),
       endsAt: new Date(end).toISOString(),
       start: toLocal(start, timezone).time,
-      end: toLocal(end, timezone).time,
+      // A window to "24:00" ends at the next midnight, which reads "00:00".
+      end: end === windowEnd && to === 24 * 60 ? "24:00" : toLocal(end, timezone).time,
     });
   };
 
@@ -68,4 +70,22 @@ export function findGaps(
   }
   emit(cursor, windowEnd);
   return gaps;
+}
+
+/**
+ * The sessions `findGaps` cannot place: a start inside the window (UTC
+ * instants, as `localWindow` gives them) and no end, because AWS gave no
+ * length. They do not block a gap, so the asker is told about them instead of
+ * being offered a meeting at the moment one starts (hunt F3). All-day
+ * sessions are left out: they never block, by rule.
+ */
+export function unplacedInWindow<T extends Placed>(entries: readonly T[], window: { from: string; to: string }): T[] {
+  return entries.filter(
+    (entry) =>
+      !entry.isAllDay &&
+      entry.startsAt !== undefined &&
+      entry.endsAt === undefined &&
+      entry.startsAt >= window.from &&
+      entry.startsAt < window.to,
+  );
 }
