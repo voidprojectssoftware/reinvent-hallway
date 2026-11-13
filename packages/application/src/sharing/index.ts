@@ -1,5 +1,7 @@
 export {
   calendarFeedPath,
+  myShareImagePath,
+  selectionSearch,
   shareImagePath,
   sharedEventId,
   sharingHandlers,
@@ -11,3 +13,19 @@ export {
   type SharingDependencies,
   type SharingHandlers,
 } from "./shared-schedule.ts";
+export {
+  draftLifetimeMs,
+  linkedInPostUrl,
+  postingHandlers,
+  type BeginLinkedInPost,
+  type CompleteLinkedInPost,
+  type ComposePost,
+  type GetMyShareImage,
+  type LinkedInMember,
+  type LinkedInPoster,
+  type PostDraftRecord,
+  type PostDraftRepository,
+  type PostingDependencies,
+  type PostingHandlers,
+  type SelectionPicture,
+} from "./post.ts";

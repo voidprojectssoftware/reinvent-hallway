@@ -21,6 +21,7 @@ import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { eventDate, eventDates, formatAgo, formatDate, formatMinute, zoneAbbreviation } from "../time.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 type GoingBySession = Map<string, Person[]>;
 
@@ -91,6 +92,12 @@ export function MyWeek() {
   const dates = [...new Set([...eventDates(event.startDate, event.endDate), ...byDate.keys()])].sort();
   const clashing = clashes(schedule.entries);
   const toggle = <WeekViewToggle view={view} onChange={setView} />;
+  const synced = (
+    <p className="gfoot">
+      {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
+      Reserving happens on re:Invent; Hallway shows what you reserved there. <WhyLink section="schedule" />
+    </p>
+  );
 
   if (view === "calendar") {
     return (
@@ -102,6 +109,7 @@ export function MyWeek() {
           clashing={clashing}
           going={(entry) => goingNote(entry, going)}
           cell={(entry) => cell(entry, clashing, going)}
+          foot={synced}
         />
       </Screen>
     );
@@ -140,10 +148,7 @@ export function MyWeek() {
             </div>
           </div>
         )}
-        <p className="gfoot">
-          {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
-          Reserving happens on re:Invent; Hallway shows what you reserved there.
-        </p>
+        {synced}
       </section>
 
       {untimed.length > 0 && (

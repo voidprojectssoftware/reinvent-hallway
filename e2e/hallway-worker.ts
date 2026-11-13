@@ -29,7 +29,7 @@ const wrangler = join(root, "node_modules/wrangler/bin/wrangler.js");
 const env = { ...process.env, CI: "true", WRANGLER_SEND_METRICS: "false" };
 
 /** A port the OS says is free right now. */
-const freePort = () =>
+export const freePort = () =>
   new Promise<number>((done, fail) => {
     const probe = createServer().once("error", fail).listen(0, "127.0.0.1", () => {
       const { port } = probe.address() as { port: number };
@@ -45,7 +45,7 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals) {
   }
 }
 
-async function stop(child: ChildProcess) {
+export async function stop(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise((done) => child.once("exit", done));
   signalGroup(child, "SIGTERM");
@@ -80,6 +80,11 @@ export default async function setup(project: TestProject) {
   if (!existsSync(join(dist, "index.html"))) {
     writeFileSync(join(dist, "index.html"), "<!doctype html>\n<html><head><title>Hallway</title></head><body></body></html>\n");
   }
+
+  // The share card's fonts (ADR 0012), copied by whatever starts wrangler, not
+  // by a wrangler "build" command (#85, apps/api/wrangler.jsonc).
+  const fonts = spawnSync(process.execPath, [join(api, "scripts/copy-card-fonts.mjs")], { cwd: api, env, encoding: "utf8" });
+  if (fonts.status !== 0) throw new Error(`Copying the share card fonts failed:\n${fonts.stdout}${fonts.stderr}`);
 
   const migrated = spawnSync(
     process.execPath,

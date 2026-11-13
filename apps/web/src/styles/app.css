@@ -119,6 +119,23 @@
 .sheet-vis .gfoot {
   margin-inline: 0;
 }
+/* The "Why?" sheet's two parts (issue #87): text, left aligned, in the
+   sheet's panel, each under its own sentence-case heading. */
+.why-part {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 0.5px solid var(--sep);
+  scroll-margin-top: var(--sp-2);
+}
+.why-part h2 {
+  margin: 0;
+  font: var(--t-headline);
+  color: var(--label);
+}
+.why-part p {
+  margin: var(--sp-2) 0 0;
+  font: var(--t-subhead);
+  color: var(--label);
+}
 /* On a shorter window the share sheet scrolls rather than losing its top
    off screen. */
 .sheet-in {
@@ -612,4 +629,74 @@ body.loading main {
 main:has(.cal.week),
 body:has(.cal.week) .nav-row {
   max-width: 1040px;
+}
+
+/* The composer (ADR 0026). The picture for the selection, as large as the
+   column allows, at the card's own ratio so nothing jumps when it loads. */
+.post-pic {
+  margin: 0;
+}
+.post-pic img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 627;
+  border-radius: var(--r-cell);
+  border: 0.5px solid var(--sep);
+  background: var(--fill);
+}
+/* The post's text, filling its cell as a grouped form's field does. */
+.post-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 14em;
+  padding: 11px var(--sp-4);
+  border: 0;
+  background: transparent;
+  font: var(--t-body);
+  color: var(--label);
+  resize: vertical;
+}
+.post-text:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+  border-radius: var(--r-cell);
+}
+/* A session's tick in the composer's list: an empty ring, filled when chosen. */
+.pick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--label3);
+  color: var(--cell);
+}
+.pick.on {
+  border-color: var(--tint);
+  background: var(--tint);
+}
+.pick svg {
+  width: 14px;
+  height: 14px;
+}
+.cell.action.lead svg {
+  width: 20px;
+  height: 20px;
+}
+/* What came back from LinkedIn when nothing was posted, above the form. */
+.post-banner {
+  margin-top: var(--sp-4);
+}
+.post-vis {
+  margin-top: var(--sp-5);
+}
+.post-vis > .gfoot {
+  margin-top: 0;
+}
+/* The composer's day chips sit under a footnote, not a title. */
+.post-days {
+  margin-top: var(--sp-5);
 }

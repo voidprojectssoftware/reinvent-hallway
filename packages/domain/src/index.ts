@@ -42,6 +42,15 @@ export {
   type SuggestionReason,
 } from "./contacts";
 export { findGaps, unplacedInWindow, type Gap, type Placed } from "./gaps";
+export {
+  postLine,
+  postText,
+  postTextLimit,
+  selectEntries,
+  type PostSession,
+  type PostTextInput,
+  type ShareSelection,
+} from "./post";
 export { normalizeHandle, isValidHandle, isReservedHandle, handleFromName, placeholderHandle } from "./handles";
 export {
   connectionBetween,

@@ -39,13 +39,15 @@ interface WeekCalendarProps<E extends CalendarEntry> {
   going?: (entry: E) => GoingNote | undefined;
   /** A row for a session with no time yet, listed under the grid as the list draws it. */
   cell: (entry: E) => ReactNode;
+  /** The footnote under the grid, as the list has under its day (My week's sync line). */
+  foot?: ReactNode;
 }
 
 /** The narrowest block worth drawing: a session code and a short word of title fit (at 60 px, codes and titles were cut to three letters). */
 const narrowestBlock = 84;
 const wide = "(min-width: 768px)";
 
-export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing, going, cell }: WeekCalendarProps<E>) {
+export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing, going, cell, foot }: WeekCalendarProps<E>) {
   const [search] = useSearchParams();
   const sideBySide = useMediaQuery(wide);
   const [dayWidth, measure] = useWidth();
@@ -153,7 +155,8 @@ export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing
             })}
           </div>
         </div>
-        {!sideBySide && !busy(chosen) && <p className="gfoot">Nothing on this day. Pick another day, or switch to the list.</p>}
+        {!sideBySide && !busy(chosen) && <p className="gfoot">Nothing on this day. Pick another day.</p>}
+        {foot}
       </section>
 
       {untimed.length > 0 && (

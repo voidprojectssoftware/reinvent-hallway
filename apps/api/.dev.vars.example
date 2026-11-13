@@ -21,3 +21,15 @@ LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+
+# Post to LinkedIn from the composer (ADR 0026): 1 once the LinkedIn app above
+# has the Share on LinkedIn product (scope w_member_social, #18). Its redirect
+# URI is <origin>/api/me/share/post/callback, beside the sign-in one. Empty,
+# the composer offers only the fallback: open LinkedIn, copy, save picture.
+LINKEDIN_POSTING=
+
+# Local only, and only with DEV_SIGN_IN=1: every LinkedIn address goes to the
+# fake LinkedIn `npm run fake:linkedin` prints (sign-in and posting), so the
+# app can be driven end to end without calling LinkedIn. Its client id and
+# secret go in LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET above.
+LINKEDIN_FAKE_URL=
