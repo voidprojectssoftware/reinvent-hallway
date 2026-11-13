@@ -180,7 +180,7 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
     expect(matched.map((c) => c.name).sort()).toEqual(["email match", "url match"]);
   });
 
-  it("reads my connections' entries for a list of sessions or a window, hidden ones included", async () => {
+  it("reads my connections' entries for a list of sessions, a window or the whole event, hidden ones included", async () => {
     const world = make();
     const [me, friend, stranger] = [await person(world, "me"), await person(world, "friend"), await person(world, "stranger")];
     await world.network.connect(connectionBetween(me.id, friend.id, "request", at), at);
@@ -216,6 +216,13 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
       startsBefore: "2026-12-02T08:00:00.000Z",
     });
     expect(window.map((p) => p.session.sessionId)).toEqual([afternoon]);
+    const whole = await world.network.connectionPlans(me.id, event, { wholeEvent: true });
+    expect(whole.map((p) => [p.owner.id, p.entry.sessionId]).sort()).toEqual(
+      [
+        [friend.id, morning],
+        [friend.id, afternoon],
+      ].sort(),
+    );
     expect(await world.network.connectionPlans(me.id, "other-event", { sessionIds: [morning] })).toEqual([]);
   });
 });

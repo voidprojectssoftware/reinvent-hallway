@@ -64,13 +64,28 @@ export const AwsSession = z
   .meta({ description: "A session exactly as the AWS Events API gives it." });
 export type AwsSession = z.infer<typeof AwsSession>;
 
+export const Intent = z
+  .enum(["interested", "reserved"])
+  .meta({ description: "`interested` is an AWS favorite, `reserved` an AWS reservation." });
+export type Intent = z.infer<typeof Intent>;
+
+/**
+ * A connection going to a session, with how sure they are: what the design
+ * draws as the Reserved or Interested badge. Only from an entry the viewer
+ * may see (domain.md), so a hidden entry never lends anyone an intent.
+ */
+export const GoingPerson = Person.extend({
+  intent: Intent.meta({ description: "`reserved`: they have a seat. `interested`: a favorite or added on Hallway." }),
+}).meta({ id: "GoingPerson", description: "One of my connections going to a session, and whether they have a seat." });
+export type GoingPerson = z.infer<typeof GoingPerson>;
+
 /** How many faces a session carries beside its count. */
 export const goingFacesShown = 5;
 
 export const ConnectionsGoing = z
   .object({
     count: z.int().min(0).meta({ description: "How many of my connections plan this session and let me see it." }),
-    people: z.array(Person).max(goingFacesShown).meta({ description: `Up to ${goingFacesShown} of them, by display name, for avatars.` }),
+    people: z.array(GoingPerson).max(goingFacesShown).meta({ description: `Up to ${goingFacesShown} of them, by display name, for avatars.` }),
   })
   .meta({ id: "ConnectionsGoing", description: "My connections going to a session, as their visibility lets me see." });
 export type ConnectionsGoing = z.infer<typeof ConnectionsGoing>;
@@ -108,9 +123,6 @@ export const Session = z
   });
 export type Session = z.infer<typeof Session>;
 
-export const Intent = z
-  .enum(["interested", "reserved"])
-  .meta({ description: "`interested` is an AWS favorite, `reserved` an AWS reservation." });
 export const EntrySource = z
   .enum(["agent-sync", "manual"])
   .meta({ description: "`agent-sync` came from the attendee's agent; `manual` was added on Hallway." });

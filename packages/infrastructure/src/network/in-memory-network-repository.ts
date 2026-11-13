@@ -155,10 +155,10 @@ export function networkInMemory({
         for (const { entry, session } of await schedule.schedule(owner.id, eventId)) {
           const inScope = wanted
             ? wanted.has(entry.sessionId)
-            : "startsFrom" in scope &&
-              session.startsAt !== undefined &&
-              session.startsAt >= scope.startsFrom &&
-              session.startsAt < scope.startsBefore;
+            : !("startsFrom" in scope) ||
+              (session.startsAt !== undefined &&
+                session.startsAt >= scope.startsFrom &&
+                session.startsAt < scope.startsBefore);
           if (inScope) plans.push({ owner, entry, session });
         }
       }

@@ -13,6 +13,7 @@ import {
   IssueAgentTokenInput,
   IssuedAgentToken,
   Me,
+  ReturnPath,
   RevokeAgentTokenInput,
   SetVisibilityInput,
   SignInOptions,
@@ -46,6 +47,15 @@ const beginLinkedIn = createRoute({
   operationId: "beginLinkedInSignIn",
   summary: "Start Sign In with LinkedIn: redirects to LinkedIn with a state bound to this browser",
   tags,
+  request: {
+    query: z.object({
+      returnTo: ReturnPath.optional().meta({
+        description:
+          "A path on this site to land on once signed in (default `/`). Only a relative path starting with a single `/`: another origin, `//host`, a backslash, or an encoded form of them is refused (400).",
+        example: "/@jane-doe",
+      }),
+    }),
+  },
   responses: { 302: redirect("To LinkedIn's consent page."), ...errorResponses },
 });
 
@@ -63,7 +73,7 @@ const linkedInCallback = createRoute({
       error_description: z.string().optional(),
     }),
   },
-  responses: { 302: redirect("Signed in; to the web app."), ...errorResponses },
+  responses: { 302: redirect("Signed in; to the `returnTo` the sign-in started with, or `/`."), ...errorResponses },
 });
 
 const devSignInRoute = createRoute({
@@ -186,22 +196,23 @@ export function registerIdentityRoutes<B extends DevSignInBindings>(app: ApiApp<
   app.openapi(beginLinkedIn, async (c) => {
     const begun = await c.var.handlers.identity.beginLinkedInSignIn({ redirectUri: callbackUrl(c.req.url) });
     if (!begun.ok) return refuse(c, begun.error);
-    setOAuthStateCookie(c, begun.value.state);
+    setOAuthStateCookie(c, begun.value.state, c.req.valid("query").returnTo);
     return c.redirect(begun.value.authorizationUrl, 302);
   });
 
   app.openapi(linkedInCallback, async (c) => {
     const { code, state, error } = c.req.valid("query");
+    const started = takeOAuthStateCookie(c);
     const signedIn = await c.var.handlers.identity.completeLinkedInSignIn({
       code,
       state,
       error,
-      expectedState: takeOAuthStateCookie(c),
+      expectedState: started.state,
       redirectUri: callbackUrl(c.req.url),
     });
     if (!signedIn.ok) return refuse(c, signedIn.error);
     setSessionCookie(c, signedIn.value.session.secret, signedIn.value.session.expiresAt);
-    return c.redirect("/", 302);
+    return c.redirect(started.returnTo, 302);
   });
 
   app.openapi(devSignInRoute, async (c) => {

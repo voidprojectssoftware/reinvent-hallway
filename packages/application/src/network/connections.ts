@@ -7,6 +7,7 @@ import type {
   ConnectionList,
   ConnectionRequest as ConnectionRequestResource,
   ConnectInput,
+  ListConnectionsInput,
   PersonScope,
   RequestConnectionInput,
   RequestList,
@@ -15,18 +16,21 @@ import type {
 } from "@hallway/contracts";
 import { connectionBetween, decideRequest, normalizeHandle, type RequestDecision } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
+import type { EventRepository } from "../events/event-repository.ts";
 import type { AttendeeRecord, AttendeeRepository } from "../identity/ports.ts";
 import { signedInAttendee } from "../identity/profile.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
+import type { ScheduleRepository } from "../schedule/schedule-repository.ts";
 import { isCurrentInvite } from "./invites.ts";
 import type { ConnectionRequestRecord, NetworkRepository } from "./ports.ts";
+import { connectionSessionCounts } from "./schedules.ts";
 import { byName, connectionResource, requestResource } from "./views.ts";
 
 export type RequestConnection = (actor: Actor, input: RequestConnectionInput) => Promise<Outcome<RequestResult>>;
 export type DecideRequest = (actor: Actor, input: RequestScope) => Promise<Outcome<RequestResult>>;
 export type ConnectViaShareLink = (actor: Actor, input: ConnectInput) => Promise<Outcome<ConnectionResource>>;
 export type RemoveConnection = (actor: Actor, input: PersonScope) => Promise<Outcome<ConnectionResource>>;
-export type ListConnections = (actor: Actor) => Promise<Outcome<ConnectionList>>;
+export type ListConnections = (actor: Actor, input?: ListConnectionsInput) => Promise<Outcome<ConnectionList>>;
 export type ListRequests = (actor: Actor) => Promise<Outcome<RequestList>>;
 
 export interface ConnectionPorts {
@@ -162,13 +166,29 @@ export function removeConnection({ attendees, network }: ConnectionPorts): Remov
   };
 }
 
-export function listConnections({ attendees, network }: ConnectionPorts): ListConnections {
-  return async (actor) => {
+export interface ListConnectionsPorts extends ConnectionPorts {
+  events: EventRepository;
+  schedule: ScheduleRepository;
+}
+
+/**
+ * My connections. Asked for an event, each carries how many of their sessions
+ * I may see and how many of those I share, counted through the same
+ * visibility rule as every other read of their schedules (schedules.ts).
+ */
+export function listConnections({ attendees, network, events, schedule }: ListConnectionsPorts): ListConnections {
+  return async (actor, { eventId } = {}) => {
     const me = await signedInAttendee(attendees, actor);
     if (!me.ok) return me;
-    const connections = (await network.connectionsOf(me.value.id)).map(({ connection, other }) =>
-      connectionResource(connection, other),
-    );
+    if (eventId !== undefined && !(await events.get(eventId))) return fail("not-found", `No event ${eventId}.`);
+    const [connected, counts] = await Promise.all([
+      network.connectionsOf(me.value.id),
+      eventId === undefined ? undefined : connectionSessionCounts(network, schedule, me.value.id, eventId),
+    ]);
+    const connections = connected.map(({ connection, other }) => ({
+      ...connectionResource(connection, other),
+      ...(counts ? (counts.get(other.id) ?? { sessions: 0, sharedWithMe: 0 }) : {}),
+    }));
     return ok({ connections: connections.sort((a, b) => byName(a.person, b.person)) });
   };
 }

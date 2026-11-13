@@ -83,7 +83,7 @@ export function networkHandlers(ports: NetworkPorts): NetworkHandlers {
     getInvite: getInvite(writes),
     rotateInvite: rotateInvite(writes),
     removeConnection: removeConnection(writes),
-    listConnections: listConnections(writes),
+    listConnections: listConnections({ ...writes, events: ports.events, schedule: ports.schedule }),
     listRequests: listRequests(writes),
     importContacts: importContacts(writes),
     listSuggestions: listSuggestions(writes),

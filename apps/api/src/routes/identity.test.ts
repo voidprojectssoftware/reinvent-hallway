@@ -133,8 +133,8 @@ describe("dev sign-in", () => {
 describe("Sign In with LinkedIn, against the fake provider", () => {
   const jane = { sub: "li-jane", name: "Jane Doe", email: "jane@example.com", email_verified: true };
 
-  async function startAt(browser: Browser) {
-    const start = await browser.fetch("/api/auth/linkedin");
+  async function startAt(browser: Browser, returnTo?: string) {
+    const start = await browser.fetch(`/api/auth/linkedin${returnTo === undefined ? "" : `?returnTo=${encodeURIComponent(returnTo)}`}`);
     expect(start.status).toBe(302);
     const location = new URL(start.headers.get("location") ?? "");
     const stateCookie = start.headers.getSetCookie().find((c) => c.startsWith("hallway_oauth_state="));
@@ -180,6 +180,47 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
     expect(wrong.status).toBe(403);
     const replay = await browser.fetch(`/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=${state}`);
     expect(replay.status).toBe(403);
+  });
+
+  it("comes back to the returnTo the sign-in started with, once", async () => {
+    const { linkedIn, call } = world();
+    const browser = new Browser(call);
+    const { state, redirectUri } = await startAt(browser, "/@sam?day=2026-12-01");
+    const back = await browser.fetch(`/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=${state}`);
+    expect(back.status).toBe(302);
+    expect(back.headers.get("location")).toBe("/@sam?day=2026-12-01");
+    expect(browser.cookie("hallway_oauth_state")).toBeUndefined();
+  });
+
+  it.each([
+    "https://evil.example/",
+    "javascript:alert(1)",
+    "//evil.example/",
+    "/\\evil.example/",
+    "/\t/evil.example/",
+    "/%2F%2Fevil.example/",
+    "/%5Cevil.example/",
+    "%2F%2Fevil.example",
+    "@jane-doe",
+  ])("refuses returnTo=%j before going to LinkedIn: no redirect, no state", async (returnTo) => {
+    const { call } = world();
+    const browser = new Browser(call);
+    const start = await browser.fetch(`/api/auth/linkedin?returnTo=${encodeURIComponent(returnTo)}`);
+    expect(start.status).toBe(400);
+    expect(start.headers.get("location")).toBeNull();
+    expect(browser.cookie("hallway_oauth_state")).toBeUndefined();
+    expect(await start.json()).toMatchObject({ kind: "invalid" });
+  });
+
+  it("goes to / when the state cookie's return path was tampered with", async () => {
+    const { linkedIn, call } = world();
+    const { state, redirectUri } = await startAt(new Browser(call), "/@sam");
+    const forged = `${state}|//evil.example/`;
+    const back = await call(`${origin}/api/auth/linkedin/callback?code=${linkedIn.issueCode(jane, redirectUri)}&state=${state}`, {
+      headers: { cookie: `hallway_oauth_state=${encodeURIComponent(forged)}` },
+    });
+    expect(back.status).toBe(302);
+    expect(back.headers.get("location")).toBe("/");
   });
 
   it("does not keep an email LinkedIn did not verify", async () => {

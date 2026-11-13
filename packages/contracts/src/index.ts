@@ -22,6 +22,7 @@ export {
   AwsSession,
   ConnectionsGoing,
   goingFacesShown,
+  GoingPerson,
   EntrySource,
   EventScope,
   Intent,
@@ -51,6 +52,7 @@ export {
   GetPersonScheduleInput,
   ImportContactsInput,
   Invite,
+  ListConnectionsInput,
   maxContactsCsvBytes,
   MeetingGaps,
   MeetingGapsInput,
@@ -74,3 +76,4 @@ export {
   WhoIsGoingQuery,
 } from "./network.ts";
 export { ShareLinks } from "./sharing.ts";
+export { isReturnPath, ReturnPath } from "./return-path.ts";

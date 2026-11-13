@@ -1,7 +1,7 @@
 // Who from my network is going to a session, in the words my-week-share.html
 // uses: up to three faces, then the names. One person by full name, two by
 // full names, three or more by first names with "and N more".
-import type { Person } from "@hallway/contracts";
+import type { GoingPerson, Person } from "@hallway/contracts";
 import type { ApiClient } from "../api/client.ts";
 
 /** The faces drawn before the names: three fit beside the text at 390. */
@@ -28,7 +28,7 @@ export async function whoIsGoing(
   api: Pick<ApiClient, "whoIsGoing">,
   eventId: string,
   sessionIds: readonly string[],
-): Promise<Map<string, Person[]>> {
+): Promise<Map<string, GoingPerson[]>> {
   const chunks: string[][] = [];
   for (let i = 0; i < sessionIds.length; i += idsPerRead) chunks.push(sessionIds.slice(i, i + idsPerRead));
   const answers = await Promise.all(chunks.map((chunk) => api.whoIsGoing(eventId, chunk)));

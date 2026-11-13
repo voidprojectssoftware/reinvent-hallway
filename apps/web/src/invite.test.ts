@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dropInvite, heldInvite, holdInviteFrom, returnAfterSignIn, takeReturnPath } from "./invite.ts";
+import { dropInvite, heldInvite, holdInviteFrom } from "./invite.ts";
 
 // vitest runs these under Node, which has no window: give it a sessionStorage.
 beforeEach(() => {
@@ -48,19 +48,5 @@ describe("an invite in a share link", () => {
     });
     expect(holdInviteFrom(new URL("https://hallway.example/@sam?invite=s3cret"), "sam")).toBe("/@sam");
     expect(heldInvite("sam")).toBeNull();
-  });
-});
-
-describe("coming back after sign-in", () => {
-  it("returns to the page once, then forgets it", () => {
-    returnAfterSignIn("/@sam");
-    expect(takeReturnPath()).toBe("/@sam");
-    expect(takeReturnPath()).toBeNull();
-  });
-
-  it("never goes to another origin", () => {
-    returnAfterSignIn("//evil.example/");
-    returnAfterSignIn("https://evil.example/");
-    expect(takeReturnPath()).toBeNull();
   });
 });

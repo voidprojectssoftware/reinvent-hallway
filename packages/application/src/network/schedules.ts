@@ -1,17 +1,18 @@
 // The reads of other people's schedules (domain.md): GetAttendeeSchedule,
-// WhoIsGoing, NetworkAgenda, FindMeetingGaps, and the "connections going"
-// that session search and get carry.
+// WhoIsGoing, NetworkAgenda, FindMeetingGaps, the "connections going" that
+// session search and get carry, and the session counts ListConnections
+// carries.
 //
 // Every one of them filters entries through the domain's `visibleEntries` and
 // nothing else, so the visibility rule and the hidden flag hold on each path
 // without a second copy of either.
 import type {
   GetPersonScheduleInput,
+  GoingPerson,
   MeetingGaps,
   MeetingGapsInput,
   NetworkAgenda,
   NetworkAgendaInput,
-  Person,
   PersonSchedule,
   WhoIsGoing,
   WhoIsGoingInput,
@@ -26,7 +27,7 @@ import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ConnectionsGoingLookup } from "../schedule/dependencies.ts";
 import { sessionResource } from "../schedule/resources.ts";
 import type { CatalogSession, ScheduleRepository } from "../schedule/schedule-repository.ts";
-import type { NetworkRepository, PlanScope } from "./ports.ts";
+import type { ConnectionPlan, NetworkRepository, PlanScope } from "./ports.ts";
 import { byName, toPerson } from "./views.ts";
 
 export type GetAttendeeSchedule = (actor: Actor, input: GetPersonScheduleInput) => Promise<Outcome<PersonSchedule>>;
@@ -47,38 +48,85 @@ const notVisible = (handle: string) =>
   fail<never>("forbidden", `@${handle}'s schedule is not visible to you: it is private, or for their connections only.`);
 
 /**
- * Per session, my connections going whose entry I may see: one read of all
- * their entries for the sessions in view, then `visibleEntries` per owner.
- * The read is joined through my connections, so `areConnected` is true here.
+ * My connections' plans that I may see: one read of all their entries in
+ * scope, then `visibleEntries` per owner. Every count and every "going" here
+ * comes from this, so a hidden entry, or any entry of a private schedule,
+ * never lends anyone a session, an intent or a count. The read is joined
+ * through my connections, so `areConnected` is true for every owner.
  */
-async function goingAmongConnections(
+async function visibleConnectionPlans(
   network: NetworkRepository,
   viewerId: string,
   eventId: string,
   scope: PlanScope,
-): Promise<Map<string, { session: CatalogSession; people: Person[] }>> {
+): Promise<ConnectionPlan[]> {
   const plans = await network.connectionPlans(viewerId, eventId, scope);
-  const byOwner = new Map<string, typeof plans>();
+  const byOwner = new Map<string, ConnectionPlan[]>();
   for (const plan of plans) {
     const owned = byOwner.get(plan.owner.id);
     if (owned) owned.push(plan);
     else byOwner.set(plan.owner.id, [plan]);
   }
-  const going = new Map<string, { session: CatalogSession; people: Person[] }>();
+  const visible: ConnectionPlan[] = [];
   for (const ownerPlans of byOwner.values()) {
     const owner = ownerPlans[0]!.owner;
-    const visible = new Set(
+    const seen = new Set(
       visibleEntries(viewerId, owner, ownerPlans.map((plan) => plan.entry), true).map((entry) => entry.sessionId),
     );
-    for (const { entry, session } of ownerPlans) {
-      if (!visible.has(entry.sessionId)) continue;
-      const slot = going.get(entry.sessionId) ?? { session, people: [] };
-      slot.people.push(toPerson(owner));
-      going.set(entry.sessionId, slot);
-    }
+    visible.push(...ownerPlans.filter((plan) => seen.has(plan.entry.sessionId)));
+  }
+  return visible;
+}
+
+/** Per session, my connections going whose entry I may see, each with their intent. */
+async function goingAmongConnections(
+  network: NetworkRepository,
+  viewerId: string,
+  eventId: string,
+  scope: PlanScope,
+): Promise<Map<string, { session: CatalogSession; people: GoingPerson[] }>> {
+  const going = new Map<string, { session: CatalogSession; people: GoingPerson[] }>();
+  for (const { owner, entry, session } of await visibleConnectionPlans(network, viewerId, eventId, scope)) {
+    const slot = going.get(entry.sessionId) ?? { session, people: [] };
+    slot.people.push({ ...toPerson(owner), intent: entry.intent });
+    going.set(entry.sessionId, slot);
   }
   for (const slot of going.values()) slot.people.sort(byName);
   return going;
+}
+
+/** Per connection, at one event. */
+export interface SessionCounts {
+  /** Their sessions I may see. */
+  sessions: number;
+  /** Of those, the ones on my schedule too (every entry of mine, hidden ones included: I am going). */
+  sharedWithMe: number;
+}
+
+/**
+ * ListConnections' counts: two reads for all my connections (their entries,
+ * my schedule), whatever their number. A connection I may see nothing of is
+ * absent from the map; the caller counts them as zero.
+ */
+export async function connectionSessionCounts(
+  network: NetworkRepository,
+  schedule: ScheduleRepository,
+  viewerId: string,
+  eventId: string,
+): Promise<Map<string, SessionCounts>> {
+  const [theirs, mine] = await Promise.all([
+    visibleConnectionPlans(network, viewerId, eventId, { wholeEvent: true }),
+    schedule.schedule(viewerId, eventId),
+  ]);
+  const myIds = new Set(mine.map(({ entry }) => entry.sessionId));
+  const counts = new Map<string, SessionCounts>();
+  for (const { owner, entry } of theirs) {
+    const count = counts.get(owner.id) ?? { sessions: 0, sharedWithMe: 0 };
+    count.sessions += 1;
+    if (myIds.has(entry.sessionId)) count.sharedWithMe += 1;
+    counts.set(owner.id, count);
+  }
+  return counts;
 }
 
 /** What session search and get ask: nobody for an anonymous asker, who has no connections. */

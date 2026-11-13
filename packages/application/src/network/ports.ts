@@ -29,10 +29,11 @@ export interface ConnectionPlan {
   session: CatalogSession;
 }
 
-/** Which of my connections' entries to read: for these sessions, or for sessions starting in a window. */
+/** Which of my connections' entries to read: for these sessions, for sessions starting in a window, or all at the event. */
 export type PlanScope =
   | { sessionIds: readonly string[] }
-  | { startsFrom: string; startsBefore: string };
+  | { startsFrom: string; startsBefore: string }
+  | { wholeEvent: true };
 
 export interface NetworkRepository {
   areConnected(one: string, other: string): Promise<boolean>;
