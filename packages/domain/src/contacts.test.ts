@@ -127,6 +127,7 @@ describe("suggestions", () => {
   const attendee = (id: string, extra: Partial<Attendee> = {}): Attendee => ({
     id,
     handle: id,
+    handlePlaceholder: false,
     displayName: id,
     visibility: "connections",
     linkedinSub: `sub-${id}`,

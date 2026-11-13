@@ -124,6 +124,25 @@ describe("SignIn", () => {
     expect(other.me.handle).toBe("jane-doe-2");
   });
 
+  it("gives a name with no Latin letter a random attendee- placeholder, marked as one", async () => {
+    const world = setup();
+    const olga = await world.signIn({ ...jane, subject: "li-olga", name: "Ольга Петрова" });
+    const taro = await world.signIn({ ...jane, subject: "li-taro", name: "山田 太郎" });
+    for (const { me } of [olga, taro]) {
+      expect(me.handle).toMatch(/^attendee-[a-z0-9]{4}$/);
+      expect(me.handlePlaceholder).toBe(true);
+    }
+    expect(olga.me.handle).not.toBe(taro.me.handle);
+    expect((await world.signIn(jane)).me.handlePlaceholder).toBe(false);
+  });
+
+  it("keeps a placeholder handle, and the mark, when that person signs in again", async () => {
+    const world = setup();
+    const first = await world.signIn({ ...jane, subject: "li-olga", name: "Ольга Петрова" });
+    const again = await world.signIn({ ...jane, subject: "li-olga", name: "Ольга Петрова" });
+    expect(again.me).toMatchObject({ handle: first.me.handle, handlePlaceholder: true });
+  });
+
   it("devSignIn signs the same name in as the same attendee, with that name verified", async () => {
     const world = setup();
     const first = await world.handlers.devSignIn({ name: "Dev Person" });
@@ -252,6 +271,19 @@ describe("UpdateProfile", () => {
     expect(await update("settings")).toMatchObject({ error: { kind: "conflict" } });
     expect(await update("bob-smith")).toMatchObject({ error: { kind: "conflict" } });
     expect(await update("jane-d")).toMatchObject({ ok: true });
+  });
+
+  it("clears the placeholder mark once the handle changes, not when the form is saved as it was", async () => {
+    const world = setup();
+    const { me } = await world.signIn({ ...jane, subject: "li-olga", name: "Ольга Петрова" });
+    const unchanged = await world.handlers.updateProfile(as(me.id), { handle: me.handle, headline: "Engineer" });
+    expect(unchanged).toMatchObject({ ok: true, value: { handlePlaceholder: true } });
+    const taken = await world.handlers.updateProfile(as(me.id), { handle: "settings" });
+    expect(taken.ok).toBe(false);
+    expect(world.attendees.get(me.id)?.handlePlaceholder).toBe(true);
+    const chosen = await world.handlers.updateProfile(as(me.id), { handle: "olga-petrova" });
+    expect(chosen).toMatchObject({ ok: true, value: { handle: "olga-petrova", handlePlaceholder: false } });
+    expect(world.attendees.get(me.id)?.handlePlaceholder).toBe(false);
   });
 
   it("stores a claimed LinkedIn URL in one spelling, refuses one that is not LinkedIn, clears on null", async () => {

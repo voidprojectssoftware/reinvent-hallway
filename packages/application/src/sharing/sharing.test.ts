@@ -32,6 +32,7 @@ function setup(visibility: Visibility) {
   const owner: AttendeeRecord = {
     id: "a-owner",
     handle: "sam",
+    handlePlaceholder: false,
     displayName: "Sam Okafor",
     headline: "Platform Engineer",
     visibility,

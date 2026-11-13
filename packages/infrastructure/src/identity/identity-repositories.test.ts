@@ -64,6 +64,7 @@ function anAttendee(overrides: Partial<AttendeeRecord> = {}): AttendeeRecord {
   return {
     id: `att-${counter}`,
     handle: `person-${counter}`,
+    handlePlaceholder: false,
     displayName: `Person ${counter}`,
     visibility: "connections",
     linkedinSub: `sub-${counter}`,
@@ -81,6 +82,15 @@ describe.each(implementations)("identity repositories %s", (_, open) => {
     expect(await attendees.byHandle(jane.handle)).toEqual(jane);
     expect(await attendees.byLinkedinSub(jane.linkedinSub)).toEqual(jane);
     expect(await attendees.byHandle("nobody-here")).toBeUndefined();
+  });
+
+  it("keeps whether the handle is a placeholder", async () => {
+    const { attendees } = open();
+    const olga = anAttendee({ handlePlaceholder: true });
+    await attendees.create(olga);
+    expect(await attendees.byId(olga.id)).toEqual(olga);
+    await attendees.save({ ...olga, handlePlaceholder: false });
+    expect((await attendees.byId(olga.id))?.handlePlaceholder).toBe(false);
   });
 
   it("saves changes, including clearing an optional field", async () => {
