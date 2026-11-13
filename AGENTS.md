@@ -57,11 +57,19 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   Hallway (calendar feed, share image, link preview) goes through
   `shareableEntries` with the same `tieBetween`, held by
   `apps/api/src/sharing.test.ts` and `person-page.test.ts` (ADR 0012).
-- **No session abstract is stored or served (ADR 0003).** _Held by:_ the
-  sessions table has no column for it and `toSession` never reads it;
-  `schedule-repository.test.ts` fails on an abstract-like column, and
-  `apps/api/src/schedule.test.ts` fails when any REST or MCP response carries
-  the fixture's abstract text.
+- **A session abstract reaches only a verified attendee, and only through
+  session search and get (ADR 0025).** Verified is the domain's
+  `canReadAbstract`: signed in, and a sync of theirs kept one of their own
+  sessions. _Held by:_ `CatalogSession` has no abstract and every read of a
+  session selects `catalogColumns`, so only the repository's `abstracts`
+  reads it, called by the search and get handlers after asking the rule;
+  `schedule-repository.test.ts` checks every other repository read leaves it
+  out; `apps/api/src/schedule.test.ts` runs search and get over REST and MCP
+  for a verified reader, one who never synced, one whose sync kept nothing and
+  a signed-out caller, and every other REST and MCP read for a verified one;
+  `sharing.test.ts` and the e2e suite check the share card, the link preview
+  and the calendar feed. A new read path that returns sessions adds its case
+  there.
 
 ## Enforcement layers
 

@@ -7,6 +7,9 @@
 // browser rather than run. To move to another version: change the version,
 // fetch the file and put its sha384 here
 // (`curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A`).
+//
+// The sidebar lists each operation by its route (`GET /api/auth/options`), not
+// its summary sentence, which still shows on the operation itself (#79).
 import type { ApiApp } from "../app.ts";
 
 export const scalarVersion = "1.76.2";
@@ -23,7 +26,7 @@ export const apiDocsPage = `<!doctype html>
 <body>
 <div id="app"></div>
 <script src="${scalarUrl}" integrity="${scalarIntegrity}" crossorigin="anonymous"></script>
-<script>Scalar.createApiReference("#app", { url: "/api/openapi.json" });</script>
+<script>Scalar.createApiReference("#app", { url: "/api/openapi.json", operationTitleSource: "path" });</script>
 </body>
 </html>
 `;

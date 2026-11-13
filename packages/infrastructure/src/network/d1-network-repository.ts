@@ -32,7 +32,7 @@ import {
   inviteTokens,
 } from "../persistence/d1/entities/network.ts";
 import { hiddenSessions, planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
-import { fromEntryRow, fromSessionRow, hiddenJoin, isHidden } from "../schedule/d1-schedule-repository.ts";
+import { catalogColumns, fromEntryRow, fromSessionRow, hiddenJoin, isHidden } from "../schedule/d1-schedule-repository.ts";
 
 /**
  * How much contact JSON one statement binds. D1 allows 2 MB in one string;
@@ -445,7 +445,7 @@ export function networkOnD1(db: Database): NetworkRepository {
       // stand to each of them, rather than a tie computed again for each row.
       const [rows, members] = await Promise.all([
         db
-          .select({ attendee: attendees, entry: planEntries, session: sessions, hidden: isHidden })
+          .select({ attendee: attendees, entry: planEntries, session: catalogColumns, hidden: isHidden })
           .from(attendees)
           .innerJoin(planEntries, and(eq(planEntries.attendeeId, attendees.id), eq(planEntries.eventId, eventId)))
           .innerJoin(

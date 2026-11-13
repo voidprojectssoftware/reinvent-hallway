@@ -322,9 +322,9 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
   });
 });
 
-describe("migration 0011_add_follows_and_network_visibility", () => {
+describe("migration 0012_add_follows_and_network_visibility", () => {
   it("turns `connections` into `network`, and rebuilds attendees without losing a row that points at them", async () => {
-    const old = await startLocalD1({ before: "0011" });
+    const old = await startLocalD1({ before: "0012" });
     try {
       const insert = old.d1.prepare(
         "insert into attendees (id, handle, display_name, visibility, created_at) values (?, ?, ?, ?, '2026-11-01T00:00:00.000Z')",
@@ -336,7 +336,7 @@ describe("migration 0011_add_follows_and_network_visibility", () => {
         old.d1.prepare("insert into identities (provider, subject, attendee_id, linked_at) values ('dev', 'ana', 'a1', 'x')"),
         old.d1.prepare("insert into connections (a, b, since, via) values ('a1', 'b2', 'x', 'request')"),
       ]);
-      await applyMigration(old.d1, "0011_add_follows_and_network_visibility.sql");
+      await applyMigration(old.d1, "0012_add_follows_and_network_visibility.sql");
 
       const visibility = await old.d1.prepare("select id, visibility from attendees order by id").all();
       expect(visibility.results).toEqual([
