@@ -88,14 +88,14 @@ function signInWith({ attendees, sessions, recordGitHubFollowing, now }: SignInP
       const stored = await attendees.byId(known.attendeeId);
       if (!stored) return fail("not-found", `No attendee ${known.attendeeId}.`);
       const [first] = await attendees.identitiesOf(stored.id);
-      attendee = await refreshed(stored, identity, first?.provider === kind);
+      attendee = refreshed(stored, identity, first?.provider === kind);
       await attendees.saveIdentity(await identityRecord(stored.id, kind, identity, known.linkedAt));
       await attendees.save(attendee);
     } else {
       const refused = await emailBelongsToSomeoneElse(attendees, kind, identity);
       if (refused) return refused;
       const at = now();
-      attendee = await created(identity, await freeHandle(attendees, identity.name), at);
+      attendee = created(identity, await freeHandle(attendees, identity.name), at);
       await attendees.create(attendee, await identityRecord(attendee.id, kind, identity, at.toISOString()));
     }
     if (identity.following) await recordGitHubFollowing({ attendeeId: attendee.id, following: identity.following });
@@ -263,14 +263,15 @@ async function identityRecord(
   identity: VerifiedIdentity,
   linkedAt: string,
 ): Promise<IdentityRecord> {
-  const verified = identity.emailVerified && identity.email !== undefined;
+  const { email } = identity;
+  const verified = identity.emailVerified && email !== undefined;
   return {
     attendeeId,
     provider,
     subject: identity.subject,
-    ...(identity.email !== undefined && { email: identity.email }),
+    ...(email !== undefined && { email }),
     emailVerified: verified,
-    ...(verified && { verifiedEmailSha256: await hashEmail(identity.email!) }),
+    ...(verified && { verifiedEmailSha256: await hashEmail(email) }),
     ...(identity.username !== undefined && { username: identity.username }),
     linkedAt,
   };
@@ -282,7 +283,7 @@ function verifiedFacts(identity: VerifiedIdentity) {
   return { verifiedName: identity.name, ...(email ? { email } : {}) };
 }
 
-async function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle, at: Date): Promise<AttendeeRecord> {
+function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle, at: Date): AttendeeRecord {
   return {
     id: crypto.randomUUID(),
     handle,
@@ -300,7 +301,7 @@ async function created(identity: VerifiedIdentity, { handle, placeholder }: NewH
  * 0018: the verified name comes from the first identity); another identity
  * only fills a missing picture. What they typed is kept either way.
  */
-async function refreshed(known: AttendeeRecord, identity: VerifiedIdentity, isFirst: boolean): Promise<AttendeeRecord> {
+function refreshed(known: AttendeeRecord, identity: VerifiedIdentity, isFirst: boolean): AttendeeRecord {
   if (!isFirst) {
     return !known.avatarUrl && identity.picture ? { ...known, avatarUrl: identity.picture } : known;
   }

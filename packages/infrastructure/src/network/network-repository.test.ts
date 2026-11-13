@@ -57,7 +57,13 @@ const implementations: [string, () => World][] = [
   ],
 ];
 
-async function person(world: World, name: string, extra: Partial<AttendeeRecord> = {}): Promise<AttendeeRecord> {
+/** An attendee signed in by dev sign-in; `googleEmailSha256` links a Google identity with that verified email too. */
+async function person(
+  world: World,
+  name: string,
+  extra: Partial<AttendeeRecord> = {},
+  googleEmailSha256?: string,
+): Promise<AttendeeRecord> {
   const id = fresh(name);
   const attendee: AttendeeRecord = {
     id,
@@ -65,11 +71,20 @@ async function person(world: World, name: string, extra: Partial<AttendeeRecord>
     handlePlaceholder: false,
     displayName: name,
     visibility: "connections",
-    linkedinSub: `sub-${id}`,
     createdAt: at,
     ...extra,
   };
-  await world.attendees.create(attendee);
+  await world.attendees.create(attendee, { attendeeId: id, provider: "dev", subject: id, emailVerified: false, linkedAt: at });
+  if (googleEmailSha256) {
+    await world.attendees.link({
+      attendeeId: id,
+      provider: "google",
+      subject: `google-${id}`,
+      emailVerified: true,
+      verifiedEmailSha256: googleEmailSha256,
+      linkedAt: at,
+    });
+  }
   return attendee;
 }
 
@@ -151,7 +166,8 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
 
   it("replaces an import whole, and narrows candidates to attendees a contact points at", async () => {
     const world = make();
-    const byEmail = await person(world, "Email Match", { verifiedEmailSha256: await hashEmail("e@example.test") });
+    // The email is on the attendee's second identity: any verified identity email matches (ADR 0018).
+    const byEmail = await person(world, "Email Match", {}, await hashEmail("e@example.test"));
     const byUrl = await person(world, "Url Match", { linkedinProfileUrl: "https://www.linkedin.com/in/url-match" });
     await person(world, "Nobody", { linkedinProfileUrl: "https://www.linkedin.com/in/nobody" });
     const me = await person(world, "me");
@@ -169,7 +185,11 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
     expect(await world.network.contactImport(me.id)).toEqual({ id: importId, attendeeId: me.id, importedAt: at, count: 3 });
 
     const { contacts: matched, candidates } = await world.network.contactMatches(me.id);
-    expect(candidates.map((a) => a.id).sort()).toEqual([byEmail.id, byUrl.id].sort());
+    expect(candidates.map(({ attendee }) => attendee.id).sort()).toEqual([byEmail.id, byUrl.id].sort());
+    expect(candidates.find(({ attendee }) => attendee.id === byEmail.id)?.verifiedEmailSha256s).toEqual([
+      await hashEmail("e@example.test"),
+    ]);
+    expect(candidates.find(({ attendee }) => attendee.id === byUrl.id)?.verifiedEmailSha256s).toEqual([]);
     expect(matched.map((c) => c.name).sort()).toEqual(["email match", "url match"]);
   });
 

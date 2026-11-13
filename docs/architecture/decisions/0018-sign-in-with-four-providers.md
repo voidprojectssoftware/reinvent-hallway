@@ -45,3 +45,46 @@ microsoft, linkedin, or github."
 An OAuth client for each of Google, Microsoft and GitHub (and LinkedIn, #18),
 asked for in #62. Until then each is proven against its fake, and dev sign-in
 stays the local way in.
+
+## Note, 2026-11-13: as built (#60)
+
+Built as written. Where the ADR left a choice open, #60 took these; none
+changes a decision above.
+
+- **One port, four adapters, one shared half.** `oauth-client.ts` is the
+  authorization code flow every provider shares; Google and LinkedIn read
+  userinfo (`oidc-userinfo.ts`), GitHub reads `/user` and `/user/emails`.
+  Each has its fake (`fake-<provider>.ts`, over `fake-oauth-server.ts`).
+- **Microsoft reads the ID token, not userinfo** (ADR 0008 chose userinfo).
+  Microsoft's userinfo leaves out `tid` and `xms_edov`, the two claims this
+  ADR's email rule needs. The ID token comes server to server in the token
+  response, so TLS vouches for it as it does for userinfo; its `aud` and
+  `iss` are still checked. The app registration must add `xms_edov` as an
+  optional claim (owner input, #62).
+- **Identities belong to the Attendee aggregate**: the attendee repository
+  stores them (`identities` table, keyed on `(provider, subject)`, unique on
+  `(attendee, provider)`), and an attendee is created with its first identity
+  in one batch. Migration `0010_add_identities` moved `attendees.linkedin_sub`
+  into identity rows and dropped it, with `verified_email_sha256`, which is
+  now per identity.
+- **Dev sign-in is an identity too**, provider `dev`, subject the normalized
+  name, so `ListIdentities` and the last-one rule cover dev accounts. It is
+  never offered as a provider and cannot be unlinked by route.
+- **A link is bound to the person who started it**: the state cookie
+  (`<state>|<attendee>|<returnTo>`, scoped to that provider's callback path)
+  carries the attendee, and the callback refuses unless the same person is
+  still signed in. The email rule applies to sign-in only: linking is the
+  person's explicit act.
+- **A refused callback redirects**, since it is a browser navigation: to
+  `/sign-in?error=<kind>&provider=<p>` (keeping `returnTo`) after a sign-in,
+  or to the link's `returnTo` with the same parameters. The email refusal is
+  error kind `account-exists` (409 elsewhere), for #61's page.
+- **`GET /api/auth/options`** gains `providers` (in the order Google,
+  Microsoft, LinkedIn, GitHub) and keeps `linkedIn` until #61 reads
+  `providers`.
+- **The first identity's facts are the attendee's**: signing in with it
+  refreshes `verifiedName`, `email` and the picture; another identity only
+  fills a missing picture.
+- **GitHub following** is read at sign-in and link time and handed to
+  `recordGitHubFollowing`, a no-op until #63. It stops after 40 pages (4,000
+  people), to stay inside a Worker's 50 subrequests on the free plan.

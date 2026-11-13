@@ -64,7 +64,10 @@ export function listSuggestions({ attendees, network }: ContactPorts): ListSugge
       network.linkedTo(me.value.id),
     ]);
     const exclude = new Set([me.value.id, ...linked]);
-    const found = suggestions(contacts, candidates, exclude).map(({ attendee, reason }) => ({ person: toPerson(attendee as AttendeeRecord), reason }));
+    const found = suggestions(contacts, candidates, exclude).map(({ attendee, reason }) => ({
+      person: toPerson(attendee as AttendeeRecord),
+      reason,
+    }));
     return ok({
       suggestions: found.sort((a, b) => byName(a.person, b.person)),
       contactImport: contactImportResource(contactImport),

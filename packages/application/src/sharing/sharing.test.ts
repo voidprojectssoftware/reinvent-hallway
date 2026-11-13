@@ -36,7 +36,6 @@ function setup(visibility: Visibility) {
     displayName: "Sam Okafor",
     headline: "Platform Engineer",
     visibility,
-    linkedinSub: "sub-sam",
     email: "sam@example.test",
     createdAt: "2026-11-13T00:00:00.000Z",
   };
@@ -58,9 +57,14 @@ function setup(visibility: Visibility) {
     attendees: {
       byId: async (id) => (id === owner.id ? owner : undefined),
       byHandle: async (handle) => (handle === owner.handle ? owner : undefined),
-      byLinkedinSub: async () => undefined,
+      identity: async () => undefined,
+      identitiesOf: async () => [],
+      identityWithVerifiedEmail: async () => undefined,
       create: async () => undefined,
       save: async () => undefined,
+      link: async () => undefined,
+      saveIdentity: async () => undefined,
+      unlink: async () => undefined,
     },
     calendarFeeds: {
       replace: async (id, token) => void feeds.set(id, token),
