@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeSnapshot, sessionUrl, toSession, type AwsSession } from "./sessions";
+import { consensus, foldText, mergeSnapshot, sessionUrl, toSession, type AwsSession, type SessionReport } from "./sessions";
 import { toLocal } from "./time";
 import type { Session } from "./types";
 
@@ -168,5 +168,77 @@ describe("sessionUrl", () => {
 
   it("refuses a template that would send every session to one page", () => {
     expect(() => sessionUrl("AIM3315", "https://example.test/catalog")).toThrow(/\{code\}/);
+  });
+});
+
+describe("consensus", () => {
+  const report = (attendeeId: string, reportedAt: string, fields: Partial<Session>): SessionReport => ({
+    sessionId: "s",
+    eventId: "e",
+    attendeeId,
+    reportedAt,
+    ...fields,
+  });
+  const honest = { title: "Building agents", startsAt: "2026-12-01T18:00:00.000Z", endsAt: "2026-12-01T19:00:00.000Z" };
+
+  it("a lone report is the session", () => {
+    expect(consensus([report("a", "t1", { ...honest, room: "101" })])).toEqual({
+      sessionId: "s",
+      eventId: "e",
+      ...honest,
+      room: "101",
+    });
+  });
+
+  it("per field, the most reports win, so one newer report cannot override two (hunt F6)", () => {
+    const poisoned = {
+      title: "CANCELLED, see you at the bar",
+      startsAt: "2026-12-04T14:00:00.000Z",
+      endsAt: "2026-12-04T14:05:00.000Z",
+    };
+    const session = consensus([
+      report("a", "t1", honest),
+      report("b", "t2", honest),
+      report("c", "t3", { ...poisoned, venue: "Wynn" }),
+    ]);
+    expect(session).toEqual({ sessionId: "s", eventId: "e", ...honest, venue: "Wynn" });
+  });
+
+  it("a tie goes to the value whose latest report is newest", () => {
+    expect(consensus([report("a", "t2", { title: "Old" }), report("b", "t3", { title: "New" })]).title).toBe("New");
+    expect(consensus([report("a", "t3", { title: "Old" }), report("b", "t2", { title: "New" })]).title).toBe("Old");
+  });
+
+  it("a report without a field does not vote on it", () => {
+    expect(consensus([report("a", "t1", { title: "Kept" }), report("b", "t2", {}), report("c", "t3", {})]).title).toBe(
+      "Kept",
+    );
+  });
+
+  it("a start and its end are one vote: a newer start never pairs with another report's end", () => {
+    const session = consensus([
+      report("a", "t1", { startsAt: "2026-12-01T18:00:00.000Z", endsAt: "2026-12-01T19:00:00.000Z" }),
+      report("b", "t2", { startsAt: "2026-12-01T18:00:00.000Z" }),
+    ]);
+    expect(session.startsAt).toBe("2026-12-01T18:00:00.000Z");
+    expect(session.endsAt).toBeUndefined();
+  });
+
+  it("compares lists whole", () => {
+    expect(
+      consensus([
+        report("a", "t1", { speakers: ["Ada", "Ben"] }),
+        report("b", "t2", { speakers: ["Ada", "Ben"] }),
+        report("c", "t3", { speakers: ["Ada"] }),
+      ]).speakers,
+    ).toEqual(["Ada", "Ben"]);
+  });
+});
+
+describe("foldText", () => {
+  it("folds case and accents with Unicode's rules, and leaves other scripts alone (hunt F1)", () => {
+    expect(foldText("Zoë Ångström")).toBe("zoe angstrom");
+    expect(foldText("ÉMILIE Šimon Özil")).toBe("emilie simon ozil");
+    expect(foldText("李小龙")).toBe("李小龙");
   });
 });

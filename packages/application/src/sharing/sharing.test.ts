@@ -41,8 +41,8 @@ function setup(visibility: Visibility) {
     createdAt: "2026-11-13T00:00:00.000Z",
   };
   const entries: PlanEntry[] = [
-    { attendeeId: owner.id, sessionId: "eks1", intent: "reserved", source: "agent-sync", hidden: false, addedAt: "x" },
-    { attendeeId: owner.id, sessionId: "secret", intent: "interested", source: "manual", hidden: true, addedAt: "x" },
+    { attendeeId: owner.id, sessionId: "eks1", intent: "reserved", source: "agent-sync", invited: false, hidden: false, addedAt: "x" },
+    { attendeeId: owner.id, sessionId: "secret", intent: "interested", source: "manual", invited: false, hidden: true, addedAt: "x" },
   ];
   const sessions = new Map([
     ["eks1", session("eks1", "2026-11-30T18:00:00.000Z")],

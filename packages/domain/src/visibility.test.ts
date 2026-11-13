@@ -28,6 +28,7 @@ describe("visibleEntries", () => {
     sessionId,
     intent: "interested",
     source: "agent-sync",
+    invited: false,
     hidden,
     addedAt: "2026-11-13T00:00:00.000Z",
   });
@@ -55,6 +56,7 @@ describe("shareableEntries", () => {
     sessionId,
     intent: "reserved",
     source: "manual",
+    invited: false,
     hidden,
     addedAt: "2026-11-13T00:00:00.000Z",
   });

@@ -15,6 +15,7 @@ export function planEntryResource(entry: PlanEntry, session: CatalogSession, url
     sessionId: entry.sessionId,
     intent: entry.intent,
     source: entry.source,
+    invited: entry.invited,
     hidden: entry.hidden,
     addedAt: entry.addedAt,
     session: sessionResource(session, urlTemplate),

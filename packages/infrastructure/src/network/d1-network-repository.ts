@@ -30,8 +30,8 @@ import {
   importedContacts,
   inviteTokens,
 } from "../persistence/d1/entities/network.ts";
-import { planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
-import { fromEntryRow, fromSessionRow } from "../schedule/d1-schedule-repository.ts";
+import { hiddenSessions, planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
+import { fromEntryRow, fromSessionRow, hiddenJoin, isHidden } from "../schedule/d1-schedule-repository.ts";
 
 /**
  * How much contact JSON one statement binds. D1 allows 2 MB in one string;
@@ -310,7 +310,7 @@ export function networkOnD1(db: Database): NetworkRepository {
             ? and(gte(sessions.startsAt, scope.startsFrom), lt(sessions.startsAt, scope.startsBefore))
             : undefined;
       const rows = await db
-        .select()
+        .select({ attendee: attendees, entry: planEntries, session: sessions, hidden: isHidden })
         .from(connections)
         .innerJoin(attendees, eq(attendees.id, otherEnd(viewerId)))
         .innerJoin(planEntries, and(eq(planEntries.attendeeId, attendees.id), eq(planEntries.eventId, eventId)))
@@ -318,11 +318,12 @@ export function networkOnD1(db: Database): NetworkRepository {
           sessions,
           and(eq(sessions.eventId, planEntries.eventId), eq(sessions.sessionId, planEntries.sessionId)),
         )
+        .leftJoin(hiddenSessions, hiddenJoin)
         .where(and(involves(viewerId), inScope));
       return rows.map((row) => ({
-        owner: toAttendee(row.attendees),
-        entry: fromEntryRow(row.plan_entries),
-        session: fromSessionRow(row.sessions),
+        owner: toAttendee(row.attendee),
+        entry: fromEntryRow(row.entry, row.hidden),
+        session: fromSessionRow(row.session),
       }));
     },
   };

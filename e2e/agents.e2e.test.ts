@@ -113,6 +113,7 @@ class Agent {
       sessions,
       favorites: schedule.favorites,
       reserved: schedule.reserved,
+      invitedSessions: schedule.invitedSessions ?? [],
     });
   }
 
@@ -271,6 +272,41 @@ describe("two agents sync from AWS and plan around each other", () => {
     expect(await adaAgent.syncFromAws()).toMatchObject({ added: 0, removed: 0, unchanged: 15 });
     const mine = await adaAgent.tool("get_my_schedule", { eventId });
     expect(mine.entries.map((e: Structured) => e.sessionId)).toContain("s-gam301");
+  });
+
+  it("a third agent cannot rewrite a session on Ada's schedule that is not on its own (hunt F6)", async () => {
+    const cy = await signIn("Cy Ramos");
+    const cyAgent = await Agent.start("cy", await issueAgentToken(cy), benAws);
+    try {
+      const before = (await adaAgent.tool("get_my_schedule", { eventId })).entries.find(
+        (entry: Structured) => entry.sessionId === "s-sec205",
+      ).session;
+      // A copying mistake, or malice: SEC205's id with another title and time,
+      // sent beside Cy's own favorite.
+      const poisoned = {
+        sessionId: "s-sec205",
+        title: "CANCELLED, see you at the bar",
+        abbreviation: "SEC205",
+        sessionTime: { date: "2026-12-04", time: "06:00", length: "5" },
+      };
+      const result = await cyAgent.tool("sync_my_schedule", {
+        eventId,
+        sessions: [poisoned],
+        favorites: ["s-aim3315"],
+        reserved: [],
+      });
+      expect(result).toMatchObject({ added: 1, sessionsStored: 0 });
+
+      const after = (await adaAgent.tool("get_my_schedule", { eventId })).entries.find(
+        (entry: Structured) => entry.sessionId === "s-sec205",
+      ).session;
+      expect(after).toEqual(before);
+      expect(after.title).toBe("Identity for agents: tokens, scopes and blast radius");
+      const found = await benAgent.tool("search_sessions", { eventId, q: "SEC205" });
+      expect(found.sessions.map((s: Structured) => s.title)).toEqual([before.title]);
+    } finally {
+      await cyAgent.close();
+    }
   });
 
   it("an agent token cannot mint another token", async () => {
