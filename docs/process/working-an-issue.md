@@ -3,15 +3,12 @@
 How a change gets from an issue to the default branch. Read `review.md` first:
 it defines what "done" means. This file is only the mechanics.
 
-> Template. Replace the bracketed parts with this repo's real commands and check
-> names, then delete this note.
-
 ## Before you start
 
 Read, in this order:
 
 1. `AGENTS.md` for the invariants and how to run the environment
-2. `[the domain doc, if there is one]`
+2. `docs/architecture/domain.md`, then the ADRs in `docs/architecture/decisions/`
 3. `docs/process/review.md` for the three review lenses
 4. The issue itself, including its parent epic
 
@@ -25,7 +22,7 @@ checking the premise is part of the job.
 <area>/<issue-number>-<short-slug>
 ```
 
-for example `platform/14-ci-pipeline` or `intake/20-eligibility-gating`.
+for example `platform/3-scaffold` or `network/12-connection-requests`.
 
 Commit messages say **why**, not what. The diff already says what.
 
@@ -34,8 +31,9 @@ Commit messages say **why**, not what. The diff already says what.
 Do not open a PR you have not run.
 
 ```bash
-[the command that brings up the environment, isolated per worktree]
-[the command that tells you this run's URLs]
+npm ci
+npm run verify          # everything CI runs
+npm run dev             # Worker + web on this worktree's own port (AGENTS.md, "Running things")
 ```
 
 Then exercise the change the way the real user would, and confirm the mechanical
@@ -55,8 +53,7 @@ write "not applicable, docs only" rather than leaving it blank.
 
 **Write every body in a file, and post it from the file**, a PR, an issue or a
 comment alike: `--body-file <file>`, never `--body "..."`, and then read back
-what was stored and compare it with the file. `[the script here that posts a
-body and reads it back, if there is one]`.
+what was stored and compare it with the file. There is no script for it here yet: post, then `gh pr view <n> --json body` and diff.
 
 **The file goes in `.bodies/` at the root of your own worktree, named for the
 artifact it carries**: `.bodies/pr-body-172.md`, `.bodies/comment-172.md`.
@@ -83,11 +80,10 @@ trivial, and even when you are confident.
 
 ## Merge discipline
 
-CI runs [N] checks: `[names]`.
+CI runs two required checks: `checks` (`npm run verify`) and `visual` (a Mermaid diagram in the PR description for each changed area, `scripts/check-pr-visual.mjs`).
 
-**GitHub itself does not enforce them.** Branch protection needs a paid plan on a
-private repo. Three things stand in for it, and each is worth exactly what it
-covers:
+A ruleset on `main` enforces them (ADR 0001); organisation admins can bypass it,
+so three more layers stand beside it, each worth exactly what it covers:
 
 1. **`node scripts/merge-pr.mjs <n>`**, the only sanctioned way to land a PR. It
    refuses unless all required checks are green, and always squash merges.

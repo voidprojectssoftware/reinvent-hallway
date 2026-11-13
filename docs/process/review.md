@@ -24,8 +24,8 @@ adding it is cheaper than reviewing for it forever.
 **The reviewer drives the running app.** Not the tests, the app.
 
 ```bash
-[bring up the environment]
-[run the end-to-end suite]
+npm run dev             # then drive it in a browser (playwright-cli) and over MCP
+npm run test:e2e        # once it exists
 ```
 
 Run the end-to-end suite first: what it covers, you do not have to re-check.
@@ -83,7 +83,7 @@ open pull request, **and** everything in a worktree (`git worktree list`), where
 a running agent's unpushed ADR is invisible to the other two. Work runs in
 parallel here, so the next free number on your branch is usually already claimed
 on someone else's.
-`[the collision check]` fails a duplicate, and CI runs it on the merge
+`node scripts/check-adr-numbers.mjs` fails a duplicate, and CI runs it on the merge
 commit, so a collision that does not exist on your branch yet still turns the PR
 red.
 

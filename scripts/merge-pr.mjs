@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url'
 // names from it and this list is not consulted. It is the fallback: for a
 // repository with no ruleset, which on a private repository without a paid
 // plan is the usual case, and for a lookup that fails. Set it regardless.
-const REQUIRED = ['REPLACE_WITH_REQUIRED_CHECK_NAME', 'REPLACE_WITH_ANOTHER_CHECK_NAME']
+const REQUIRED = ['checks', 'visual']
 
 // SETUP: refuse a branch that is behind its base. On by default, and it has to
 // be: without branch protection GitHub reports such a branch as mergeable and
