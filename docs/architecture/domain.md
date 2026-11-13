@@ -145,6 +145,19 @@ We store UTC instants and the event timezone, and render in the event timezone
   syncs end as one of them, never as their union, and a sync racing
   `AddToPlan` on the same session ends with one entry and no error. Only the
   returned counts come from the earlier read (ADR 0016, hunt F4).
+- **A time that does not read is said, not guessed.** A snapshot's
+  `sessionTime` is read as AWS documents it: `date` `YYYY-MM-DD`, `time`
+  24-hour `HH:MM` (seconds allowed), `length` whole minutes, in the event's
+  timezone. A part sent in another form is not guessed at: the session is kept
+  without it (as for a part not sent), and the sync lists it in
+  `unreadableTimes` with the value as sent (hunt F2). The input reads `null`
+  as absent and a number as `length`'s minutes, since models re-serialize
+  AWS's JSON (hunt F11); any other wrong type is refused with its path.
+- **Planning reads answer only the event's days.** `NetworkAgenda` and
+  `FindMeetingGaps` refuse (`invalid`) a day outside the event's local dates
+  (`startDate` to `endDate`, 30 Nov to 4 Dec 2026), naming them: a model
+  reaching for last year's date would otherwise be told everyone is free
+  (hunt F9).
 - **A listed id needs a session.** An id in `favorites` or `reserved` sent
   without a snapshot is kept when the catalog already has that session, and
   otherwise skipped and returned in `missingSessions`; it never fails the sync.
@@ -194,9 +207,13 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SignIn` | anyone | LinkedIn OIDC (or dev sign-in locally); creates the attendee on first sign-in, picking a free handle |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
-| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), and `missingSessions`; when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
+| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), `missingSessions`, and `unreadableTimes` (rule below); when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
 | `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
 | `SetEntryHidden` | me | hide or show the session of one entry: puts it in, or takes it out of, my hidden sessions for the event |
+
+These three take a session's id or, when exactly one catalog session carries
+it, its code (`AIM3315`): people read codes off the catalog, and agents pass
+what they are told (hunt F10).
 | `IssueAgentToken` / `RevokeAgentToken` | me, signed in as a person (not an agent token) | |
 | `RotateCalendarFeed` | me, signed in as a person (not an agent token) | |
 | `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows (exact duplicates folded), replace my previous import, all or nothing (ADR 0011) |
@@ -217,11 +234,11 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
-| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
+| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it) and `limit`, with `total` (how many match) and `truncated` (more match than were returned); open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
 | `GetSession(eventId, sessionId)` | the session, and to a signed-in caller `connectionsGoing` as in search |
-| `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read. Session search and get carry the same people, intent included |
-| `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who and their intent |
-| `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. All-day sessions (the expo and the like) do not block a gap |
+| `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read, and `unknownSessions`, the asked ids the catalog does not have (absent when there are none). Session search and get carry the same people, intent included |
+| `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day of the event (`from`/`to` as `HH:MM`, `to` up to `24:00`, default the whole day) that my connections plan to attend, with who and their intent |
+| `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. `to` may be `24:00`. All-day sessions (the expo and the like) do not block a gap, nor do sessions with a start and no length, which are returned as `unplacedSessions` (mine, and theirs I may see) so the asker can decide |
 | `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule (`GET /cal/{token}.ics`); a rotated token finds no one |
 | `ShareImage(handle, day?)` | a PNG of the schedule as the asker may see it, hidden entries left out, for posting (`GET /og/{handle}.png`, 1200 by 627) |
 | `LinkPreview(handle)` | `/@handle`'s Open Graph and Twitter tags, always as an anonymous visitor sees it; `og:image` is the share image with a version that changes when what it shows changes |
@@ -265,6 +282,18 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `find_meeting_gaps` | `FindMeetingGaps` |
 | `search_sessions` | `SearchSessions` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
+| `set_entry_hidden` | `SetEntryHidden` |
+
+Every tool error is the Error resource, and names a next step the agent can
+take with its own tools (#54): a refused removal points at `set_entry_hidden`,
+an unknown session at `search_sessions`, a schedule it may not see says
+whether it is private or for connections only, and a connection with no token
+says to ask the user for one from Connect your agent (`/connect`). A refused
+token is a 401 with `WWW-Authenticate: Bearer` before any tool runs, and
+`/.well-known/*` answers a JSON 404, so an MCP client does not take the web
+app for OAuth metadata. A failure no handler meant (a D1 error, a bug) is
+logged with its detail and reaches the caller as `unavailable` (REST 503):
+the same call may work again, and no driver text leaves the Worker (#68).
 
 ## Identities and follows (decided 2026-11-13, being built: #60, #61, #63)
 

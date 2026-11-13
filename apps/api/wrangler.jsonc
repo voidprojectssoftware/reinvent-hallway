@@ -35,7 +35,9 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // /@* is the web app's, but served by the Worker: src/person-page.ts.
-    "run_worker_first": ["/api/*", "/mcp", "/mcp/*", "/cal/*", "/og/*", "/@*"],
+    // /.well-known/* is the Worker's so it answers a JSON 404, not the SPA:
+    // an MCP client looking for OAuth metadata there must not parse HTML (hunt F13).
+    "run_worker_first": ["/api/*", "/mcp", "/mcp/*", "/cal/*", "/og/*", "/@*", "/.well-known/*"],
   },
 
   // The share card's font files arrive as ArrayBuffers (src/sharing/

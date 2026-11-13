@@ -27,7 +27,7 @@ describe("GetEvent", () => {
     const outcome = await getEvent(events)(anonymous, { eventId: "summit-nowhere" });
     expect(outcome).toEqual({
       ok: false,
-      error: { kind: "not-found", message: "No event summit-nowhere." },
+      error: { kind: "not-found", message: "No event summit-nowhere. Hallway knows re:Invent 2026, `reinvent2026`." },
     });
   });
 });

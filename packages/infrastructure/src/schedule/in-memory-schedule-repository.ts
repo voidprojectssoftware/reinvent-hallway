@@ -50,13 +50,12 @@ export function scheduleInMemory(): ScheduleRepository {
 
     async searchSessions(eventId, { q, startsFrom, startsBefore, limit }) {
       const needle = q === undefined ? undefined : foldText(q);
-      return sessionsOf(eventId)
+      const matching = sessionsOf(eventId)
         .filter((s) => needle === undefined || searchText(s).some((field) => field.includes(needle)))
         .filter((s) => startsFrom === undefined || (s.startsAt !== undefined && s.startsAt >= startsFrom))
         .filter((s) => startsBefore === undefined || (s.startsAt !== undefined && s.startsAt < startsBefore))
-        .sort(bySessionOrder)
-        .slice(0, limit)
-        .map((s) => structuredClone(s));
+        .sort(bySessionOrder);
+      return { sessions: matching.slice(0, limit).map((s) => structuredClone(s)), total: matching.length };
     },
 
     async reports(attendeeId, eventId, sessionIds) {

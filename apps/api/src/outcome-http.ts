@@ -10,7 +10,18 @@ export const httpStatus = {
   forbidden: 403,
   "not-found": 404,
   conflict: 409,
+  unavailable: 503,
 } as const satisfies Record<ErrorKind, ContentfulStatusCode>;
+
+/**
+ * What the caller is told, over REST and MCP alike, when something failed
+ * that it did not cause (#68). The detail goes to the log, never to the caller.
+ */
+export const unavailable: ApiError = {
+  kind: "unavailable",
+  message:
+    "Hallway could not finish this; nothing was wrong with the request. Try the same call again. If it fails again, Hallway is having trouble: try later.",
+};
 
 const refusal = (description: string) => ({
   description,
@@ -28,6 +39,7 @@ export const errorResponses = {
   [httpStatus.forbidden]: refusal("The actor may not do this."),
   [httpStatus["not-found"]]: refusal("No such resource, or not one the actor may see."),
   [httpStatus.conflict]: refusal("The resource changed in a way that refuses this."),
+  [httpStatus.unavailable]: refusal("Something failed that the request did not cause; the same request may work again."),
 } as const;
 
 export function respond<T extends object>(c: Context, outcome: Outcome<T>) {

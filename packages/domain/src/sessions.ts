@@ -1,4 +1,4 @@
-import { localToEpoch, parseLocalTime } from "./time";
+import { localToEpoch, parseLocalDate, parseLocalTime } from "./time";
 import type { Event, Session } from "./types";
 
 /**
@@ -48,9 +48,33 @@ function placeInTime(
   if (!startsAt) return {};
 
   const lengthText = aws.sessionTime?.length?.trim();
-  const length = lengthText && /^\d+$/.test(lengthText) ? Number(lengthText) : undefined;
+  const length = lengthText && minutesText.test(lengthText) ? Number(lengthText) : undefined;
   if (length === undefined) return { startsAt };
   return { startsAt, endsAt: iso(localToEpoch(date, start + length, timezone))! };
+}
+
+const minutesText = /^\d+$/;
+
+/** The parts of `sessionTime` Hallway could not read, as AWS sent them. */
+export type UnreadableTime = Partial<Record<"date" | "time" | "length", string>>;
+
+/**
+ * Which of a session's `date`, `time` and `length` were sent but are not in a
+ * form `toSession` reads ("2026-12-02", "16:00" or "16:00:00", whole minutes
+ * like "60"), with the values as sent; undefined when every sent part reads.
+ * Such a session is kept without that part, so the sync can say so instead of
+ * reporting success over a session it could not place (hunt F2). The time of
+ * an all-day session is not read, so it is never unreadable.
+ */
+export function unreadableTime(aws: AwsSession): UnreadableTime | undefined {
+  const { date, time, length } = aws.sessionTime ?? {};
+  const unreadable: UnreadableTime = {};
+  if (date !== undefined && parseLocalDate(date) === undefined) unreadable.date = date;
+  if (!aws.isAllDaySession) {
+    if (time !== undefined && parseLocalTime(time) === undefined) unreadable.time = time;
+    if (length !== undefined && length.trim() !== "" && !minutesText.test(length.trim())) unreadable.length = length;
+  }
+  return Object.keys(unreadable).length > 0 ? unreadable : undefined;
 }
 
 /**

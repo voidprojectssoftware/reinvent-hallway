@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayBounds, localWindow } from "./time";
+import { dayBounds, isEventDay, localWindow } from "./time";
 
 describe("localWindow", () => {
   it("is the UTC span of a Las Vegas afternoon, and the whole day up to 24:00", () => {
@@ -36,5 +36,13 @@ describe("dayBounds", () => {
 
   it("is undefined for a date that does not exist", () => {
     expect(dayBounds("2026-02-30", "America/Los_Angeles")).toBeUndefined();
+  });
+});
+
+describe("isEventDay", () => {
+  const reinvent = { startDate: "2026-11-30T05:30-08:00", endDate: "2026-12-04T23:59-08:00" };
+  it("is the event's local dates, first and last included", () => {
+    expect(["2026-11-30", "2026-12-02", "2026-12-04"].map((day) => isEventDay(day, reinvent))).toEqual([true, true, true]);
+    expect(["2026-11-29", "2026-12-05", "2025-12-02"].map((day) => isEventDay(day, reinvent))).toEqual([false, false, false]);
   });
 });

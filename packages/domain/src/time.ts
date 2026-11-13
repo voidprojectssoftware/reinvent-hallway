@@ -92,6 +92,29 @@ export function localToEpoch(date: string, minutes: number, timezone: string): n
   return second;
 }
 
+/**
+ * A window's edge, "HH:MM", as minutes after midnight: a time of day, or
+ * "24:00" for the end of the day. Every window (agenda, gaps) reads its edges
+ * through this, so `to: "24:00"` means the same thing everywhere (hunt F13).
+ */
+export function parseWindowEdge(time: string): number | undefined {
+  return time.trim() === "24:00" ? 24 * 60 : parseLocalTime(time);
+}
+
+/**
+ * The event-local dates an event runs over, first and last ("2026-11-30",
+ * "2026-12-04"): the date part of its local `startDate` and `endDate`.
+ */
+export function eventDays(event: { startDate: string; endDate: string }): { first: string; last: string } {
+  return { first: event.startDate.slice(0, 10), last: event.endDate.slice(0, 10) };
+}
+
+/** Whether an event-local date ("2026-12-01") is one of the event's days. */
+export function isEventDay(day: string, event: { startDate: string; endDate: string }): boolean {
+  const { first, last } = eventDays(event);
+  return day >= first && day <= last;
+}
+
 /** The event-local date ("2026-12-01") and time ("16:00") of a UTC instant. */
 export function toLocal(instant: string | number, timezone: string): { date: string; time: string } {
   const w = wallClockAt(typeof instant === "number" ? instant : Date.parse(instant), timezone);
@@ -126,8 +149,7 @@ export function localWindow(
   to: string,
   timezone: string,
 ): { from: string; to: string } | undefined {
-  const minutes = (time: string) => (time.trim() === "24:00" ? 24 * 60 : parseLocalTime(time));
-  const [start, end] = [minutes(from), minutes(to)];
+  const [start, end] = [parseWindowEdge(from), parseWindowEdge(to)];
   if (start === undefined || end === undefined || start >= end) return undefined;
   const startMs = localToEpoch(date, start, timezone);
   const endMs = localToEpoch(date, end, timezone);

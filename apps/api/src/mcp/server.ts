@@ -48,7 +48,7 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
       outputSchema: asToolOutput(Event),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(await handlers.getEvent(actor, input)),
+    (input) => toolResult(() => handlers.getEvent(actor, input)),
   );
   server.registerTool(
     "whoami",
@@ -59,7 +59,7 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
       outputSchema: asToolOutput(Me),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => toolResult(await handlers.identity.getMe(actor)),
+    () => toolResult(() => handlers.identity.getMe(actor)),
   );
   registerScheduleTools(server, handlers, actor);
   registerNetworkTools(server, handlers, actor);
