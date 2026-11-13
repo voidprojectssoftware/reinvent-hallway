@@ -63,7 +63,7 @@ erDiagram
 
 | Resource | What it is | Key fields |
 | --- | --- | --- |
-| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `verifiedName` (LinkedIn's name, not editable), `email` (stored only when LinkedIn says it is verified, with its SHA-256 for suggestions) |
+| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `verifiedName` (LinkedIn's name, not editable), `email` (stored only when LinkedIn says it is verified, with its SHA-256 for suggestions) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
 | **Session** | A catalog snapshot of one session | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt`. **No abstract** |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation), `source` (`agent-sync` \| `manual`), `hidden` (bool), `addedAt` |
@@ -105,6 +105,16 @@ We store UTC instants and the event timezone, and render in the event timezone
     when the viewer is the owner, who is about to show it to others. A link
     preview is always the anonymous view, since everyone a link is posted to
     sees the card (ADR 0012).
+- **A handle is ASCII, made from the name.** It is a link people paste into
+  LinkedIn posts, where a percent-encoded URL reads as broken. On first
+  sign-in `handleFromName` folds Latin Extended letters to base letters
+  (NFKD, marks stripped, and a small table: Ł→l, Ø→o, Đ→d, ß→ss, Æ→ae, Œ→oe,
+  Þ→th). A name that leaves no Latin letter (Cyrillic, Greek, CJK and so on)
+  gets `attendee-` and four random letters or digits (`placeholderHandle`),
+  never a count, which would say how many people have signed up, and is
+  marked `handlePlaceholder`. The web asks that person to choose a handle on
+  each visit until they do, and the share sheet nudges them; changing the
+  handle clears the mark. A handle never changes by itself. Decided on #48.
 - **Sync replaces, never duplicates.** `SyncSchedule` for an event makes the
   attendee's `agent-sync` entries exactly equal to the sent favorites and
   reservations: new ones added, missing ones removed, `reserved` beats
