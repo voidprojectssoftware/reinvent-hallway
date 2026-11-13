@@ -10,7 +10,7 @@ import { api } from "../api/client.ts";
 import { clashes, clashLabel } from "../clash.ts";
 import { EVENT_ID } from "../event.ts";
 import { inSlot, parseSlot, slotMinutes } from "../schedule/calendar.ts";
-import { DayChips, pickDate } from "../schedule/DayChips.tsx";
+import { DayChips, DayCount, pickDate } from "../schedule/DayChips.tsx";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { Going } from "../schedule/Going.tsx";
 import { whoIsGoing } from "../schedule/going.ts";
@@ -137,9 +137,7 @@ export function MyWeek() {
 
       <section className="section">
         <div className="day-head">
-          <h2 className="ghead big">
-            <span className="day-name">{formatDate(chosen)}</span> <small>{count(entries.length)}</small>
-          </h2>
+          <DayCount date={chosen} count={entries.length} />
           {toggle}
         </div>
         {slot !== null && (
@@ -184,7 +182,8 @@ function cell(entry: PlanEntry, clashing: Map<string, string[]>, going: GoingByS
       hidden={entry.hidden}
       clash={names && clashLabel(names)}
       // A hidden entry is mine alone, so the design leaves who is going off it.
-      going={!entry.hidden && people && <Going people={people} />}
+      // No one going is not news, so that row is left off too (#114).
+      going={!entry.hidden && people && people.length > 0 && <Going people={people} />}
     />
   );
 }
@@ -205,5 +204,3 @@ function goingNote(entry: PlanEntry, going: GoingBySession): GoingNote | undefin
   if (entry.hidden || n === 0) return undefined;
   return { short: String(n), spoken: n === 1 ? "1 person you know is going" : `${n} people you know are going` };
 }
-
-const count = (n: number) => (n === 1 ? "1 session" : `${n} sessions`);
