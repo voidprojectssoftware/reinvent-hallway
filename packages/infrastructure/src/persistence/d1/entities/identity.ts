@@ -3,11 +3,12 @@
 // hex, never the secret, and are looked up by that hash; the calendar feed
 // token is the exception, below. Instants are ISO-8601 UTC text, which sorts
 // and compares as time does.
-import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const attendees = sqliteTable("attendees", {
   id: text("id").primaryKey(),
   handle: text("handle").notNull().unique(),
+  handlePlaceholder: integer("handle_placeholder", { mode: "boolean" }).notNull().default(false),
   displayName: text("display_name").notNull(),
   headline: text("headline"),
   avatarUrl: text("avatar_url"),

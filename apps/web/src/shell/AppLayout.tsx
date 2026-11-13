@@ -7,11 +7,13 @@
 // open points). So the layout asks GET /api/me once, and the screens read the
 // answer with useMe(). It also counts the requests waiting for me, for the
 // red badge on the Network tab (network.html); revalidating after an accept
-// or decline updates it.
+// or decline updates it. Someone whose handle is still a placeholder is
+// asked to choose one (HandlePrompt).
 import type { Me } from "@hallway/contracts";
 import { useEffect } from "react";
 import { NavLink, Outlet, useRouteLoaderData } from "react-router";
 import { api } from "../api/client.ts";
+import { HandlePrompt } from "../profile/HandlePrompt.tsx";
 import { Icon, type IconName } from "./Icon.tsx";
 import { ifSignedIn } from "./signed-in.ts";
 
@@ -52,6 +54,7 @@ export function AppLayout() {
   return (
     <>
       <Outlet />
+      {me && <HandlePrompt me={me} />}
       {me && (
         <nav className="tabbar" aria-label="Hallway">
           <span className="brand">Hallway</span>

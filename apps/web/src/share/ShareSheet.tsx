@@ -6,11 +6,16 @@
 // do: the page link shows my week as my visibility allows and connects no
 // one; the invite link lets whoever has it connect with me at once, so it
 // comes with a way to reset it.
+//
+// A placeholder handle (issue #48) is nudged at the top until it is replaced:
+// the page link is the handle, and a made-up one is a poor thing to post.
 import type { ShareLinks } from "@hallway/contracts";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router";
 import { api } from "../api/client.ts";
 import { copyText } from "../copy.ts";
+import { useMe } from "../shell/AppLayout.tsx";
 import { failureText } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
 
@@ -20,6 +25,7 @@ const linkedInShare = (pageUrl: string) => `https://www.linkedin.com/sharing/sha
 const webcal = (calendarUrl: string) => calendarUrl.replace(/^https?:/, "webcal:");
 
 export function ShareSheet({ onClose }: { onClose: () => void }) {
+  const placeholder = useMe()?.handlePlaceholder ?? false;
   const [links, setLinks] = useState<ShareLinks | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,12 +87,21 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
             <b id="share-t">Share my week</b>
             {page ? `${page.host}${page.pathname} shows your week to whoever your settings allow.` : "Getting your links…"}
             {links?.inviteUrl && " Your invite link also lets whoever has it connect with you in one tap."}
+            {placeholder && (
+              <span className="sheet-note">Your link uses a handle Hallway made up. Choose your own before you share it.</span>
+            )}
             {(note || error) && (
               <span className={error ? "sheet-note error" : "sheet-note"} role={error ? "alert" : "status"}>
                 {error ?? note}
               </span>
             )}
           </div>
+          {placeholder && (
+            <Link className="sheet-b" to="/settings/profile" onClick={onClose}>
+              <Icon name="gear" />
+              Choose your handle
+            </Link>
+          )}
           {links && (
             <>
               <SheetButton icon="link" onClick={() => copy(links.pageUrl, "Link copied.")}>

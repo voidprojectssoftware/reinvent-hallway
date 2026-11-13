@@ -26,6 +26,7 @@ function attendeeRow(attendee: AttendeeRecord): typeof attendees.$inferInsert {
   return {
     id: attendee.id,
     handle: attendee.handle,
+    handlePlaceholder: attendee.handlePlaceholder,
     displayName: attendee.displayName,
     headline: attendee.headline ?? null,
     avatarUrl: attendee.avatarUrl ?? null,

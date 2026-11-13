@@ -33,6 +33,10 @@ const publicFields = {
 export const Me = z
   .object({
     ...publicFields,
+    handlePlaceholder: z.boolean().meta({
+      description:
+        "The handle is a random `attendee-` one Hallway made because the name had no Latin letter to make one from. False once the attendee changes it.",
+    }),
     verifiedName: z
       .string()
       .optional()
