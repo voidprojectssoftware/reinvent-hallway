@@ -12,7 +12,8 @@
 // under `.state/` in this worktree, so two worktrees never share a database.
 //
 // Resources:
-//   web   vite build --watch into apps/web/dist, which wrangler serves (ADR 0010)
+//   web   vite build --watch into apps/web/dist, which wrangler serves (ADR 0010);
+//         listed under api, with the same App links (#95)
 //   api   wrangler dev: /api, /mcp, /cal, /og, /@handle and the web app's files
 //   seed  a one-shot that loads demo people once api is healthy (npm run seed:demo)
 //   lan   with HALLWAY_LAN=1 only: the LAN proxy (scripts/lan-proxy.mjs)
@@ -42,7 +43,7 @@ const builder = await createBuilder();
 // resource so its output has its own log. --no-emptyOutDir because wrangler
 // is serving the directory while it rebuilds (#34). No hot reload: reload the
 // page after a change (ADR 0010).
-await builder.addExecutable("web", "node", web, [
+const webBuild = await builder.addExecutable("web", "node", web, [
   vite,
   "build",
   "--watch",
@@ -88,6 +89,12 @@ const apiHttp = await api.getEndpoint("http");
 await api.withUrl(refExpr`${apiHttp}/api/docs`, { displayText: "API reference" });
 await api.withUrl(refExpr`${apiHttp}/api/openapi.json`, { displayText: "OpenAPI document" });
 
+// web builds the pages but api serves them, so web carries api's App link
+// too, and sits under api in the dashboard (#95).
+await webBuild
+  .withUrl(refExpr`${apiHttp}/`, { displayText: "App" })
+  .withParentRelationship(api);
+
 // seed: demo people, schedules and connections, through the public API.
 // Idempotent, so it runs on every start.
 await builder
@@ -105,6 +112,7 @@ if (process.env.HALLWAY_LAN === "1") {
   const lanPort = Number(process.env.HALLWAY_LAN_PORT ?? "8796");
   const lanHost = process.env.HALLWAY_LAN_HOST ?? lanAddress();
   const lan = `http://${lanHost}:${lanPort}`;
+  await webBuild.withUrl(`${lan}/`, { displayText: "App (LAN)" });
   await builder
     .addExecutable("lan", "node", root, ["scripts/lan-proxy.mjs"])
     .withHttpEndpoint({ port: lanPort, targetPort: lanPort, env: "PORT", isProxied: false })
