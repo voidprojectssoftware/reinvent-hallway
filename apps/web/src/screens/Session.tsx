@@ -19,6 +19,7 @@ import { Icon, type IconName } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
+import { WhyLink } from "../why/WhySheet.tsx";
 
 type Loaded =
   | { found: false }
@@ -117,7 +118,8 @@ export function Session() {
             ? "This session has no code yet, so there is no re:Invent link for it."
             : session.abstract
               ? "Seats and reservations are on the re:Invent site."
-              : "The description, seats and reservations are on the re:Invent site."}
+              : "The description, seats and reservations are on the re:Invent site."}{" "}
+          <WhyLink section={session.abstract ? "schedule" : "description"} sessionUrl={session.url} />
           {signedIn && !synced && (
             <>
               {" "}

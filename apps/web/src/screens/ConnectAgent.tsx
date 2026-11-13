@@ -78,7 +78,12 @@ export function ConnectAgent() {
     <Screen
       title="Connect your agent"
       long
-      sub="Your AI agent reads your re:Invent favorites and reservations from AWS and puts them here. Hallway never sees your AWS sign-in."
+      sub={
+        <>
+          Your AI agent reads your re:Invent favorites and reservations from AWS and puts them here. Hallway never sees your AWS sign-in.{" "}
+          {whyAgentLine} <WhyLink section="schedule" />
+        </>
+      }
     >
       <section className="section">
         <div className="seg" role="group" aria-label="Your agent">

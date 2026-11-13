@@ -129,7 +129,7 @@ export function MyWeek() {
         )}
         <p className="gfoot">
           {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
-          Reserving happens on re:Invent; Hallway shows what you reserved there.
+          Reserving happens on re:Invent; Hallway shows what you reserved there. <WhyLink section="schedule" />
         </p>
       </section>
 

@@ -119,6 +119,23 @@
 .sheet-vis .gfoot {
   margin-inline: 0;
 }
+/* The "Why?" sheet's two parts (issue #87): text, left aligned, in the
+   sheet's panel, each under its own sentence-case heading. */
+.why-part {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 0.5px solid var(--sep);
+  scroll-margin-top: var(--sp-2);
+}
+.why-part h2 {
+  margin: 0;
+  font: var(--t-headline);
+  color: var(--label);
+}
+.why-part p {
+  margin: var(--sp-2) 0 0;
+  font: var(--t-subhead);
+  color: var(--label);
+}
 /* On a shorter window the share sheet scrolls rather than losing its top
    off screen. */
 .sheet-in {

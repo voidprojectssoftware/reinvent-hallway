@@ -137,7 +137,7 @@ export function Sessions() {
         )}
         <p className="gfoot">
           Hallway knows the sessions attendees' agents have synced, not the whole re:Invent catalog. A session missing here is on re:Invent:
-          favorite it there and ask your agent to sync.
+          favorite it there and ask your agent to sync. <WhyLink section="description" />
         </p>
       </section>
     </Screen>
