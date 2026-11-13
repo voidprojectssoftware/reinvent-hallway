@@ -7,6 +7,9 @@
 // token. Ben hides one session on the web, Ada connects through Ben's share
 // link, and Ada's agent plans around Ben: who is going, the network agenda,
 // a time to meet. Ben's hidden session must never reach Ada, on any path.
+// Session abstracts reach an agent only once its own attendee has synced, and
+// never a signed-out caller, a link preview, the share image or the calendar
+// feed (ADR 0025).
 //
 // Agent A's AWS data is the fixture apps/api's tests use; agent B's overlaps
 // it on four sessions and adds three of Ben's own (fixtures/).
@@ -150,6 +153,21 @@ describe("two agents sync from AWS and plan around each other", () => {
   it("each agent reads its schedule from AWS and syncs it", async () => {
     const adaSync = await adaAgent.syncFromAws();
     expect(adaSync).toMatchObject({ added: 15, removed: 0, sessionsStored: 15, missingSessions: [] });
+
+    // Ada's agent has synced: it reads abstracts. Ben's has not yet, and a
+    // signed-out caller never does.
+    const aim = { eventId, sessionId: "s-aim3315" };
+    expect((await adaAgent.tool("get_session", aim)).abstract).toMatch(/^ABSTRACT-TEXT-AIM3315/);
+    const found = await adaAgent.tool("search_sessions", { eventId, q: "AIM3315" });
+    expect(found.sessions[0].abstract).toMatch(/^ABSTRACT-TEXT-AIM3315/);
+    expect(await benAgent.tool("get_session", aim)).not.toHaveProperty("abstract");
+    expect(JSON.stringify(await benAgent.tool("search_sessions", { eventId, limit: 200 }))).not.toContain("ABSTRACT-TEXT");
+    for (const path of [`/api/events/${eventId}/sessions/s-aim3315`, `/api/events/${eventId}/sessions?limit=200`]) {
+      const signedOut = await fetch(`${hallway}${path}`);
+      expect(signedOut.status).toBe(200);
+      expect(await signedOut.text()).not.toContain("ABSTRACT-TEXT");
+    }
+
     const benSync = await benAgent.syncFromAws();
     expect(benSync).toMatchObject({ added: 7, removed: 0, sessionsStored: 7, missingSessions: [] });
 
@@ -168,6 +186,7 @@ describe("two agents sync from AWS and plan around each other", () => {
       IOT220: "interested",
     });
     expect(JSON.stringify(mine)).not.toContain("ABSTRACT-TEXT");
+    expect((await benAgent.tool("get_session", aim)).abstract).toMatch(/^ABSTRACT-TEXT-AIM3315/);
   });
 
   it("before they connect, Ben's week is not Ada's to see", async () => {
@@ -384,6 +403,53 @@ describe("two agents sync from AWS and plan around each other", () => {
         await anonymous.close();
       }
     });
+  });
+
+  it("no abstract leaves Hallway: not the link preview, the share image or the calendar feed (ADR 0025)", async () => {
+    await rest("PUT", "/api/me/visibility", ben.cookie, { visibility: "public" });
+    const page = async () => {
+      const response = await fetch(`${hallway}/@${ben.handle}`);
+      expect(response.status).toBe(200);
+      return response.text();
+    };
+    const card = async (cookie?: string) => {
+      const response = await fetch(`${hallway}/og/${ben.handle}.png`, cookie ? { headers: { cookie } } : {});
+      expect(response.headers.get("content-type")).toBe("image/png");
+      return Buffer.from(await response.arrayBuffer());
+    };
+    const feed = async () => {
+      await rest("POST", "/api/me/calendar-feed/rotate", ben.cookie);
+      const { calendarUrl } = await rest<{ calendarUrl: string }>("GET", "/api/me/share", ben.cookie);
+      return (await fetch(calendarUrl)).text();
+    };
+
+    const before = { page: await page(), anonymous: await card(), owner: await card(ben.cookie) };
+    expect(before.page).toContain('property="og:image"');
+    expect(before.page).not.toContain("ABSTRACT-TEXT");
+    expect(await feed()).not.toContain("ABSTRACT-TEXT");
+
+    // Ben's agent sends every abstract changed. GAM301 is reported by Ben
+    // alone, so its abstract in the catalog changes; the share image, drawn
+    // by the real renderer with GAM301 on it, must not change by a byte.
+    const aws = await connectFakeAwsEvents({
+      ...benAws,
+      sessions: benAws.sessions.map((session) => ({ ...session, abstract: `ABSTRACT-TEXT-CHANGED ${session.sessionId}` })),
+    });
+    const { schedule } = await Agent.call(aws, "GetSchedule", { eventId });
+    const sessions = [];
+    for (const sessionId of [...schedule.reserved, ...schedule.favorites]) {
+      sessions.push((await Agent.call(aws, "GetSession", { eventId, sessionId })).session);
+    }
+    await aws.close();
+    await benAgent.tool("sync_my_schedule", { eventId, sessions, favorites: schedule.favorites, reserved: schedule.reserved });
+    expect((await benAgent.tool("get_session", { eventId, sessionId: "s-gam301" })).abstract).toBe(
+      "ABSTRACT-TEXT-CHANGED s-gam301",
+    );
+
+    expect((await card()).equals(before.anonymous)).toBe(true);
+    expect((await card(ben.cookie)).equals(before.owner)).toBe(true);
+    expect(await page()).toBe(before.page);
+    expect(await feed()).not.toContain("ABSTRACT-TEXT");
   });
 
   it("an agent token cannot mint another token", async () => {

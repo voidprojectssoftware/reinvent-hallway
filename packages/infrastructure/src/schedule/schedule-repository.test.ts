@@ -1,5 +1,5 @@
 // One contract, both implementations, then what only D1 can show: its
-// parameter limit, its atomic batch, and a schema with no abstract in it.
+// parameter limit, its atomic batch, and the size of a sync with abstracts.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { CatalogSession, LastSync, ScheduleRepository, SyncWrite } from "@hallway/application";
@@ -33,7 +33,7 @@ const report = (attendeeId: string, sessionId: string, extra: Partial<SessionRep
   ...extra,
 });
 /** The catalog row a lone report makes. */
-const shown = ({ attendeeId: _a, reportedAt, ...session }: SessionReport): CatalogSession => ({
+const shown = ({ attendeeId: _a, reportedAt, abstract: _abstract, ...session }: SessionReport): CatalogSession => ({
   ...session,
   lastSeenAt: reportedAt,
 });
@@ -91,7 +91,19 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
       endsAt: "2026-12-01T17:00:00.000Z",
       isAllDay: false,
       speakers: ["Priya Raman"],
+      abstract: "AWS's text about agents.",
+      tracks: ["Developer Productivity"],
       topics: ["Artificial Intelligence"],
+      industries: ["Retail"],
+      areasOfInterest: ["Generative AI"],
+      roles: ["Developer / Engineer"],
+      services: ["Amazon Bedrock", "AWS Lambda"],
+      segments: ["Enterprise"],
+      features: ["Interactive"],
+      customerPersonas: ["Architect"],
+      experiences: ["Executive Summit"],
+      additionalActivities: ["Hands-on"],
+      focusAreas: ["Agents"],
     });
     const bare = report(me, fresh("bare"));
     await repository.applySync(sync({ attendeeId: me, reports: [full, bare] }));
@@ -102,6 +114,77 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
       expect.arrayContaining([full, bare]),
     );
     expect(await repository.reports(fresh("other"), event, [full.sessionId])).toEqual([]);
+  });
+
+  it("reads the abstract only through `abstracts`; every other read of a session leaves it out (ADR 0025)", async () => {
+    const repository = make();
+    const [me, other] = [fresh("a"), fresh("b")];
+    const withText = report(me, fresh("txt"), { code: "TXT1", title: "Texty", abstract: "ABSTRACT-TEXT-REPO", startsAt: "2026-12-01T16:00:00.000Z" });
+    const without = report(me, fresh("none"), { title: "Bare" });
+    await repository.applySync(
+      sync({ attendeeId: me, reports: [withText, without], synced: [favorite(withText.sessionId), favorite(without.sessionId)] }),
+    );
+    expect(await repository.abstracts(event, [withText.sessionId, without.sessionId, fresh("unknown")])).toEqual(
+      new Map([[withText.sessionId, "ABSTRACT-TEXT-REPO"]]),
+    );
+    expect(await repository.abstracts(event, [])).toEqual(new Map());
+    expect(await repository.abstracts("other-event", [withText.sessionId])).toEqual(new Map());
+    const reads = [
+      await repository.session(event, withText.sessionId),
+      await repository.sessions(event, [withText.sessionId]),
+      await repository.searchSessions(event, { q: "texty", limit: 10 }),
+      await repository.schedule(me, event),
+    ];
+    for (const read of reads) {
+      expect(JSON.stringify(read)).toContain("Texty");
+      expect(JSON.stringify(read)).not.toContain("ABSTRACT-TEXT");
+    }
+    // Search never matches on it either: it would tell an unverified asker what it says.
+    expect((await repository.searchSessions(event, { q: "abstract-text-repo", limit: 10 })).sessions).toEqual([]);
+    expect(await repository.hasReported(me, event)).toBe(true);
+    expect(await repository.hasReported(me, "other-event")).toBe(false);
+    expect(await repository.hasReported(other, event)).toBe(false);
+  });
+
+  it("votes on the abstract and each list whole, as the domain's consensus does", async () => {
+    const repository = make();
+    const id = fresh("s");
+    const [a, b, c] = [fresh("a"), fresh("b"), fresh("c")];
+    const honest = { abstract: "AWS's text", services: ["Amazon Bedrock", "AWS Lambda"], roles: ["Developer"] };
+    await repository.applySync(sync({ attendeeId: a, reports: [report(a, id, honest)] }));
+    await repository.applySync(sync({ attendeeId: b, reports: [report(b, id, { ...honest, reportedAt: later })] }));
+    await repository.applySync(
+      sync({
+        attendeeId: c,
+        reports: [report(c, id, { abstract: "Buy my course", services: ["AWS Lambda", "Amazon Bedrock"], roles: ["Developer"], reportedAt: latest })],
+      }),
+    );
+    expect(await repository.session(event, id)).toMatchObject({ services: ["Amazon Bedrock", "AWS Lambda"], roles: ["Developer"] });
+    expect(await repository.abstracts(event, [id])).toEqual(new Map([[id, "AWS's text"]]));
+  });
+
+  it("filters search by type, level, and one topic, track or service, each exactly", async () => {
+    const repository = make();
+    const me = fresh("a");
+    const tag = fresh("flt");
+    const bedrock = report(me, fresh("f"), {
+      type: `Chalk talk ${tag}`,
+      level: "300 - Advanced",
+      topics: ["Artificial Intelligence", tag],
+      tracks: [`Track ${tag}`],
+      services: ["Amazon Bedrock", `Svc ${tag}`],
+    });
+    const lambda = report(me, fresh("f"), { type: `Workshop ${tag}`, level: "200 - Intermediate", topics: [tag], services: ["AWS Lambda"] });
+    await repository.applySync(sync({ attendeeId: me, reports: [bedrock, lambda] }));
+    const ids = async (filter: Omit<Parameters<ScheduleRepository["searchSessions"]>[1], "limit">) =>
+      (await repository.searchSessions(event, { ...filter, limit: 50 })).sessions.map((s) => s.sessionId);
+    expect(await ids({ topic: tag })).toEqual(expect.arrayContaining([bedrock.sessionId, lambda.sessionId]));
+    expect(await ids({ topic: tag, service: "Amazon Bedrock" })).toEqual([bedrock.sessionId]);
+    expect(await ids({ type: `Workshop ${tag}` })).toEqual([lambda.sessionId]);
+    expect(await ids({ topic: tag, level: "300 - Advanced" })).toEqual([bedrock.sessionId]);
+    expect(await ids({ track: `Track ${tag}` })).toEqual([bedrock.sessionId]);
+    expect(await ids({ service: `svc ${tag}` })).toEqual([]);
+    expect(await ids({ service: "Amazon" , topic: tag })).toEqual([]);
   });
 
   it("a lone reporter's next report replaces their own whole", async () => {
@@ -410,14 +493,47 @@ describe("ScheduleRepository on D1, at sync size", () => {
     expect(await repository.entries(me, event)).toEqual([entry(me, kept)]);
   });
 
-  it("has no column an abstract could be kept in (ADR 0003)", async () => {
-    const columns = await local.d1
-      .prepare(
-        "select name from pragma_table_info('sessions') union all select name from pragma_table_info('session_reports') union all select name from pragma_table_info('plan_entries')",
-      )
-      .all<{ name: string }>();
-    const names = columns.results.map((column) => column.name);
-    expect(names).toContain("title");
-    expect(names.filter((name) => /abstract|description|summary/i.test(name))).toEqual([]);
+  it("writes a 250-session sync with abstracts and every list as one batch, its JSON in two chunks (ADR 0025)", async () => {
+    const { d1, log } = recorded(local.d1);
+    const repository = scheduleOnD1(openDatabase(d1));
+    const me = fresh("me");
+    const ids = Array.from({ length: 250 }, () => fresh("rich"));
+    // About what AWS writes: a 1,200-character abstract, and a few values a list.
+    const abstract = "An abstract of about the length AWS writes for a breakout session. ".repeat(18);
+    const list = (name: string) => [`${name} one`, `${name} two`, `${name} three`];
+    const reports = ids.map((id) =>
+      report(me, id, {
+        code: id,
+        title: `Session ${id}`,
+        type: "Breakout session",
+        level: "300 - Advanced",
+        venue: "Venetian",
+        room: "Level 3, Lido 3001",
+        startsAt: "2026-12-01T16:00:00.000Z",
+        endsAt: "2026-12-01T17:00:00.000Z",
+        isAllDay: false,
+        speakers: ["Priya Raman", "Tom Okafor"],
+        abstract,
+        tracks: list("track"),
+        topics: list("topic"),
+        industries: list("industry"),
+        areasOfInterest: list("area"),
+        roles: list("role"),
+        services: list("service"),
+        segments: list("segment"),
+        features: list("feature"),
+        customerPersonas: list("persona"),
+        experiences: list("experience"),
+        additionalActivities: list("activity"),
+        focusAreas: list("focus"),
+      }),
+    );
+    await repository.applySync(sync({ attendeeId: me, reports, synced: ids.map(favorite) }));
+    expect(log.batches).toHaveLength(1);
+    expect(log.directRuns).toBe(0);
+    expect(Math.max(...log.parameters)).toBeLessThanOrEqual(D1_MAX_PARAMETERS);
+    // The last sync; catalog rows and reports, two chunks each; consensus; delete, manual fallback, entries.
+    expect(log.batches[0]).toBe(1 + 2 + 2 + 1 + 1 + 1 + 1);
+    expect((await repository.abstracts(event, ids)).size).toBe(250);
   });
 });

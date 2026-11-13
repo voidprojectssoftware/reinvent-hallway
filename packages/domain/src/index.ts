@@ -13,6 +13,9 @@ export {
   toSession,
   mergeSnapshot,
   consensus,
+  canReadAbstract,
+  withoutAbstract,
+  sessionTags,
   foldText,
   foldSpeakers,
   sessionUrl,
@@ -20,6 +23,7 @@ export {
   type UnreadableTime,
   type AwsSession,
   type SessionReport,
+  type AbstractReader,
 } from "./sessions";
 export { toLocal, dayBounds, localWindow, eventDays, isEventDay } from "./time";
 export {

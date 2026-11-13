@@ -1,6 +1,6 @@
 # 0003. The attendee's agent is the import path, and we keep no abstracts
 
-Date: 2026-11-13. Status: accepted.
+Date: 2026-11-13. Status: accepted; the abstract and taxonomy part amended by ADR 0025.
 
 The AWS Events API's only OAuth client is public, loopback-only, with fixed
 callback ports (`docs/discovery/aws-events-api.md`). A hosted app cannot sign an
@@ -14,6 +14,12 @@ lists. Hallway's catalog is the union of those snapshots.
 **We drop `abstract`** (and the other descriptive taxonomies except `topics`)
 at the contract boundary: the abstract is AWS content behind a login, it is the
 largest field, and the session link exists for reading it.
+
+*Amended by ADR 0025 (issue #74):* Hallway now keeps every field an agent
+sends but AWS's live seat state, shows the descriptive fields to anyone who can
+see the session, and shows the abstract only to an attendee whose own agent
+has synced sessions (`canReadAbstract`), never on anything that leaves
+Hallway.
 
 **Rejected:** scraping the catalog (behind login, against its use); asking users
 for their Builder ID token (we would hold a credential that can reserve and

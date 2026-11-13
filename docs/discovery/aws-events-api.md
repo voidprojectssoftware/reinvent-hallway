@@ -49,5 +49,6 @@ Kiro `mcp.json` `"awsevents": { "url": "https://api.awsevents.com/mcp", "oauth":
 
 ## What Hallway takes from it
 
-The `Session` shape, reduced (no abstract, ADR 0003), and the `Schedule` shape
-as the input to `sync_my_schedule`.
+The `Session` shape, all of it but `seatAvailability` and `isReservable` (ADR
+0025; the abstract only for verified attendees), and the `Schedule` shape as
+the input to `sync_my_schedule`.

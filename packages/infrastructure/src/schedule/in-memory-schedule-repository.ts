@@ -1,9 +1,19 @@
 import type { CatalogSession, LastSync, ScheduleRepository } from "@hallway/application";
-import { consensus, foldSpeakers, foldText, planSync, type PlanEntry, type SessionReport } from "@hallway/domain";
+import {
+  consensus,
+  foldSpeakers,
+  foldText,
+  planSync,
+  withoutAbstract,
+  type PlanEntry,
+  type SessionReport,
+} from "@hallway/domain";
 
 /** The fake: answers as the D1 repository does (schedule-repository.test.ts holds both to it). */
 export function scheduleInMemory(): ScheduleRepository {
   const catalog = new Map<string, CatalogSession>();
+  /** Kept beside the catalog, as only `abstracts` reads it (ADR 0025). */
+  const abstractOf = new Map<string, string>();
   const reportsBySession = new Map<string, Map<string, SessionReport>>();
   /** Entries without their hidden state, which lives in `hidden`. */
   const plans = new Map<string, Omit<PlanEntry, "hidden">>();
@@ -48,10 +58,13 @@ export function scheduleInMemory(): ScheduleRepository {
       });
     },
 
-    async searchSessions(eventId, { q, startsFrom, startsBefore, limit }) {
+    async searchSessions(eventId, { q, startsFrom, startsBefore, type, level, topic, track, service, limit }) {
       const needle = q === undefined ? undefined : foldText(q);
+      const has = (list: string[] | undefined, value: string | undefined) => value === undefined || !!list?.includes(value);
       const matching = sessionsOf(eventId)
         .filter((s) => needle === undefined || searchText(s).some((field) => field.includes(needle)))
+        .filter((s) => (type === undefined || s.type === type) && (level === undefined || s.level === level))
+        .filter((s) => has(s.topics, topic) && has(s.tracks, track) && has(s.services, service))
         .filter((s) => startsFrom === undefined || (s.startsAt !== undefined && s.startsAt >= startsFrom))
         .filter((s) => startsBefore === undefined || (s.startsAt !== undefined && s.startsAt < startsBefore))
         .sort(bySessionOrder);
@@ -63,6 +76,19 @@ export function scheduleInMemory(): ScheduleRepository {
         const report = reportsBySession.get(sessionKey(eventId, id))?.get(attendeeId);
         return report ? [structuredClone(report)] : [];
       });
+    },
+
+    async hasReported(attendeeId, eventId) {
+      return [...reportsBySession.values()].some((byAttendee) => byAttendee.get(attendeeId)?.eventId === eventId);
+    },
+
+    async abstracts(eventId, sessionIds) {
+      return new Map(
+        [...new Set(sessionIds)].flatMap((id) => {
+          const abstract = abstractOf.get(sessionKey(eventId, id));
+          return abstract === undefined ? [] : [[id, abstract] as const];
+        }),
+      );
     },
 
     async entry(attendeeId, eventId, sessionId) {
@@ -95,10 +121,13 @@ export function scheduleInMemory(): ScheduleRepository {
         all.set(report.attendeeId, structuredClone(report));
         reportsBySession.set(key, all);
         const every = [...all.values()];
+        const agreed = consensus(every);
         catalog.set(key, {
-          ...consensus(every),
+          ...withoutAbstract(agreed),
           lastSeenAt: every.map((r) => r.reportedAt).reduce((a, b) => (a > b ? a : b)),
         });
+        if (agreed.abstract === undefined) abstractOf.delete(key);
+        else abstractOf.set(key, agreed.abstract);
       }
       // Planned against the entries as they are now, which in memory is the
       // same as computing it inside the write.

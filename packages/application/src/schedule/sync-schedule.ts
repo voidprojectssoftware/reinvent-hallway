@@ -95,6 +95,6 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
 // `undefined` where the agent sent null (the contract reads null as absent),
 // which every reader of AwsSession treats as absent; the types differ only by
 // the `| undefined` that exactOptionalPropertyTypes adds to zod's optional fields.
-// The fields toSession does not read (the abstract among them) are carried
+// The fields toSession does not read (AWS's live seat state) are carried
 // into it and ignored there; it copies only the fields Hallway keeps.
 const asDomainSession = (aws: AwsSessionInput) => aws as AwsSession;

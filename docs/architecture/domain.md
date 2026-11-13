@@ -34,9 +34,10 @@ this file in the same PR.
 - **The catalog is behind registration**, so we cannot crawl it. Hallway's
   session catalog is built from the sessions attendees' agents send: each
   snapshot is that attendee's report, and the catalog shows what the reporters
-  agree on (rule below, ADR 0016). We keep the fields needed to place and identify a session and
-  **never store or show the abstract**: the abstract is AWS's content behind a
-  login, and the link out is how people read it.
+  agree on (rule below, ADR 0016). We keep every field an agent sends of a
+  session but AWS's live seat state, and **show the abstract only to an
+  attendee whose own agent has synced**: it is AWS's content behind a login
+  (ADR 0025, amending 0003).
 - **LinkedIn will not give us anyone's connections.** Sign In with LinkedIn
   (OpenID Connect) gives a verified identity: `sub`, name, picture, email. The
   Connections API is partner-only and closed. So the network is Hallway's own
@@ -69,8 +70,8 @@ erDiagram
 | --- | --- | --- |
 | **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
-| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt` (the newest report). **No abstract** |
-| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields, `attendeeId`, `reportedAt`. One per attendee and session |
+| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, and only to a reader `canReadAbstract` allows (rule below). Never `seatAvailability` or `isReservable` |
+| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`. One per attendee and session |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation or invitation), `source` (`agent-sync` \| `manual`), `invited` (bool: from AWS `invitedSessions`), `hidden` (bool, from the hidden sessions below), `addedAt` |
 | **Hidden session** | Not served on its own: a session an attendee hid, per event | `attendeeId`, `eventId`, `sessionId`. An entry is hidden while its session is here |
 | **Connection** | Two attendees who agreed to see each other | unordered pair, `since`, `via` (`request` \| `share-link`) |
@@ -178,6 +179,14 @@ We store UTC instants and the event timezone, and render in the event timezone
   counts if others come to agree. The consensus is written to the session's
   catalog row in the sync's own batch, so reading a session never reads
   reports (ADR 0016). A snapshot for an unknown event is refused.
+- **The abstract is for verified attendees (`canReadAbstract`, ADR 0025).**
+  A session's abstract is shown to a signed-in attendee (as a person or
+  through their agent token) once a sync of theirs has kept one of their own
+  sessions of the event as their report: that sync is the proof AWS let them
+  read the catalog. Only session search and get carry it, over REST and MCP.
+  It never appears to anyone else, signed out included, nor on any schedule,
+  agenda, link preview, share image or calendar feed, whoever asks. Search
+  never matches on it. It is plain text and is rendered as text.
 - **A connection is mutual and needs consent.** A request becomes a connection
   only when the other side accepts. Connecting via someone's share link forms
   the connection at once: the link's current invite token is their consent
@@ -207,7 +216,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SignIn` | anyone | Google, Microsoft, LinkedIn or GitHub (or dev sign-in locally); creates the attendee and their first Identity on first sign-in, picking a free handle; refused (`account-exists`) when the verified email is another attendee's |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
-| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), `missingSessions`, and `unreadableTimes` (rule below); when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
+| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent, kept whole but for `seatAvailability` and `isReservable` (ADR 0025). Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), `missingSessions`, and `unreadableTimes` (rule below); when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
 | `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
 | `SetEntryHidden` | me | hide or show the session of one entry: puts it in, or takes it out of, my hidden sessions for the event |
 
@@ -234,8 +243,8 @@ what they are told (hunt F10).
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
-| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it) and `limit`, with `total` (how many match) and `truncated` (more match than were returned); open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
-| `GetSession(eventId, sessionId)` | the session, and to a signed-in caller `connectionsGoing` as in search |
+| `SearchSessions(eventId, q?, day?, type?, level?, topic?, track?, service?, from?, to?)` | catalog sessions, with how many of my connections are going, and to a verified reader their abstracts. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it), `type` and `level` (exact), `topic`, `track` and `service` (one item of that list, exact) and `limit`, with `total` (how many match) and `truncated` (more match than were returned); open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
+| `GetSession(eventId, sessionId)` | the session, to a signed-in caller `connectionsGoing` as in search, and to a verified reader its abstract |
 | `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read, and `unknownSessions`, the asked ids the catalog does not have (absent when there are none). Session search and get carry the same people, intent included |
 | `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day of the event (`from`/`to` as `HH:MM`, `to` up to `24:00`, default the whole day) that my connections plan to attend, with who and their intent |
 | `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. `to` may be `24:00`. All-day sessions (the expo and the like) do not block a gap, nor do sessions with a start and no length, which are returned as `unplacedSessions` (mine, and theirs I may see) so the asker can decide |
@@ -273,7 +282,7 @@ holds logic the other lacks. Both take and return the contract schemas in
 
 | Tool | Handler |
 | --- | --- |
-| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then `GetSession` per id, and `invitedSessions` passed through) |
+| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then the full `GetSession` object per id, or `ListSessions` pages for a large schedule, and `invitedSessions` passed through) |
 | `get_my_schedule` | `GetMySchedule` |
 | `list_my_connections` | `ListConnections` |
 | `get_person_schedule` | `GetAttendeeSchedule` |
@@ -281,6 +290,7 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `network_agenda` | `NetworkAgenda` |
 | `find_meeting_gaps` | `FindMeetingGaps` |
 | `search_sessions` | `SearchSessions` |
+| `get_session` | `GetSession` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
 | `set_entry_hidden` | `SetEntryHidden` |
 
