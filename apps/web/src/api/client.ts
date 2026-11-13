@@ -8,7 +8,23 @@
 // signed in" by the same names the handlers use. Two more kinds cover what no
 // handler said: the server could not be reached, or it answered with
 // something the contract does not describe (a proxy's HTML page, a 500).
-import { ApiError, Event, SignInOptions, type ErrorKind } from "@hallway/contracts";
+import {
+  AgentToken,
+  AgentTokenList,
+  ApiError,
+  AttendeeCard,
+  CalendarFeed,
+  Event,
+  IssuedAgentToken,
+  Me,
+  MySchedule,
+  PlanEntry,
+  Session,
+  SignInOptions,
+  type ErrorKind,
+  type UpdateProfileInput,
+  type Visibility,
+} from "@hallway/contracts";
 
 export type { SignInOptions };
 
@@ -35,6 +51,10 @@ export class ApiFailure extends Error {
 const ignored: Schema<void> = { parse: () => undefined };
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+const myScheduleOf = (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/my-schedule`;
+const entryOf = (eventId: string, sessionId: string) =>
+  `${myScheduleOf(eventId)}/entries/${encodeURIComponent(sessionId)}`;
 
 export function createApiClient(send: typeof fetch = (input, init) => fetch(input, init)) {
   async function request<T>(method: Method, path: string, schema: Schema<T>, body?: unknown): Promise<T> {
@@ -72,6 +92,31 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
 
     /** `POST /api/dev/sign-in { name }` sets the session cookie. */
     devSignIn: (name: string) => request("POST", "/api/dev/sign-in", ignored, { name }),
+
+    signOut: () => request("POST", "/api/auth/sign-out", ignored),
+
+    /** The signed-in attendee; an `unauthenticated` failure when no one is. */
+    me: () => request("GET", "/api/me", Me),
+    updateProfile: (input: UpdateProfileInput) => request("PATCH", "/api/me", Me, input),
+    setVisibility: (visibility: Visibility) => request("PUT", "/api/me/visibility", Me, { visibility }),
+
+    agentTokens: () => request("GET", "/api/me/tokens", AgentTokenList),
+    issueAgentToken: (label: string) => request("POST", "/api/me/tokens", IssuedAgentToken, { label }),
+    revokeAgentToken: (tokenId: string) => request("DELETE", `/api/me/tokens/${encodeURIComponent(tokenId)}`, AgentToken),
+
+    calendarFeed: () => request("GET", "/api/me/calendar-feed", CalendarFeed),
+    rotateCalendarFeed: () => request("POST", "/api/me/calendar-feed/rotate", CalendarFeed),
+
+    attendee: (handle: string) => request("GET", `/api/attendees/${encodeURIComponent(handle)}`, AttendeeCard),
+
+    mySchedule: (eventId: string) => request("GET", myScheduleOf(eventId), MySchedule),
+    addToPlan: (eventId: string, sessionId: string) => request("POST", entryOf(eventId, sessionId), PlanEntry),
+    removeFromPlan: (eventId: string, sessionId: string) => request("DELETE", entryOf(eventId, sessionId), PlanEntry),
+    setEntryHidden: (eventId: string, sessionId: string, hidden: boolean) =>
+      request("PATCH", entryOf(eventId, sessionId), PlanEntry, { hidden }),
+
+    session: (eventId: string, sessionId: string) =>
+      request("GET", `/api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`, Session),
   };
 }
 
