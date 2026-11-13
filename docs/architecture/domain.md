@@ -232,6 +232,41 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `search_sessions` | `SearchSessions` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
 
+## Identities and follows (decided 2026-11-13, being built: #60, #61, #63)
+
+The owner, 2026-11-13: sign-in with Google, Microsoft, LinkedIn or GitHub, and
+"show them the schedule of people they follow on linkedin / in their network
+and the same for github". ADRs 0018 and 0019 hold the decisions. Until those
+issues land, the code is still the model above; this section is what it moves to.
+
+```mermaid
+erDiagram
+  ATTENDEE ||--|{ IDENTITY : "signs in with"
+  ATTENDEE ||--o{ FOLLOW : follows
+  FOLLOW }o--o| ATTENDEE : "points at (or a GitHub id not yet on Hallway)"
+```
+
+| Resource | What it is | Key fields |
+| --- | --- | --- |
+| **Identity** | One provider account an attendee signs in with | `provider` (`google` \| `microsoft` \| `linkedin` \| `github`), `subject` (the provider's stable id), `email`, `emailVerified`, `username` (GitHub login), `linkedAt`. Unique per provider and subject |
+| **Follow** | One-way: I follow someone | `follower`, `followee` (an attendee, or a GitHub user id not yet on Hallway), `source` (`github` \| `linkedin-import`), `since` |
+
+Rules:
+
+- **Linking is explicit, never by email.** A new provider is added from a
+  signed-in session. A sign-in whose verified email matches another account is
+  refused with directions, never merged.
+- **Visibility "connections" becomes "My network":** the attendee, their Hallway
+  connections, and **the people they follow**. Following someone never lets you
+  see their schedule; their following you does. (Owner to confirm: #64.)
+- **GitHub follows** are fetched with the user's token during a sign-in or link
+  round trip and the token is dropped. **LinkedIn follows** are two-fact matches
+  from the user's own `Connections.csv` import.
+
+Commands: `LinkIdentity`, `UnlinkIdentity`, `RefreshGitHubFollows`,
+`ImportContacts` (now also writes follows). Queries: `ListIdentities`,
+`ListFollowing`, and `ListMyNetwork` (connections plus follows, labelled).
+
 ## Out of scope for the MVP
 
 Reserving on AWS (the user's agent does that against AWS directly), personal
