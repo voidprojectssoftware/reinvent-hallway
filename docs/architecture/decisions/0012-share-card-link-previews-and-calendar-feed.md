@@ -63,8 +63,11 @@ the Worker; these are the choices it left open.
   (`/share-card-fonts/`) once per isolate. Satori then keeps them for later
   cards. CJK is 13 MB a weight for three languages, so it cannot go in the
   bundle; `scripts/copy-card-fonts.mjs` copies the 720 files (20 MB, with each
-  family's licence) into the assets directory, run by wrangler's `build`
-  command before every `wrangler dev` and deploy. Each subset has its own
+  family's licence) into the assets directory, run by whatever starts
+  wrangler (`npm run dev`, the Aspire `api` resource, the e2e setup) and by
+  `npm run build`. It was wrangler's `build` command until #85: with a custom
+  build, wrangler never reloaded its assets after a web rebuild, so dev
+  served a stale or blank page until restarted. Each subset has its own
   family name, because Satori keeps one font per name and weight: the
   Latin Extended file bundled before this as a second "Inter" was never used,
   and "Łukasz" drew a missing-glyph box. A character no subset has (emoji,

@@ -1,5 +1,5 @@
 // The AppHost's `api` resource (apphost.mts, ADR 0017): wrangler dev for the
-// Worker, after the two things `npm run dev` also does first.
+// Worker, after the three things `npm run dev` also does first.
 //
 // 1. Apply the D1 migrations to the local database under PERSIST_TO, because
 //    wrangler dev does not, and a Worker over an empty database fails on its
@@ -7,6 +7,7 @@
 // 2. Wait for the `web` resource's first build to write apps/web/dist/index.html:
 //    wrangler refuses an assets directory that does not exist, and serving
 //    before the first build answers every page with a 404.
+// 3. Copy the share card's fonts into that build (ADR 0012, #85).
 //
 // It also copies apps/api/.dev.vars.example to .dev.vars when there is none,
 // as `npm run dev` does, so dev sign-in works (ADR 0008).
@@ -51,6 +52,13 @@ for (let waited = 0; !existsSync(index); waited++) {
   }
   await sleep(1000);
 }
+
+// The share card's fonts (ADR 0012). Not wrangler's
+//    "build" command: with one, wrangler never reloads its assets after a web
+//    rebuild (#85, apps/api/wrangler.jsonc). web builds with --no-emptyOutDir,
+//    so they stay put.
+const fonts = spawnSync(process.execPath, [join(api, "scripts/copy-card-fonts.mjs")], { cwd: api, stdio: "inherit" });
+if (fonts.status !== 0) process.exit(fonts.status ?? 1);
 
 const dev = spawn(
   process.execPath,
