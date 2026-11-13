@@ -291,6 +291,11 @@ button.cell:active {
 .when b {
   font: 600 15px/1.3 var(--font);
 }
+/* "Time to come" and "All day" are words, not times: they wrap onto a
+   second line rather than run under the title beside them (#100). */
+.when.words {
+  white-space: normal;
+}
 .when span {
   font: var(--t-footnote);
   color: var(--label2);
