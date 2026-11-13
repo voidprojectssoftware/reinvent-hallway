@@ -4,7 +4,7 @@ import type { IdentityList, UnlinkIdentityInput } from "@hallway/contracts";
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import { personAtKeyboard } from "./person-at-keyboard.ts";
-import type { AttendeeRepository } from "./ports.ts";
+import type { AttendeeRepository, RecordGitHubFollowing } from "./ports.ts";
 import { signedInAttendee } from "./profile.ts";
 import { providerTitle } from "./sign-in.ts";
 import { toIdentity } from "./views.ts";
@@ -20,8 +20,12 @@ export function listIdentities(attendees: AttendeeRepository): ListIdentities {
   };
 }
 
-/** Removes a way in, never the last one: an attendee with none could not sign in again. */
-export function unlinkIdentity(attendees: AttendeeRepository): UnlinkIdentity {
+/**
+ * Removes a way in, never the last one: an attendee with none could not sign
+ * in again. Unlinking GitHub also forgets who they follow there (ADR 0019):
+ * those follows came from that account, and they let people see the schedule.
+ */
+export function unlinkIdentity(attendees: AttendeeRepository, recordGitHubFollowing: RecordGitHubFollowing): UnlinkIdentity {
   return async (actor, { provider }) => {
     const person = personAtKeyboard(actor);
     if (!person.ok) return person;
@@ -33,6 +37,7 @@ export function unlinkIdentity(attendees: AttendeeRepository): UnlinkIdentity {
       return fail("conflict", `${providerTitle[provider]} is your only way to sign in. Add another before removing it.`);
     }
     await attendees.unlink(person.value, provider);
+    if (provider === "github") await recordGitHubFollowing({ attendeeId: person.value, following: [] });
     const left = mine.filter((identity) => identity.provider !== provider);
     return ok({ identities: left.map(toIdentity) });
   };

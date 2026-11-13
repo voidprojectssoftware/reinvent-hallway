@@ -2,7 +2,7 @@
 // session (or a linked identity) out. Every provider and dev sign-in end here,
 // so an attendee is created, refreshed and refused in one place whichever door
 // was used.
-import type { DevSignInInput, Identity, Me, SignInOptions, SignInProvider } from "@hallway/contracts";
+import type { DevLinkGitHubInput, DevSignInInput, Identity, Me, SignInOptions, SignInProvider } from "@hallway/contracts";
 import { signInProviders } from "@hallway/contracts";
 import { handleFromName, hashEmail, normalizeName, placeholderHandle } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
@@ -33,6 +33,7 @@ export interface SignedIn {
 export type Completed = ({ mode: "signed-in" } & SignedIn) | { mode: "linked"; identity: Identity };
 
 export type DevSignIn = (input: DevSignInInput) => Promise<Outcome<SignedIn>>;
+export type DevLinkGitHub = (actor: Actor, input: DevLinkGitHubInput) => Promise<Outcome<Identity>>;
 export type BeginSignIn = (input: {
   actor: Actor;
   provider: SignInProvider;
@@ -138,7 +139,7 @@ async function emailBelongsToSomeoneElse(
  * have a different account of the same provider.
  */
 function linkTo({ attendees, recordGitHubFollowing, now }: SignInPorts) {
-  return async (attendeeId: string, kind: SignInProvider, identity: VerifiedIdentity): Promise<Outcome<Completed>> => {
+  return async (attendeeId: string, kind: SignInProvider, identity: VerifiedIdentity): Promise<Outcome<Identity>> => {
     const owner = await attendees.identity(kind, identity.subject);
     if (owner && owner.attendeeId !== attendeeId) {
       return fail(
@@ -162,12 +163,13 @@ function linkTo({ attendees, recordGitHubFollowing, now }: SignInPorts) {
       await attendees.link(record);
     }
     if (identity.following) await recordGitHubFollowing({ attendeeId, following: identity.following });
-    return ok({ mode: "linked", identity: toIdentity(record) });
+    return ok(toIdentity(record));
   };
 }
 
 export interface SignInHandlers {
   devSignIn: DevSignIn;
+  devLinkGitHub: DevLinkGitHub;
   beginSignIn: BeginSignIn;
   completeSignIn: CompleteSignIn;
 }
@@ -185,6 +187,23 @@ export function signInHandlers(providers: IdentityProviders, ports: SignInPorts)
      * same attendee, so a dev can come back to their data.
      */
     devSignIn: ({ name }) => signIn("dev", { subject: normalizeName(name), name, emailVerified: false }),
+
+    /**
+     * Dev only, like dev sign-in: the end of a GitHub link round trip with
+     * the account and its following list given rather than fetched, so a dev
+     * server and the e2e suite reach the same link path without GitHub.
+     */
+    async devLinkGitHub(actor, { id, login, following }) {
+      const person = personAtKeyboard(actor);
+      if (!person.ok) return person;
+      return link(person.value, "github", {
+        subject: String(id),
+        name: login,
+        username: login,
+        emailVerified: false,
+        following: following.map((user) => ({ id: String(user.id), login: user.login })),
+      });
+    },
 
     async beginSignIn({ actor, provider, link: linking, redirectUri }) {
       const adapter = providers[provider];
@@ -227,7 +246,10 @@ export function signInHandlers(providers: IdentityProviders, ports: SignInPorts)
       if (!code) return fail("invalid", "The callback carries no authorization code.");
       const identity = await adapter.identify({ code, redirectUri });
       if (!identity) return fail("unauthenticated", `${title} did not accept the authorization code.`);
-      if (linkFor !== undefined) return link(linkFor, provider, identity);
+      if (linkFor !== undefined) {
+        const linked = await link(linkFor, provider, identity);
+        return linked.ok ? ok({ mode: "linked", identity: linked.value }) : linked;
+      }
       const signedIn = await signIn(provider, identity);
       return signedIn.ok ? ok({ mode: "signed-in", ...signedIn.value }) : signedIn;
     },
@@ -290,7 +312,7 @@ function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle,
     handlePlaceholder: placeholder,
     displayName: identity.name,
     ...(identity.picture ? { avatarUrl: identity.picture } : {}),
-    visibility: "connections",
+    visibility: "network",
     ...verifiedFacts(identity),
     createdAt: at.toISOString(),
   };

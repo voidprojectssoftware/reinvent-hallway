@@ -129,7 +129,7 @@ describe("suggestions", () => {
     handle: id,
     handlePlaceholder: false,
     displayName: id,
-    visibility: "connections",
+    visibility: "network",
     ...extra,
   });
   const contact = (extra: Partial<ImportedContact>): ImportedContact => ({ name: "", ...extra });

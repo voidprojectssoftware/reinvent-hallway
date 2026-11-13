@@ -24,7 +24,7 @@ import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleRepository } from "../schedule/schedule-repository.ts";
 import { isCurrentInvite } from "./invites.ts";
 import type { ConnectionRequestRecord, NetworkRepository } from "./ports.ts";
-import { connectionSessionCounts } from "./schedules.ts";
+import { networkSessionCounts } from "./schedules.ts";
 import { byName, connectionResource, requestResource } from "./views.ts";
 
 export type RequestConnection = (actor: Actor, input: RequestConnectionInput) => Promise<Outcome<RequestResult>>;
@@ -184,7 +184,7 @@ export function listConnections({ attendees, network, events, schedule }: ListCo
     if (eventId !== undefined && !(await events.get(eventId))) return noEvent(eventId);
     const [connected, counts] = await Promise.all([
       network.connectionsOf(me.value.id),
-      eventId === undefined ? undefined : connectionSessionCounts(network, schedule, me.value.id, eventId),
+      eventId === undefined ? undefined : networkSessionCounts(network, schedule, me.value.id, eventId),
     ]);
     const connections = connected.map(({ connection, other }) => ({
       ...connectionResource(connection, other),

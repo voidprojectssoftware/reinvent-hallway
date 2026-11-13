@@ -1,5 +1,5 @@
 export type * from "./types";
-export { canViewSchedule, visibleEntries, shareableEntries, type ViewerId } from "./visibility";
+export { canViewSchedule, visibleEntries, shareableEntries, noTie, type Tie, type ViewerId } from "./visibility";
 export {
   planSync,
   syncedSessions,

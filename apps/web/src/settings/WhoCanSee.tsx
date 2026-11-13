@@ -10,9 +10,10 @@ import { Foot, type Failed } from "../shell/Foot.tsx";
 const choices: { value: Visibility; label: string; explain: string }[] = [
   { value: "public", label: "Anyone", explain: "Anyone with your link sees your sessions. Hidden sessions stay yours alone." },
   {
-    value: "connections",
-    label: "Connections",
-    explain: 'Your connections see your sessions and you in "who is going". Hidden sessions stay yours alone.',
+    value: "network",
+    label: "My network",
+    explain:
+      'Your connections and the people you follow on GitHub or from your LinkedIn import see your sessions and you in "who is going". Following you does not let anyone in. Hidden sessions stay yours alone.',
   },
   { value: "private", label: "Only me", explain: "No one else sees your sessions or counts you as going." },
 ];

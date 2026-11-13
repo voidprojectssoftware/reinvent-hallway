@@ -3,10 +3,12 @@
 import type {
   Connection,
   ConnectionRequest,
+  FollowSource,
   ImportedContact,
   PlanEntry,
   RequestStatus,
   SuggestionCandidate,
+  Tie,
 } from "@hallway/domain";
 import type { AttendeeRecord } from "../identity/ports.ts";
 import type { CatalogSession } from "../schedule/schedule-repository.ts";
@@ -29,14 +31,29 @@ export interface ContactImportRecord {
   count: number;
 }
 
-/** One of a connection's plan entries, with its session and its owner. */
-export interface ConnectionPlan {
+/** One plan entry of someone in my network, with its session, its owner, and how I stand to them. */
+export interface NetworkPlan {
   owner: AttendeeRecord;
+  /** How the viewer stands to the owner: what the visibility rule needs. */
+  tie: Tie;
   entry: PlanEntry;
   session: CatalogSession;
 }
 
-/** Which of my connections' entries to read: for these sessions, for sessions starting in a window, or all at the event. */
+/**
+ * Someone in my network (ADR 0019): a connection, someone I follow, or both.
+ * People who follow me without my following them are not in it, although
+ * they may let me see their schedule.
+ */
+export interface NetworkMemberRecord {
+  other: AttendeeRecord;
+  connection?: Connection;
+  /** Each source I follow them from, with when that follow was first stored. */
+  follows: { source: FollowSource; since: string }[];
+  tie: Tie;
+}
+
+/** Which of my network's entries to read: for these sessions, for sessions starting in a window, or all at the event. */
 export type PlanScope =
   | { sessionIds: readonly string[] }
   | { startsFrom: string; startsBefore: string }
@@ -44,6 +61,8 @@ export type PlanScope =
 
 export interface NetworkRepository {
   areConnected(one: string, other: string): Promise<boolean>;
+  /** How `viewer` stands to `owner`, in one read: connected, and whether the owner follows the viewer. */
+  tie(viewer: string, owner: string): Promise<Tie>;
   /** The pair's connection, either spelling of the pair. */
   connection(one: string, other: string): Promise<Connection | undefined>;
   /** My connections with the attendee at the other end. */
@@ -85,9 +104,24 @@ export interface NetworkRepository {
   linkedTo(attendeeId: string): Promise<Set<string>>;
 
   /**
-   * My connections' entries for an event in one read, hidden ones included:
-   * the handler filters them through the domain's `visibleEntries`, which is
+   * Replaces the attendee's GitHub follows with these GitHub user ids, in one
+   * batch however many (ADR 0011). A follow kept keeps its `since`. An id
+   * names a GitHub account, so it points at whoever links that account,
+   * now or later.
+   */
+  replaceGitHubFollows(attendeeId: string, gitHubIds: readonly string[], at: string): Promise<void>;
+  /** Replaces the attendee's `linkedin-import` follows with these attendees. A follow kept keeps its `since`. */
+  replaceImportFollows(attendeeId: string, followeeIds: readonly string[], at: string): Promise<void>;
+  /** My connections and the attendees I follow, each once, with how. Never me. */
+  networkOf(attendeeId: string): Promise<NetworkMemberRecord[]>;
+  /** How many GitHub accounts I follow that no attendee has linked yet. */
+  gitHubFollowsNotOnHallway(attendeeId: string): Promise<number>;
+
+  /**
+   * The entries of everyone in my network (`networkOf`) for an event in one
+   * read, hidden ones included, each with how I stand to its owner: the
+   * handler filters them through the domain's `visibleEntries`, which is
    * what keeps the rule in one place.
    */
-  connectionPlans(viewerId: string, eventId: string, scope: PlanScope): Promise<ConnectionPlan[]>;
+  networkPlans(viewerId: string, eventId: string, scope: PlanScope): Promise<NetworkPlan[]>;
 }

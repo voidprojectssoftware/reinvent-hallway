@@ -4,7 +4,6 @@ export { identityHandlers, type IdentityHandlers, type IdentityPorts } from "./i
 export type {
   AgentTokenRecord,
   AgentTokenRepository,
-  AreConnected,
   AttendeeRecord,
   AttendeeRepository,
   CalendarFeedRepository,
@@ -14,9 +13,11 @@ export type {
   IdentityProviders,
   IdentityRecord,
   RecordGitHubFollowing,
+  TieBetween,
   VerifiedIdentity,
   WebSessionRecord,
   WebSessionRepository,
 } from "./ports.ts";
 export { sessionLifetimeDays, type Completed, type SignedIn } from "./sign-in.ts";
 export { claimedProfileUrlPrefix } from "./profile.ts";
+export { viewerTie } from "./tie.ts";
