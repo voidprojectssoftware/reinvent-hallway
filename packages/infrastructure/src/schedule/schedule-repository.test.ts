@@ -2,7 +2,7 @@
 // parameter limit, its atomic batch, and a schema with no abstract in it.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { D1Database } from "@cloudflare/workers-types";
-import type { CatalogSession, ScheduleRepository, SyncWrite } from "@hallway/application";
+import type { CatalogSession, LastSync, ScheduleRepository, SyncWrite } from "@hallway/application";
 import type { PlanEntry } from "@hallway/domain";
 import { openDatabase } from "../persistence/d1/database.ts";
 import { startLocalD1, type LocalD1 } from "../persistence/d1/local-d1.ts";
@@ -38,12 +38,22 @@ const entry = (attendeeId: string, sessionId: string, extra: Partial<PlanEntry> 
   addedAt: seen,
   ...extra,
 });
+const lastSync = (extra: Partial<LastSync> = {}): LastSync => ({
+  syncedAt: seen,
+  added: 0,
+  removed: 0,
+  changed: 0,
+  unchanged: 0,
+  missingSessions: 0,
+  ...extra,
+});
 const sync = (write: Partial<SyncWrite> & Pick<SyncWrite, "attendeeId">): SyncWrite => ({
   eventId: event,
   sessions: [],
   add: [],
   remove: [],
   update: [],
+  lastSync: lastSync(),
   ...write,
 });
 
@@ -174,6 +184,21 @@ describe.each(implementations)("ScheduleRepository %s", (_, make) => {
     expect(await repository.searchSessions(event, { q: "%", limit: 50 })).toEqual([]);
   });
 
+  it("keeps the last sync per attendee and event, each sync replacing the one before", async () => {
+    const repository = make();
+    const [me, other] = [fresh("me"), fresh("other")];
+    expect(await repository.lastSync(me, event)).toBeUndefined();
+    const first = lastSync({ syncedAt: "2026-11-13T12:00:00.000Z", added: 3, missingSessions: 1 });
+    const second = lastSync({ syncedAt: "2026-11-13T13:00:00.000Z", removed: 1, changed: 1, unchanged: 1 });
+    await repository.applySync(sync({ attendeeId: me, lastSync: first }));
+    await repository.applySync(sync({ attendeeId: other, lastSync: lastSync({ added: 9 }) }));
+    expect(await repository.lastSync(me, event)).toEqual(first);
+    await repository.applySync(sync({ attendeeId: me, lastSync: second }));
+    expect(await repository.lastSync(me, event)).toEqual(second);
+    expect(await repository.lastSync(other, event)).toEqual(lastSync({ added: 9 }));
+    expect(await repository.lastSync(me, "other-event")).toBeUndefined();
+  });
+
   it("finds the sessions it has among many ids", async () => {
     const repository = make();
     const ids = Array.from({ length: 250 }, () => fresh("many"));
@@ -237,8 +262,8 @@ describe("ScheduleRepository on D1, at sync size", () => {
     expect(log.batches).toHaveLength(1);
     expect(log.directRuns).toBe(0);
     expect(Math.max(...log.parameters)).toBeLessThanOrEqual(D1_MAX_PARAMETERS);
-    // 200 sessions of 14 columns, 7 a statement; 200 entries of 7 columns, 14 a statement.
-    expect(log.batches[0]).toBe(29 + 15);
+    // The last sync; 200 sessions of 14 columns, 7 a statement; 200 entries of 7 columns, 14 a statement.
+    expect(log.batches[0]).toBe(1 + 29 + 15);
     expect(await repository.entries(me, event)).toHaveLength(200);
 
     // And the next sync of the same size, removing and changing most of it.
@@ -270,6 +295,26 @@ describe("ScheduleRepository on D1, at sync size", () => {
     await expect(repository.applySync(write)).rejects.toThrow();
     expect(await repository.sessions(event, ids)).toEqual([]);
     expect(await repository.entries(me, event)).toEqual([]);
+    expect(await repository.lastSync(me, event)).toBeUndefined();
+  });
+
+  it("a failed sync leaves the previous last sync as it was", async () => {
+    const repository = scheduleOnD1(openDatabase(local.d1));
+    const me = fresh("me");
+    const kept = fresh("kept");
+    const before = lastSync({ syncedAt: "2026-11-13T12:00:00.000Z", added: 1 });
+    await repository.applySync(
+      sync({ attendeeId: me, sessions: [session(kept)], add: [entry(me, kept)], lastSync: before }),
+    );
+    const failing = sync({
+      attendeeId: me,
+      remove: [kept],
+      add: [entry(me, fresh("never-sent"))],
+      lastSync: lastSync({ syncedAt: "2026-11-13T13:00:00.000Z", added: 1, removed: 1 }),
+    });
+    await expect(repository.applySync(failing)).rejects.toThrow();
+    expect(await repository.lastSync(me, event)).toEqual(before);
+    expect(await repository.entries(me, event)).toEqual([entry(me, kept)]);
   });
 
   it("has no column an abstract could be kept in (ADR 0003)", async () => {

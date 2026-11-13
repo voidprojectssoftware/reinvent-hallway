@@ -58,3 +58,25 @@ export const planEntries = sqliteTable(
     check("plan_entries_source", sql`${table.source} in ('agent-sync', 'manual')`),
   ],
 );
+
+/**
+ * What each attendee's last sync for an event did. One row per attendee and
+ * event, replaced inside the sync's own batch (ADR 0009), so it changes only
+ * when a sync lands. No foreign key to attendees, as with plan entries.
+ */
+export const lastSyncs = sqliteTable(
+  "last_syncs",
+  {
+    attendeeId: text("attendee_id").notNull(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.eventId),
+    syncedAt: text("synced_at").notNull(),
+    added: integer("added").notNull(),
+    removed: integer("removed").notNull(),
+    changed: integer("changed").notNull(),
+    unchanged: integer("unchanged").notNull(),
+    missingSessions: integer("missing_sessions").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.attendeeId, table.eventId] })],
+);
