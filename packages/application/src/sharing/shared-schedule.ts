@@ -3,7 +3,7 @@
 // SharedSchedule, and every one of them is built here through the domain's
 // one visibility rule (`shareableEntries`), so no read path decides for itself.
 import type { Event, Session, ShareLinks } from "@hallway/contracts";
-import { canViewSchedule, normalizeHandle, shareableEntries, type Intent } from "@hallway/domain";
+import { canViewSchedule, normalizeHandle, shareableEntries, type Intent, type ShareSelection } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import type { EventRepository } from "../events/event-repository.ts";
 import { personAtKeyboard } from "../identity/person-at-keyboard.ts";
@@ -97,19 +97,42 @@ export function sharingHandlers(dependencies: SharingDependencies): SharingHandl
       const person = personAtKeyboard(actor);
       const feed = person.ok ? await dependencies.calendarFeeds.get(person.value) : undefined;
       if (feed) links.calendarUrl = new URL(calendarFeedPath(feed.token), origin).href;
-      if (person.ok) links.inviteUrl = new URL(await dependencies.invitePath(me), origin).href;
+      if (person.ok) {
+        links.myImageUrl = new URL(myShareImagePath({ kind: "week" }), origin).href;
+        links.inviteUrl = new URL(await dependencies.invitePath(me), origin).href;
+      }
       return ok(links);
     },
   };
 }
 
-/** `/og/{handle}.png?v=...`, the share card's address. */
+/**
+ * `/og/{handle}.png?v=...`, the link preview's card: always the anonymous
+ * view, so it may be cached by URL (#70). The owner's own picture is
+ * `myShareImagePath`, a different address.
+ */
 export const shareImagePath = (handle: string, version: string) =>
   `/og/${encodeURIComponent(handle)}.png?v=${version}`;
 
+/** A selection as a query string ("" for the week, "?day=..." or "?session=...&session=..."). */
+export function selectionSearch(selection: ShareSelection): string {
+  const query = new URLSearchParams();
+  if (selection.kind === "day") query.set("day", selection.day);
+  if (selection.kind === "sessions") for (const id of selection.sessionIds) query.append("session", id);
+  const search = query.toString();
+  return search ? `?${search}` : "";
+}
+
+/**
+ * `/api/me/share-image.png`, my own picture of a selection of my week: only
+ * for me, never cached (ADR 0026). Never the same address as the anonymous card.
+ */
+export const myShareImagePath = (selection: ShareSelection) => `/api/me/share-image.png${selectionSearch(selection)}`;
+
 export const calendarFeedPath = (token: string) => `/cal/${token}.ics`;
 
-function sharedScheduleOf({ events, schedule, areConnected, sessionUrlTemplate }: SharingDependencies) {
+/** An owner's schedule as `viewer` may take it away (`null`: anonymous). */
+export function sharedScheduleOf({ events, schedule, areConnected, sessionUrlTemplate }: SharingDependencies) {
   return async (viewer: string | null, owner: AttendeeRecord): Promise<Outcome<SharedSchedule>> => {
     const event = await events.get(sharedEventId);
     if (!event) return fail("not-found", `No event ${sharedEventId}.`);

@@ -20,6 +20,7 @@
     "aspire": "node scripts/aspire.mjs",
     "aspire:stop": "node scripts/aspire.mjs stop",
     "seed:demo": "node scripts/seed-demo.mjs",
+    "fake:linkedin": "node scripts/fake-linkedin.mjs",
     "db:generate": "node scripts/generate-migration.mjs",
     "test:e2e": "vitest run --config e2e/vitest.config.ts"
   },

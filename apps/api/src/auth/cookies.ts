@@ -69,6 +69,33 @@ export function setOAuthStateCookie(c: Context, provider: SignInProvider, start:
   });
 }
 
+// Posting to LinkedIn (ADR 0026) is its own round trip, with its own cookie
+// on its own callback path, so it never meets a sign-in's. The cookie holds
+// the state and the composer page to come back to; the draft itself waits on
+// the server, keyed by the state's hash.
+export const postStateCookie = "hallway_post_state";
+export const postCallbackPath = "/api/me/share/post/callback";
+
+export function setPostStateCookie(c: Context, start: { state: string; returnTo: string }) {
+  setCookie(c, postStateCookie, `${start.state}${separator}${start.returnTo}`, {
+    httpOnly: true,
+    secure: secure(c),
+    sameSite: "Lax",
+    path: postCallbackPath,
+    maxAge: 600,
+  });
+}
+
+/** The state and the way back, the cookie deleted at once; the path is checked again on the way out. */
+export function takePostStateCookie(c: Context): { state: string | undefined; returnTo: string | undefined } {
+  const value = getCookie(c, postStateCookie);
+  deleteCookie(c, postStateCookie, { path: postCallbackPath, secure: secure(c), httpOnly: true, sameSite: "Lax" });
+  const cut = value?.indexOf(separator) ?? -1;
+  if (value === undefined || cut === -1) return { state: undefined, returnTo: undefined };
+  const returnTo = value.slice(cut + 1);
+  return { state: value.slice(0, cut), returnTo: isReturnPath(returnTo) ? returnTo : undefined };
+}
+
 /**
  * Reads the state, link and return path and deletes the cookie at once: a
  * state is good for one callback. The path is checked again on the way out

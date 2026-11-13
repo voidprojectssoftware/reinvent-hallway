@@ -116,7 +116,7 @@ describe("GET /api/me/share", () => {
 });
 
 describe("GET /og/{handle}.png", () => {
-  it("draws a 1200 by 627 PNG, cacheable for a day when anonymous and current, never when signed in", async () => {
+  it("draws a 1200 by 627 PNG, cacheable for a day when current and briefly otherwise, whoever asks", async () => {
     const me = await attendee("Sam Okafor", "public");
     const { imageUrl } = (await (await call("/api/me/share", { as: me.id })).json()) as ShareLinks;
     const path = new URL(imageUrl).pathname + new URL(imageUrl).search;
@@ -128,7 +128,8 @@ describe("GET /og/{handle}.png", () => {
     expect(pngSize(new Uint8Array(await anonymous.arrayBuffer()))).toEqual([1200, 627]);
 
     expect((await call(`/og/${me.handle}.png?v=stale`)).headers.get("cache-control")).toBe("public, max-age=300");
-    expect((await call(path, { as: me.id })).headers.get("cache-control")).toBe("private, no-store");
+    // The owner asking gets the very same public card, so caching it by URL is safe (#70).
+    expect((await call(path, { as: me.id })).headers.get("cache-control")).toBe("public, max-age=86400, immutable");
   });
 
   it("draws one day when asked, and refuses a day outside the event", async () => {
@@ -140,6 +141,75 @@ describe("GET /og/{handle}.png", () => {
 
   it("answers 404 for an unknown handle", async () => {
     expect((await call("/og/nobody.png")).status).toBe(404);
+  });
+});
+
+// #70: the anonymous card and the owner's picture never share a URL. Every
+// image address Hallway gives the owner is asked for without credentials, and
+// none may answer with anything but the card a stranger gets; the owner's
+// own week is only ever behind their sign-in.
+describe("no image URL gives the owner's week to anyone else (#70)", () => {
+  const bytes = async (response: Response) => Buffer.from(await response.arrayBuffer()).toString("base64");
+
+  it("answers every image URL the owner is handed with the stranger's card or a refusal, never their week", async () => {
+    const me = await attendee("Sam Okafor", "connections");
+    const links = (await (await call("/api/me/share", { as: me.id })).json()) as ShareLinks;
+    const drafts = await Promise.all(
+      ["", "?day=2026-12-01", "?session=s-aim3315"].map(
+        async (query) => ((await (await call(`/api/me/share/post${query}`, { as: me.id })).json()) as { imageUrl: string }).imageUrl,
+      ),
+    );
+    const urls = [links.imageUrl, links.myImageUrl!, ...drafts, `${origin}/og/${me.handle}.png`, `${origin}/og/${me.handle}.png?day=2026-12-01`];
+    const path = (url: string) => new URL(url).pathname + new URL(url).search;
+
+    const strangersCard = await bytes(await call(`/og/${me.handle}.png`));
+    const ownersWeek = await call(path(links.myImageUrl!), { as: me.id });
+    expect(ownersWeek.status).toBe(200);
+    expect(ownersWeek.headers.get("cache-control")).toBe("private, no-store");
+    const week = await bytes(ownersWeek);
+    // The test has teeth only if the two pictures differ.
+    expect(week).not.toBe(strangersCard);
+
+    for (const url of urls) {
+      const response = await call(path(url));
+      if (new URL(url).pathname.startsWith("/og/")) {
+        expect(response.status, url).toBe(200);
+        const body = await bytes(response);
+        expect(body, url).not.toBe(week);
+        // And the owner's own request for it is the stranger's card too, so
+        // whatever a cache kept for this URL is safe to hand anyone.
+        expect(await bytes(await call(path(url), { as: me.id })), url).toBe(body);
+      } else {
+        expect(response.status, url).toBe(401);
+        expect(response.headers.get("content-type"), url).not.toBe("image/png");
+      }
+    }
+    expect(new Set(urls.map((url) => new URL(url).pathname.startsWith("/og/"))).size).toBe(2);
+  });
+});
+
+describe("GET /api/me/share-image.png", () => {
+  it("draws my week, a day or chosen sessions for me alone, never cached, and refuses an agent token", async () => {
+    const me = await attendee("Sam Okafor", "private");
+    for (const query of ["", "?day=2026-12-01", "?session=s-aim3315"]) {
+      const response = await call(`/api/me/share-image.png${query}`, { as: me.id });
+      expect(response.status, query).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(pngSize(new Uint8Array(await response.arrayBuffer()))).toEqual([1200, 627]);
+    }
+    const token = (await (
+      await call("/api/me/tokens", { as: me.id, method: "POST", body: JSON.stringify({ label: "agent" }) })
+    ).json()) as { secret: string };
+    const agent = await call("/api/me/share-image.png", { headers: { authorization: `Bearer ${token.secret}` } });
+    expect(agent.status).toBe(403);
+  });
+
+  it("refuses a hidden session, someone else's, and a day outside the event", async () => {
+    const me = await attendee("Sam Okafor", "public");
+    await hide(me, "s-aim3315");
+    expect((await call("/api/me/share-image.png?session=s-aim3315", { as: me.id })).status).toBe(400);
+    expect((await call("/api/me/share-image.png?session=nope", { as: me.id })).status).toBe(400);
+    expect((await call("/api/me/share-image.png?day=2026-12-25", { as: me.id })).status).toBe(400);
   });
 });
 

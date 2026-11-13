@@ -82,3 +82,10 @@ export {
 } from "./network.ts";
 export { ShareLinks } from "./sharing.ts";
 export { isReturnPath, ReturnPath } from "./return-path.ts";
+export {
+  BeginLinkedInPostInput,
+  BegunLinkedInPost,
+  PostableSession,
+  PostDraft,
+  ShareSelectionQuery,
+} from "./post.ts";

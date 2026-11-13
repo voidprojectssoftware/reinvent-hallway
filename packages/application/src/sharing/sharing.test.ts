@@ -160,6 +160,7 @@ describe("getShareLinks", () => {
     expect(links.ok && links.value).toEqual({
       pageUrl: "https://hallway.example/@sam",
       imageUrl: expect.stringMatching(/^https:\/\/hallway\.example\/og\/sam\.png\?v=[0-9a-f]{16}$/),
+      myImageUrl: "https://hallway.example/api/me/share-image.png",
       calendarUrl: "https://hallway.example/cal/tok-1.ics",
       inviteUrl: "https://hallway.example/@sam?invite=inv-1",
     });
@@ -173,6 +174,7 @@ describe("getShareLinks", () => {
     const agent = await handlers.getShareLinks(attendee("a-owner", "agent-token"), { origin: "https://hallway.example" });
     expect(agent.ok && agent.value.calendarUrl).toBeUndefined();
     expect(agent.ok && agent.value.inviteUrl).toBeUndefined();
+    expect(agent.ok && agent.value.myImageUrl).toBeUndefined();
     expect(agent.ok && agent.value.pageUrl).toBe("https://hallway.example/@sam");
   });
 
