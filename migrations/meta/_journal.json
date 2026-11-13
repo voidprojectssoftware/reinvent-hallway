@@ -85,6 +85,13 @@
       "when": 1794603183316,
       "tag": "0011_add_session_details",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794604470143,
+      "tag": "0012_add_linkedin_post_drafts",
+      "breakpoints": true
     }
   ]
 }
