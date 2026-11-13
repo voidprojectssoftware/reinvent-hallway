@@ -92,6 +92,13 @@
       "when": 1794604468684,
       "tag": "0012_add_follows_and_network_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794604751104,
+      "tag": "0013_add_session_report_abstract_keys",
+      "breakpoints": true
     }
   ]
 }

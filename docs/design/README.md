@@ -115,8 +115,8 @@ from, not a second source.
    hero. This is a utility app.
 6. 44 px tap targets (the small pill buttons extend theirs with `::after`).
 7. Never an AWS logo or the re:Invent wordmark. "re:Invent" as text is fine.
-8. A session abstract only for an attendee whose own agent has synced (ADR
-   0025), as plain text. Everyone else is told the description is on
+8. A session abstract only for an attendee whose own agent has synced an
+   abstract another attendee's agent also sent (ADR 0025, #83), as plain text. Everyone else is told the description is on
    re:Invent, and linked there.
 9. The "not visible to you" state shows the public card and nothing about the
    schedule: no count, no days.

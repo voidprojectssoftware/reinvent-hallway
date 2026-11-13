@@ -19,7 +19,8 @@ largest field, and the session link exists for reading it.
 sends but AWS's live seat state, shows the descriptive fields to anyone who can
 see the session, and shows the abstract only to an attendee whose own agent
 has synced sessions (`canReadAbstract`), never on anything that leaves
-Hallway.
+Hallway. Since #83 that sync must carry an abstract another attendee's agent
+also sent.
 
 **Rejected:** scraping the catalog (behind login, against its use); asking users
 for their Builder ID token (we would hold a credential that can reserve and

@@ -80,6 +80,12 @@ export const sessionReports = sqliteTable(
     attendeeId: text("attendee_id").notNull(),
     reportedAt: text("reported_at").notNull(),
     ...sessionFields(),
+    /**
+     * The domain's `abstractKey` of this report's abstract (SHA-256 of its
+     * normalized text), null when it has none: what corroborates a reader for
+     * abstracts (ADR 0025, issue #83). Only `hasCorroboratedAbstract` reads it.
+     */
+    abstractKey: text("abstract_key"),
   },
   (table) => [
     primaryKey({ columns: [table.eventId, table.sessionId, table.attendeeId] }),
@@ -89,6 +95,9 @@ export const sessionReports = sqliteTable(
     }),
     // An attendee's own reports, read before their next sync merges into them.
     index("session_reports_by_attendee").on(table.attendeeId, table.eventId),
+    // Whether another reporter of a session sent the same abstract: one probe
+    // per report of the reader's, however many report the session.
+    index("session_reports_by_abstract").on(table.eventId, table.sessionId, table.abstractKey),
   ],
 );
 
