@@ -35,3 +35,8 @@ export function respond<T extends object>(c: Context, outcome: Outcome<T>) {
     ? c.json(outcome.value, 200)
     : c.json(outcome.error, httpStatus[outcome.error.kind]);
 }
+
+/** A refusal alone, for a route that answers success its own way (a redirect, a cookie). */
+export function refuse(c: Context, error: ApiError) {
+  return c.json(error, httpStatus[error.kind]);
+}

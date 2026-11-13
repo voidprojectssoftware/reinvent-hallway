@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handleFromName, isValidHandle, normalizeHandle } from "./handles";
+import { handleFromName, isReservedHandle, isValidHandle, normalizeHandle } from "./handles";
 
 describe("normalizeHandle", () => {
   it("trims, drops a leading @, lowercases", () => {
@@ -49,5 +49,20 @@ describe("handleFromName", () => {
   it("a name with nothing to slug falls back to attendee", () => {
     expect(handleFromName("王伟", new Set())).toBe("attendee");
     expect(handleFromName("王伟", new Set(["attendee"]))).toBe("attendee-2");
+  });
+
+  it("skips a reserved word as if taken", () => {
+    expect(handleFromName("Admin", new Set())).toBe("admin-2");
+    expect(handleFromName("Dev", new Set(["dev-2"]))).toBe("dev-3");
+  });
+});
+
+describe("isReservedHandle", () => {
+  it.each(["api", "mcp", "cal", "settings", "connect", "dev"])("reserves %s", (h) => {
+    expect(isReservedHandle(h)).toBe(true);
+  });
+
+  it("leaves an ordinary name free", () => {
+    expect(isReservedHandle("jane-doe")).toBe(false);
   });
 });

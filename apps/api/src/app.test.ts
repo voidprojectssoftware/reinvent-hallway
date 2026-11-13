@@ -2,15 +2,18 @@
 // with plain requests, MCP with the SDK's own client. The point of the
 // skeleton is that both reach one handler, so both must give the same data.
 import { describe, expect, it } from "vitest";
-import { getEvent } from "@hallway/application";
-import { eventsInMemory, reinvent2026 } from "@hallway/infrastructure";
+import { getEvent, identityHandlers } from "@hallway/application";
+import { eventsInMemory, identityInMemory, reinvent2026 } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
 
 const bindings = { DEV_SIGN_IN: "1" };
 const app = createApp<typeof bindings>({
-  handlers: () => ({ getEvent: getEvent(eventsInMemory([reinvent2026])) }),
+  handlers: () => ({
+    getEvent: getEvent(eventsInMemory([reinvent2026])),
+    identity: identityHandlers(identityInMemory()),
+  }),
 });
 const origin = "http://127.0.0.1:8787";
 const call = async (input: string | URL | Request, init?: RequestInit) =>
@@ -46,8 +49,8 @@ describe("MCP get_event", () => {
   it("lists the tool with the contract's input schema", async () => {
     const client = await mcpClient();
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["get_event"]);
-    expect(tools[0]?.inputSchema).toMatchObject({ required: ["eventId"] });
+    const tool = tools.find((candidate) => candidate.name === "get_event");
+    expect(tool?.inputSchema).toMatchObject({ required: ["eventId"] });
     await client.close();
   });
 
@@ -76,8 +79,9 @@ describe("GET /api/openapi.json", () => {
       paths: Record<string, unknown>;
       components: { schemas: Record<string, unknown> };
     };
-    expect(Object.keys(document.paths)).toEqual(["/api/events/{eventId}"]);
-    expect(Object.keys(document.components.schemas).sort()).toEqual(["Error", "Event"]);
+    // Each slice adds its own; this test holds the skeleton's to staying named.
+    expect(Object.keys(document.paths)).toContain("/api/events/{eventId}");
+    expect(Object.keys(document.components.schemas)).toEqual(expect.arrayContaining(["Error", "Event"]));
   });
 });
 

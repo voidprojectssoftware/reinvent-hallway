@@ -11,7 +11,7 @@
 //   Worker over an empty database fails on its first query.
 //
 // It also copies .dev.vars.example to apps/api/.dev.vars when there is none, so
-// the dev bearer token works locally (src/auth/dev-actor.ts). .dev.vars is
+// dev sign-in works locally (src/auth/dev-sign-in.ts). .dev.vars is
 // git-ignored and never deployed.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";

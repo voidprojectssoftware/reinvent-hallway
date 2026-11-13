@@ -2,16 +2,20 @@
 // over D1, tests pass handlers over the in-memory fakes. REST routes and MCP
 // tools both reach the same handlers through `c.var.handlers` (ADR 0002).
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Actor, GetEvent } from "@hallway/application";
+import type { Actor, GetEvent, IdentityHandlers } from "@hallway/application";
 import type { ApiError } from "@hallway/contracts";
-import { resolveDevActor, type DevSignInBindings } from "./auth/dev-actor.ts";
+import { readSessionCookie } from "./auth/cookies.ts";
+import type { DevSignInBindings } from "./auth/dev-sign-in.ts";
+import { resolveActor } from "./auth/resolve-actor.ts";
 import { registerMcp } from "./mcp/server.ts";
 import { httpStatus } from "./outcome-http.ts";
 import { registerEventRoutes } from "./routes/events.ts";
+import { registerIdentityRoutes } from "./routes/identity.ts";
 
 /** Every handler the interfaces may call, built per request from the bindings. */
 export interface Handlers {
   getEvent: GetEvent;
+  identity: IdentityHandlers;
 }
 
 export interface ApiEnv<Bindings extends object> {
@@ -41,14 +45,15 @@ export function createApp<Bindings extends DevSignInBindings>(
   });
 
   app.use("*", async (c, next) => {
-    const actor = resolveDevActor(c.req.raw, c.env);
+    c.set("handlers", dependencies.handlers(c.env));
+    const actor = await resolveActor(c.req.raw, c.env, readSessionCookie(c), c.var.handlers.identity.authenticate);
     if (!actor.ok) return c.json(actor.error, httpStatus[actor.error.kind]);
     c.set("actor", actor.value);
-    c.set("handlers", dependencies.handlers(c.env));
     await next();
   });
 
   registerEventRoutes(app);
+  registerIdentityRoutes(app);
   registerMcp(app);
 
   app.doc31("/api/openapi.json", {

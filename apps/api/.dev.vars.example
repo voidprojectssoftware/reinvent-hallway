@@ -1,4 +1,13 @@
-# The local stand-in sign-in (src/auth/dev-actor.ts). scripts/dev.mjs copies
-# this to .dev.vars (git-ignored) when there is none; wrangler types reads this
-# file, not .dev.vars, so the generated Env is the same on every checkout.
+# Local settings for `npm run dev`. scripts/dev.mjs copies this to .dev.vars
+# (git-ignored) when there is none; wrangler types reads this file, not
+# .dev.vars, so the generated Env is the same on every checkout.
+
+# Dev sign-in (src/auth/dev-sign-in.ts): POST /api/dev/sign-in { name } and
+# `Authorization: Bearer dev:<attendeeId>`, on a loopback host only.
 DEV_SIGN_IN=1
+
+# Sign In with LinkedIn (ADR 0004). Empty until the owner creates the LinkedIn
+# app; LinkedIn sign-in answers 404 while either is empty. Put real values in
+# .dev.vars, never here.
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=

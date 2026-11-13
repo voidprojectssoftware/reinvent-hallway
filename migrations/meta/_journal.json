@@ -15,6 +15,13 @@
       "when": 1794594395676,
       "tag": "0001_seed_reinvent2026",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794595591502,
+      "tag": "0002_create_identity",
+      "breakpoints": true
     }
   ]
 }
