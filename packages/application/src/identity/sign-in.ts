@@ -33,7 +33,7 @@ export interface SignedIn {
 export type Completed = ({ mode: "signed-in" } & SignedIn) | { mode: "linked"; identity: Identity };
 
 export type DevSignIn = (input: DevSignInInput) => Promise<Outcome<SignedIn>>;
-export type DevLinkGitHub = (actor: Actor, input: DevLinkGitHubInput) => Promise<Outcome<Completed>>;
+export type DevLinkGitHub = (actor: Actor, input: DevLinkGitHubInput) => Promise<Outcome<Identity>>;
 export type BeginSignIn = (input: {
   actor: Actor;
   provider: SignInProvider;
@@ -139,7 +139,7 @@ async function emailBelongsToSomeoneElse(
  * have a different account of the same provider.
  */
 function linkTo({ attendees, recordGitHubFollowing, now }: SignInPorts) {
-  return async (attendeeId: string, kind: SignInProvider, identity: VerifiedIdentity): Promise<Outcome<Completed>> => {
+  return async (attendeeId: string, kind: SignInProvider, identity: VerifiedIdentity): Promise<Outcome<Identity>> => {
     const owner = await attendees.identity(kind, identity.subject);
     if (owner && owner.attendeeId !== attendeeId) {
       return fail(
@@ -163,7 +163,7 @@ function linkTo({ attendees, recordGitHubFollowing, now }: SignInPorts) {
       await attendees.link(record);
     }
     if (identity.following) await recordGitHubFollowing({ attendeeId, following: identity.following });
-    return ok({ mode: "linked", identity: toIdentity(record) });
+    return ok(toIdentity(record));
   };
 }
 
@@ -246,7 +246,10 @@ export function signInHandlers(providers: IdentityProviders, ports: SignInPorts)
       if (!code) return fail("invalid", "The callback carries no authorization code.");
       const identity = await adapter.identify({ code, redirectUri });
       if (!identity) return fail("unauthenticated", `${title} did not accept the authorization code.`);
-      if (linkFor !== undefined) return link(linkFor, provider, identity);
+      if (linkFor !== undefined) {
+        const linked = await link(linkFor, provider, identity);
+        return linked.ok ? ok({ mode: "linked", identity: linked.value }) : linked;
+      }
       const signedIn = await signIn(provider, identity);
       return signedIn.ok ? ok({ mode: "signed-in", ...signedIn.value }) : signedIn;
     },

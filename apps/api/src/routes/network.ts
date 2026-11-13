@@ -7,6 +7,8 @@ import {
   ConnectionList,
   ContactImport,
   EventScope,
+  Following,
+  GitHubRoundTrip,
   ImportContactsInput,
   Invite,
   ListConnectionsInput,
@@ -15,9 +17,11 @@ import {
   MeetingGapsQuery,
   NetworkAgenda,
   NetworkAgendaQuery,
+  NetworkList,
   PersonSchedule,
   PersonScheduleQuery,
   PersonScope,
+  RefreshGitHubFollowsInput,
   RequestConnectionInput,
   RequestList,
   RequestResult,
@@ -28,6 +32,7 @@ import {
   type ApiError,
 } from "@hallway/contracts";
 import type { ApiApp } from "../app.ts";
+import { callbackPath, setOAuthStateCookie } from "../auth/cookies.ts";
 import { errorResponses, refuse, respond } from "../outcome-http.ts";
 
 const json = <T>(schema: T, description: string) => ({ description, content: { "application/json": { schema } } });
@@ -41,6 +46,40 @@ const listConnectionsRoute = createRoute({
   tags,
   request: { query: ListConnectionsInput },
   responses: { 200: json(ConnectionList, "My connections, by name."), ...errorResponses },
+});
+
+const listNetworkRoute = createRoute({
+  method: "get",
+  path: "/api/me/network",
+  operationId: "listMyNetwork",
+  summary: "My network: my connections and the people I follow, each once, labelled with how",
+  description:
+    "Each person says whether I may see their schedule. Following someone does not let me see a network-only schedule; their connecting with me or following me does. With `eventId`, each carries how many of their sessions I may see and share.",
+  tags,
+  request: { query: ListConnectionsInput },
+  responses: { 200: json(NetworkList, "My network, by name."), ...errorResponses },
+});
+
+const listFollowingRoute = createRoute({
+  method: "get",
+  path: "/api/me/following",
+  operationId: "listFollowing",
+  summary: "The people I follow, grouped by source: GitHub, and my LinkedIn Connections.csv",
+  tags,
+  request: { query: ListConnectionsInput },
+  responses: { 200: json(Following, "Who I follow."), ...errorResponses },
+});
+
+const refreshGitHubRoute = createRoute({
+  method: "post",
+  path: "/api/me/following/github/refresh",
+  operationId: "refreshGitHubFollows",
+  summary: "Start a GitHub round trip that reads who I follow again. Web sign-in only: 403 to an agent token",
+  description:
+    "Sets the round trip's state cookie and returns GitHub's URL for the browser to open. GitHub comes back to `/api/auth/github/callback`, which replaces my GitHub follows with the list GitHub gives and drops the token; then the browser lands on `returnTo`. The same as adding GitHub in Settings, so it links GitHub if it is not linked yet. 404 when GitHub sign-in is not configured here.",
+  tags,
+  request: { body: { required: false, content: { "application/json": { schema: RefreshGitHubFollowsInput } } } },
+  responses: { 200: json(GitHubRoundTrip, "Where to send the browser."), ...errorResponses },
 });
 
 const removeConnectionRoute = createRoute({
@@ -190,6 +229,25 @@ const gapsRoute = createRoute({
 });
 
 export function registerNetworkRoutes<B extends object>(app: ApiApp<B>) {
+  app.openapi(listNetworkRoute, async (c) =>
+    respond(c, await c.var.handlers.network.listMyNetwork(c.var.actor, c.req.valid("query"))),
+  );
+  app.openapi(listFollowingRoute, async (c) =>
+    respond(c, await c.var.handlers.network.listFollowing(c.var.actor, c.req.valid("query"))),
+  );
+  // RefreshGitHubFollows is LinkIdentity for GitHub: the callback stores the list.
+  app.openapi(refreshGitHubRoute, async (c) => {
+    const { returnTo = "/network" } = c.req.valid("json") ?? {};
+    const begun = await c.var.handlers.identity.beginSignIn({
+      actor: c.var.actor,
+      provider: "github",
+      link: true,
+      redirectUri: new URL(callbackPath("github"), c.req.url).toString(),
+    });
+    if (!begun.ok) return refuse(c, begun.error);
+    setOAuthStateCookie(c, "github", { state: begun.value.state, linkFor: begun.value.linkFor, returnTo });
+    return c.json({ authorizationUrl: begun.value.authorizationUrl }, 200);
+  });
   app.openapi(listConnectionsRoute, async (c) =>
     respond(c, await c.var.handlers.network.listConnections(c.var.actor, c.req.valid("query"))),
   );
