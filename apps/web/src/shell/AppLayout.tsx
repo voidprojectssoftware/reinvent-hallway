@@ -20,6 +20,7 @@ import { NavLink, Outlet, useNavigation, useRouteLoaderData } from "react-router
 import { api } from "../api/client.ts";
 import { HandlePrompt } from "../profile/HandlePrompt.tsx";
 import { Icon, type IconName } from "./Icon.tsx";
+import { MadeBy } from "./MadeBy.tsx";
 import { ifSignedIn } from "./signed-in.ts";
 
 const tabs: { to: string; label: string; icon: IconName }[] = [
@@ -81,6 +82,7 @@ export function AppLayout() {
               )}
             </NavLink>
           ))}
+          <MadeBy />
         </nav>
       )}
     </>

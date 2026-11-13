@@ -586,7 +586,7 @@ button.cell:active {
   border-radius: var(--r-ico);
   display: grid;
   place-items: center;
-  /* The light indigo in both schemes: white glyphs on the dark scheme's
+  /* The light violet in both schemes: white glyphs on the dark scheme's
      lighter tint were too faint. */
   background: var(--av-1);
   color: #fff;
@@ -912,5 +912,42 @@ button.cell:active {
   }
   main {
     padding-bottom: 64px;
+  }
+}
+
+/* "Made by Void Projects" (MadeBy.tsx, issue #106): a footnote-sized line,
+   one per screen size. The secondary label, as every other footnote: it is
+   a credit, not an action. The 44 px row is its tap target. */
+.madeby {
+  display: flex;
+  margin-top: var(--sp-5);
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--tap);
+  font: var(--t-footnote);
+  color: var(--label2);
+}
+.madeby img {
+  flex: none;
+}
+.madeby strong {
+  font-weight: 600;
+}
+.tabbar a.madeby {
+  display: none;
+}
+@media (min-width: 1000px) {
+  .tabbar a.madeby {
+    display: flex;
+    justify-content: flex-start;
+    height: auto;
+    margin-top: auto;
+    gap: 6px;
+    font: var(--t-footnote);
+    color: var(--label2);
+  }
+  .madeby.on-phone {
+    display: none;
   }
 }

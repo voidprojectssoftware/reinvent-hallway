@@ -585,7 +585,7 @@ button.cell:active {
   border-radius: var(--r-ico);
   display: grid;
   place-items: center;
-  /* The light indigo in both schemes: white glyphs on the dark scheme's
+  /* The light violet in both schemes: white glyphs on the dark scheme's
      lighter tint were too faint. */
   background: var(--av-1);
   color: #fff;
