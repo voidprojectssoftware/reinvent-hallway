@@ -22,11 +22,12 @@ import { asToolOutput } from "./server.ts";
  */
 export const syncMyScheduleDescription = [
   "Put the user's AWS re:Invent 2026 schedule on Hallway, so the people they know can see where they will be. Hallway cannot read AWS itself; you read it from the AWS Events MCP server and send it here.",
-  "1. Call the AWS Events MCP tool `GetSchedule` with eventId `reinvent2026`. It returns `favorites` and `reserved`, two lists of session ids.",
-  "2. Call AWS `GetSession` for each id in both lists (or, for many ids, page through AWS `ListSessions` with `includeAbstracts=false` and keep the ones you need).",
-  "3. Call this tool once, with eventId `reinvent2026`, every session object in `sessions` exactly as AWS returned it, and the two id lists exactly as `GetSchedule` gave them.",
+  "1. Call the AWS Events MCP tool `GetSchedule` with eventId `reinvent2026`. It returns `favorites` and `reserved`, two lists of session ids, and `invitedSessions`, whole sessions the event placed on the user's schedule.",
+  "2. Call AWS `GetSession` for each id in `favorites` and `reserved` (or, for many ids, page through AWS `ListSessions` with `includeAbstracts=false` and keep the ones you need).",
+  "3. Call this tool once, with eventId `reinvent2026`, every session object in `sessions` exactly as AWS returned it, the two id lists exactly as `GetSchedule` gave them, and `invitedSessions` exactly as `GetSchedule` gave it.",
   "Leave `abstract` out of each session if you can: Hallway never stores or shows it, and dropping it keeps a large schedule within your tool-input limits. Sessions shaped like `ListSessions` with `includeAbstracts=false` are exactly right.",
-  "Each call replaces what your last sync put on Hallway: un-favorited sessions are removed, reservations show as reserved, and sessions the user added or hid on Hallway are kept. The same input twice changes nothing. An id sent without a session object that Hallway has never seen is skipped and listed in `missingSessions`; call `GetSession` for those and sync again.",
+  "Each call replaces what your last sync put on Hallway: un-favorited sessions are removed, reservations and invitations show as reserved (invitations marked `invited`), and sessions the user added or hid on Hallway are kept. The same input twice changes nothing. An id sent without a session object that Hallway has never seen is skipped and listed in `missingSessions`; call `GetSession` for those and sync again.",
+  "Send only the user's own sessions, copied from AWS. A session object for an id in none of the lists is ignored. The session details everyone sees are what most attendees' agents report, so one agent's copying mistake does not change a session for others.",
   "Hallway never reserves, cancels or favorites anything on AWS, and writes nothing back to AWS. To reserve a seat, use AWS `ReserveSessions` or follow the session's `url`.",
 ].join("\n\n");
 

@@ -110,7 +110,10 @@ export type Session = z.infer<typeof Session>;
 
 export const Intent = z
   .enum(["interested", "reserved"])
-  .meta({ description: "`interested` is an AWS favorite, `reserved` an AWS reservation." });
+  .meta({
+    description:
+      "`interested` is an AWS favorite, `reserved` an AWS reservation or invitation. A session added by hand is `reserved` while the latest sync says it is reserved, and `interested` otherwise.",
+  });
 export const EntrySource = z
   .enum(["agent-sync", "manual"])
   .meta({ description: "`agent-sync` came from the attendee's agent; `manual` was added on Hallway." });
@@ -120,7 +123,12 @@ export const PlanEntry = z
     sessionId: SessionId,
     intent: Intent,
     source: EntrySource,
-    hidden: z.boolean().meta({ description: "Hidden entries are seen only by their owner." }),
+    invited: z.boolean().meta({
+      description: "The event placed it on my schedule (AWS `invitedSessions`); shown as invited, held like a reservation.",
+    }),
+    hidden: z.boolean().meta({
+      description: "Hidden entries are seen only by their owner. Hiding is kept per session, so it holds if the session leaves my schedule and comes back.",
+    }),
     addedAt: instant,
     session: Session,
   })
@@ -167,10 +175,18 @@ export const SyncScheduleBody = z.object({
     .max(1000)
     .meta({
       description:
-        "A session object (AWS's shape) for each id in `favorites` and `reserved`. Ids Hallway already has may be left out.",
+        "A session object (AWS's shape) for each id in `favorites` and `reserved`. Ids Hallway already has may be left out. A session in neither list is ignored: an agent reports only sessions on its own attendee's schedule.",
     }),
   favorites: idList("`favorites` from AWS `GetSchedule`, unchanged."),
   reserved: idList("`reserved` from AWS `GetSchedule`, unchanged."),
+  invitedSessions: z
+    .array(AwsSession)
+    .max(1000)
+    .default([])
+    .meta({
+      description:
+        "`invitedSessions` from AWS `GetSchedule`, unchanged: whole sessions the event placed on the schedule by invitation. Each is held like a reservation and marked invited.",
+    }),
 });
 export type SyncScheduleBody = z.infer<typeof SyncScheduleBody>;
 
@@ -184,7 +200,9 @@ export const SyncResult = z
     removed: count.meta({ description: "Synced sessions no longer favorited or reserved on AWS." }),
     changed: count.meta({ description: "Entries whose intent changed (a favorite reserved, a reservation cancelled)." }),
     unchanged: count.meta({ description: "Sent sessions already on the schedule as they should be." }),
-    sessionsStored: count.meta({ description: "Session snapshots saved to the catalog." }),
+    sessionsStored: count.meta({
+      description: "Snapshots kept as this attendee's report of a listed session. The catalog shows what most reporters agree on.",
+    }),
     missingSessions: z.array(SessionId).meta({
       description:
         "Listed ids sent without a session object that Hallway has never seen. They were skipped: send their `GetSession` output and sync again.",
@@ -208,7 +226,7 @@ export const SearchSessionsQuery = z.object({
     .min(1)
     .max(200)
     .optional()
-    .meta({ description: "Matches the code, title or a speaker, ignoring case." }),
+    .meta({ description: "Matches the code, title or a speaker, ignoring case and accents." }),
   day: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

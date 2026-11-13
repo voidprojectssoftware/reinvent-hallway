@@ -7,6 +7,7 @@ function entry(sessionId: string, code: string | undefined, startsAt?: string, e
     sessionId,
     intent: "interested",
     source: "agent-sync",
+    invited: false,
     hidden: false,
     addedAt: "2026-11-13T12:00:00Z",
     session: { sessionId, eventId: "reinvent2026", code, title: `Title of ${sessionId}`, startsAt, endsAt, lastSeenAt: "2026-11-13T12:00:00Z", ...extra },

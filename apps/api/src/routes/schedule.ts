@@ -25,9 +25,9 @@ const syncRoute = createRoute({
   method: "put",
   path: mySchedule,
   operationId: "syncMySchedule",
-  summary: "Replace my synced entries with my AWS favorites and reservations",
+  summary: "Replace my synced entries with my AWS favorites, reservations and invitations",
   description:
-    "What `sync_my_schedule` does over MCP. Upserts the session snapshots, then makes my `agent-sync` entries equal the two id lists. Manual entries and hidden flags survive.",
+    "What `sync_my_schedule` does over MCP. Keeps each snapshot of a listed session as my report of it (the catalog shows what most reporters agree on), then makes my `agent-sync` entries equal the id lists and invited sessions. Manual entries and hidden sessions survive.",
   request: { params: EventScope, body: body(SyncScheduleBody) },
   responses: { 200: json(SyncResult, "What the sync did."), ...errorResponses },
 });
