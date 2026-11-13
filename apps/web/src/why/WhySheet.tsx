@@ -3,15 +3,14 @@
 // app sends a person to re:Invent, so the reason is said once and the same
 // everywhere (its words are in copy.ts).
 //
-// It is the share sheet's action sheet and focus trap (useModal), with text
-// in place of actions, and opens scrolled to the part the link was beside.
+// It is the shared action sheet (Sheet), with text in place of actions, and
+// opens scrolled to the part the link was beside.
 // The closing step is the session on re:Invent when there is one, else a
 // sync from Connect your agent.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { Link } from "react-router";
 import { Icon } from "../shell/Icon.tsx";
-import { useModal } from "../shell/modal.ts";
+import { Sheet } from "../shell/Sheet.tsx";
 import { whyNext, whySections, whyTitle, type WhySection } from "./copy.ts";
 
 interface WhyProps {
@@ -58,9 +57,7 @@ function WhyOpener({ children, ...props }: WhyProps & { children: (open: () => v
 }
 
 function WhySheet({ section, sessionUrl, onClose }: WhyProps & { onClose: () => void }) {
-  const dialog = useRef<HTMLDivElement>(null);
   const opened = useRef<HTMLElement>(null);
-  useModal(dialog, onClose);
 
   // The schedule part sits under the description; on a short window the
   // sheet scrolls, so a link about the schedule brings that part into view.
@@ -68,42 +65,28 @@ function WhySheet({ section, sessionUrl, onClose }: WhyProps & { onClose: () => 
     if (section !== "description") opened.current?.scrollIntoView({ block: "start" });
   }, [section]);
 
-  // Into body, as the share sheet: a fixed sheet inside the blurred nav bar
-  // or a group would be pinned to it. Unlike the share sheet, the dialog
-  // that takes focus is the panel that scrolls, not the dimmed page around
-  // it: this sheet is mostly text, longer than a phone's screen, and the
-  // arrow keys and Page Down scroll only what has focus or holds it.
-  return createPortal(
-    <div className="sheet" onClick={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="sheet-in" role="dialog" aria-modal="true" aria-labelledby="why-t" tabIndex={-1} ref={dialog}>
-        <div className="sheet-grab" aria-hidden="true" />
-        <div className="sheet-g">
-          <div className="sheet-t">
-            <b id="why-t">{whyTitle}</b>
-          </div>
-          {(Object.keys(whySections) as WhySection[]).map((key) => (
-            <section key={key} className="why-part" ref={key === section ? opened : undefined} aria-labelledby={`why-${key}`}>
-              <h2 id={`why-${key}`}>{whySections[key].heading}</h2>
-              {whySections[key].paragraphs.map((text) => (
-                <p key={text}>{text}</p>
-              ))}
-            </section>
-          ))}
-          {sessionUrl ? (
-            <a className="sheet-b" href={sessionUrl} target="_blank" rel="noopener">
-              {whyNext.open} <Icon name="out" />
-            </a>
-          ) : (
-            <Link className="sheet-b" to="/connect" onClick={onClose}>
-              {whyNext.sync}
-            </Link>
-          )}
-        </div>
-        <button className="sheet-cancel" type="button" onClick={onClose}>
-          Done
-        </button>
+  return (
+    <Sheet labelledBy="why-t" onClose={onClose} closeLabel="Done">
+      <div className="sheet-t">
+        <b id="why-t">{whyTitle}</b>
       </div>
-    </div>,
-    document.body,
+      {(Object.keys(whySections) as WhySection[]).map((key) => (
+        <section key={key} className="why-part" ref={key === section ? opened : undefined} aria-labelledby={`why-${key}`}>
+          <h2 id={`why-${key}`}>{whySections[key].heading}</h2>
+          {whySections[key].paragraphs.map((text) => (
+            <p key={text}>{text}</p>
+          ))}
+        </section>
+      ))}
+      {sessionUrl ? (
+        <a className="sheet-b" href={sessionUrl} target="_blank" rel="noopener">
+          {whyNext.open} <Icon name="out" />
+        </a>
+      ) : (
+        <Link className="sheet-b" to="/connect" onClick={onClose}>
+          {whyNext.sync}
+        </Link>
+      )}
+    </Sheet>
   );
 }

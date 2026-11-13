@@ -9,12 +9,11 @@ import { useEffect, useRef, type RefObject } from "react";
 
 const focusable = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function useModal(sheet: RefObject<HTMLElement | null>, onClose: () => void, open = true) {
+export function useModal(sheet: RefObject<HTMLElement | null>, onClose: () => void) {
   const close = useRef(onClose);
   close.current = onClose;
 
   useEffect(() => {
-    if (!open) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const root = document.getElementById("root");
     root?.setAttribute("inert", "");
@@ -48,5 +47,5 @@ export function useModal(sheet: RefObject<HTMLElement | null>, onClose: () => vo
       root?.removeAttribute("inert");
       if (opener?.isConnected) opener.focus();
     };
-  }, [open, sheet]);
+  }, [sheet]);
 }

@@ -21,11 +21,10 @@
 // A placeholder handle (issue #48) is nudged at the top until it is replaced:
 // the page link is the handle, and a made-up one is a poor thing to post.
 //
-// It is modal for the keyboard too (useModal): focus stays in it, and goes
-// back to the Share button when it closes.
+// It is the shared action sheet (Sheet), modal for the keyboard too: focus
+// stays in it, and goes back to the Share button when it closes.
 import type { ShareLinks } from "@hallway/contracts";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { api } from "../api/client.ts";
 import { copyText } from "../copy.ts";
@@ -33,7 +32,7 @@ import { WhoCanSee } from "../settings/WhoCanSee.tsx";
 import { useMe } from "../shell/AppLayout.tsx";
 import { ProblemText, type Failed } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
-import { useModal } from "../shell/modal.ts";
+import { Sheet } from "../shell/Sheet.tsx";
 
 /** An https feed as a webcal: link, which calendar apps open as a subscription. */
 const webcal = (calendarUrl: string) => calendarUrl.replace(/^https?:/, "webcal:");
@@ -46,8 +45,6 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
   const [note, setNote] = useState<string | null>(null);
   const [failed, setFailed] = useState<Failed | null>(null);
   const [busy, setBusy] = useState(false);
-  const dialog = useRef<HTMLDivElement>(null);
-  useModal(dialog, onClose);
 
   async function load() {
     try {
@@ -87,109 +84,89 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
   }
 
   const page = links && new URL(links.pageUrl);
-  // Into body, not where the Share button sits: the nav bar's backdrop-filter
-  // makes it the containing block of anything fixed inside it, which pinned
-  // the sheet to the bar's 44 px.
-  return createPortal(
-    <div
-      className="sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="share-t"
-      tabIndex={-1}
-      ref={dialog}
-      onClick={(event) => event.target === event.currentTarget && onClose()}
-    >
-      <div className="sheet-in">
-        <div className="sheet-grab" aria-hidden="true" />
-        <div className="sheet-g">
-          <div className="sheet-t">
-            <b id="share-t">Share my week</b>
-            {page ? `${page.host}${page.pathname} shows your week to whoever your settings allow.` : "Getting your links…"}
-            {links?.inviteUrl && " Your invite link also lets whoever has it connect with you in one tap."}
-            {placeholder && (
-              <span className="sheet-note">Your link uses a handle Hallway made up. Choose your own before you share it.</span>
-            )}
-            {(note || failed) && (
-              <span className={failed ? "sheet-note error" : "sheet-note"} role={failed ? "alert" : "status"}>
-                {failed ? <ProblemText failed={failed} /> : note}
-              </span>
-            )}
-          </div>
-          {links && (
-            <div className="sheet-pics">
-              <figure>
-                <img src={links.imageUrl} alt="The link preview people see when you post your link" width={1200} height={627} />
-                <figcaption>When you post the link, people see</figcaption>
-              </figure>
-              {links.myImageUrl && (
-                <figure>
-                  <img src={links.myImageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
-                  <figcaption>Your week, to save and post as a picture</figcaption>
-                </figure>
-              )}
-            </div>
-          )}
-          {links && visibility !== "public" && (
-            <div className="sheet-vis">
-              <p className="sheet-vis-t">
-                {visibility === "private"
-                  ? "Your week is private, so the link preview shows only your name."
-                  : "Your week is for your network, so the link preview shows only your name."}
-              </p>
-              <WhoCanSee visibility={visibility} onChanged={() => void load()} />
-            </div>
-          )}
-          {placeholder && (
-            <Link className="sheet-b" to="/settings/profile" onClick={onClose}>
-              <Icon name="gear" />
-              Choose your handle
-            </Link>
-          )}
-          {links && (
-            <>
-              <SheetButton icon="link" onClick={() => copy(links.pageUrl, "Link copied.")}>
-                Copy link
-              </SheetButton>
-              {links.inviteUrl && (
-                <SheetButton icon="people" onClick={() => copy(links.inviteUrl ?? "", "Invite link copied. Whoever opens it can connect with you.")}>
-                  Copy invite link
-                </SheetButton>
-              )}
-              <Link className="sheet-b" to="/share/post" onClick={onClose}>
-                <Icon name="share" />
-                Post on LinkedIn
-              </Link>
-              {links.myImageUrl && (
-                <a className="sheet-b" href={links.myImageUrl} download="hallway-week.png">
-                  <Icon name="photo" />
-                  Save picture
-                </a>
-              )}
-              {links.calendarUrl ? (
-                <a className="sheet-b" href={webcal(links.calendarUrl)}>
-                  <Icon name="cal" />
-                  Subscribe in Calendar
-                </a>
-              ) : (
-                <SheetButton icon="cal" disabled={busy} onClick={() => change(() => api.rotateCalendarFeed(), "Calendar link made. Tap Subscribe.")}>
-                  Make a calendar link
-                </SheetButton>
-              )}
-              {links.inviteUrl && (
-                <SheetButton icon="key" danger disabled={busy} onClick={resetInvite}>
-                  Reset invite link
-                </SheetButton>
-              )}
-            </>
+  return (
+    <Sheet labelledBy="share-t" onClose={onClose} closeLabel="Cancel">
+      <div className="sheet-t">
+        <b id="share-t">Share my week</b>
+        {page ? `${page.host}${page.pathname} shows your week to whoever your settings allow.` : "Getting your links…"}
+        {links?.inviteUrl && " Your invite link also lets whoever has it connect with you in one tap."}
+        {placeholder && (
+          <span className="sheet-note">Your link uses a handle Hallway made up. Choose your own before you share it.</span>
+        )}
+        {(note || failed) && (
+          <span className={failed ? "sheet-note error" : "sheet-note"} role={failed ? "alert" : "status"}>
+            {failed ? <ProblemText failed={failed} /> : note}
+          </span>
+        )}
+      </div>
+      {links && (
+        <div className="sheet-pics">
+          <figure>
+            <img src={links.imageUrl} alt="The link preview people see when you post your link" width={1200} height={627} />
+            <figcaption>When you post the link, people see</figcaption>
+          </figure>
+          {links.myImageUrl && (
+            <figure>
+              <img src={links.myImageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
+              <figcaption>Your week, to save and post as a picture</figcaption>
+            </figure>
           )}
         </div>
-        <button className="sheet-cancel" type="button" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
-    </div>,
-    document.body,
+      )}
+      {links && visibility !== "public" && (
+        <div className="sheet-vis">
+          <p className="sheet-vis-t">
+            {visibility === "private"
+              ? "Your week is private, so the link preview shows only your name."
+              : "Your week is for your network, so the link preview shows only your name."}
+          </p>
+          <WhoCanSee visibility={visibility} onChanged={() => void load()} />
+        </div>
+      )}
+      {placeholder && (
+        <Link className="sheet-b" to="/settings/profile" onClick={onClose}>
+          <Icon name="gear" />
+          Choose your handle
+        </Link>
+      )}
+      {links && (
+        <>
+          <SheetButton icon="link" onClick={() => copy(links.pageUrl, "Link copied.")}>
+            Copy link
+          </SheetButton>
+          {links.inviteUrl && (
+            <SheetButton icon="people" onClick={() => copy(links.inviteUrl ?? "", "Invite link copied. Whoever opens it can connect with you.")}>
+              Copy invite link
+            </SheetButton>
+          )}
+          <Link className="sheet-b" to="/share/post" onClick={onClose}>
+            <Icon name="share" />
+            Post on LinkedIn
+          </Link>
+          {links.myImageUrl && (
+            <a className="sheet-b" href={links.myImageUrl} download="hallway-week.png">
+              <Icon name="photo" />
+              Save picture
+            </a>
+          )}
+          {links.calendarUrl ? (
+            <a className="sheet-b" href={webcal(links.calendarUrl)}>
+              <Icon name="cal" />
+              Subscribe in Calendar
+            </a>
+          ) : (
+            <SheetButton icon="cal" disabled={busy} onClick={() => change(() => api.rotateCalendarFeed(), "Calendar link made. Tap Subscribe.")}>
+              Make a calendar link
+            </SheetButton>
+          )}
+          {links.inviteUrl && (
+            <SheetButton icon="key" danger disabled={busy} onClick={resetInvite}>
+              Reset invite link
+            </SheetButton>
+          )}
+        </>
+      )}
+    </Sheet>
   );
 }
 
