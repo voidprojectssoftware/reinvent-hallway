@@ -209,3 +209,73 @@ body.loading main {
 .day.any b {
   font: 600 15px/1.15 var(--font);
 }
+
+/* The composer (ADR 0026). The picture for the selection, as large as the
+   column allows, at the card's own ratio so nothing jumps when it loads. */
+.post-pic {
+  margin: 0;
+}
+.post-pic img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 627;
+  border-radius: var(--r-cell);
+  border: 0.5px solid var(--sep);
+  background: var(--fill);
+}
+/* The post's text, filling its cell as a grouped form's field does. */
+.post-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 14em;
+  padding: 11px var(--sp-4);
+  border: 0;
+  background: transparent;
+  font: var(--t-body);
+  color: var(--label);
+  resize: vertical;
+}
+.post-text:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+  border-radius: var(--r-cell);
+}
+/* A session's tick in the composer's list: an empty ring, filled when chosen. */
+.pick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--label3);
+  color: var(--cell);
+}
+.pick.on {
+  border-color: var(--tint);
+  background: var(--tint);
+}
+.pick svg {
+  width: 14px;
+  height: 14px;
+}
+.cell.action.lead svg {
+  width: 20px;
+  height: 20px;
+}
+/* What came back from LinkedIn when nothing was posted, above the form. */
+.post-banner {
+  margin-top: var(--sp-4);
+}
+.post-vis {
+  margin-top: var(--sp-5);
+}
+.post-vis > .gfoot {
+  margin-top: 0;
+}
+/* The composer's day chips sit under a footnote, not a title. */
+.post-days {
+  margin-top: var(--sp-5);
+}

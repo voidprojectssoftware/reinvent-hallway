@@ -16,6 +16,7 @@ import {
   AgentTokenList,
   ApiError,
   AttendeeCard,
+  BegunLinkedInPost,
   CalendarFeed,
   Connection,
   ConnectionList,
@@ -27,6 +28,7 @@ import {
   MySchedule,
   PersonSchedule,
   PlanEntry,
+  PostDraft,
   RequestList,
   RequestResult,
   Session,
@@ -35,6 +37,7 @@ import {
   SignInOptions,
   SuggestionList,
   WhoIsGoing,
+  type BeginLinkedInPostInput,
   type ErrorKind,
   type UpdateProfileInput,
   type Visibility,
@@ -171,6 +174,10 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
       ),
 
     shareLinks: () => request("GET", "/api/me/share", ShareLinks),
+    /** The composer's draft for a selection: `search` is "", "?day=..." or "?session=...&session=...". */
+    composePost: (search: string) => request("GET", `/api/me/share/post${search}`, PostDraft),
+    /** Holds the post on the server and answers LinkedIn's consent page, for a page navigation. */
+    beginLinkedInPost: (input: BeginLinkedInPostInput) => request("POST", "/api/me/share/post", BegunLinkedInPost, input),
 
     mySchedule: (eventId: string) => request("GET", myScheduleOf(eventId), MySchedule),
     addToPlan: (eventId: string, sessionId: string) => request("POST", entryOf(eventId, sessionId), PlanEntry),
@@ -188,27 +195,6 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
       if (filter.day) query.set("day", filter.day);
       const search = query.size > 0 ? `?${query}` : "";
       return request("GET", `/api/events/${encodeURIComponent(eventId)}/sessions${search}`, SessionList);
-    },
-
-    /**
-     * The share card as an anonymous visitor gets it, which is what LinkedIn
-     * fetches for the link preview (ADR 0012): without the cookie, so the
-     * owner sees what others will. It is asked for under its own URL (an
-     * extra `view` the server ignores) so the browser's cache never hands
-     * this public card to the owner's signed-in `<img>` of the same picture.
-     * TODO(#70): a preview URL from ShareLinks would make this a plain `<img>`.
-     */
-    publicShareCard: async (imageUrl: string): Promise<Blob> => {
-      const url = new URL(imageUrl);
-      url.searchParams.set("view", "public");
-      let response: Response;
-      try {
-        response = await send(url.pathname + url.search, { credentials: "omit" });
-      } catch (cause) {
-        throw new ApiFailure("unreachable", `Could not reach Hallway: ${String(cause)}`);
-      }
-      if (!response.ok) throw new ApiFailure("unexpected", `GET ${url.pathname} answered ${response.status}.`, response.status);
-      return response.blob();
     },
   };
 }

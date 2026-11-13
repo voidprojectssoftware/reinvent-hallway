@@ -225,6 +225,13 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
             />
           </label>
         </li>
+        {!entry.hidden && (
+          <li>
+            <Link className="cell action lead" to={`/share/post?session=${encodeURIComponent(sessionId)}`}>
+              Tell people you're going
+            </Link>
+          </li>
+        )}
         {!synced && (
           <li>
             <button className="cell action danger" type="button" disabled={busy} onClick={() => change(() => api.removeFromPlan(EVENT_ID, sessionId))}>

@@ -177,6 +177,7 @@ describe("posting to LinkedIn, against the fake LinkedIn", () => {
     expect((await w.post(sam, { text: "Tuesday", day })).back.searchParams.get("posted")).toBeTruthy();
     expect((await w.post(sam, { text: "One", sessionIds: [offered[0]!.sessionId] })).back.searchParams.get("posted")).toBeTruthy();
     expect(w.linkedIn.posts.map((p) => p.commentary)).toEqual(["Tuesday", "One"]);
+    expect(new Set(w.linkedIn.posts.map((p) => p.urn)).size).toBe(2);
   });
 
   it("uses a draft once: the same callback again posts nothing", async () => {

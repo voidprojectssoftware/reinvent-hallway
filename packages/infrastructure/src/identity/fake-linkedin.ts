@@ -86,7 +86,7 @@ export function fakeLinkedIn({ uploadBase = "https://www.linkedin.com/dms-upload
         if (typeof body.commentary !== "string" || body.commentary.length > 3000) {
           return json({ message: "commentary must be text of at most 3000 characters" }, 422);
         }
-        const urn = `urn:li:share:${7000000000000000000 + posts.length + 1}`;
+        const urn = `urn:li:share:${7000000000000000000n + BigInt(posts.length + 1)}`;
         posts.push({
           urn,
           author: member,

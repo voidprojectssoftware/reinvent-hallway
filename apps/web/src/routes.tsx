@@ -5,6 +5,7 @@
 // A screen that is only mine sends a signed-out visitor to /sign-in from its
 // loader (requireSignIn); a /@handle and a session are open to anyone.
 import { createBrowserRouter, Link, useLocation, useRevalidator, useRouteError } from "react-router";
+import { Compose, composeLoader } from "./screens/Compose.tsx";
 import { ConnectAgent, connectAgentLoader } from "./screens/ConnectAgent.tsx";
 import { MyWeek, myWeekLoader } from "./screens/MyWeek.tsx";
 import { Network, networkLoader } from "./screens/Network.tsx";
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
           { path: "/connect", element: <ConnectAgent />, loader: connectAgentLoader },
           { path: "/settings", element: <Settings />, loader: settingsLoader },
           { path: "/settings/profile", element: <Profile />, loader: profileLoader },
+          { path: "/share/post", element: <Compose />, loader: composeLoader },
           { path: "/sessions", element: <Sessions />, loader: sessionsLoader },
           { path: "/sessions/:sessionId", element: <Session />, loader: sessionLoader },
           // /@handle. Static paths above win over this one; Person shows
@@ -61,6 +63,7 @@ const titles: Record<string, string> = {
   "/connect": "Connect your agent",
   "/settings": "Settings",
   "/settings/profile": "Profile",
+  "/share/post": "Tell people you're going",
   "/sign-in": "Hallway",
 };
 
