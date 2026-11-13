@@ -12,6 +12,7 @@
 // SQL, inside the batch, so a concurrent report is never lost.
 import type { CatalogSession, ScheduleRepository, SessionFilter } from "@hallway/application";
 import {
+  abstractKey,
   foldSpeakers,
   foldText,
   manualIntent,
@@ -122,9 +123,9 @@ const tagColumn = (tag: (typeof sessionTags)[number]) => getTableColumns(session
  * (`json_extract` reads a missing key as NULL either way), which keeps a
  * large sync's chunks small.
  */
-const reportJson = (report: SessionReport): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(reportColumns(report)).filter(([, value]) => value !== null));
-const reportColumns = (report: SessionReport): Record<string, unknown> => ({
+const reportJson = (report: SessionReport, abstractKey: string | undefined): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(reportColumns(report, abstractKey)).filter(([, value]) => value !== null));
+const reportColumns = (report: SessionReport, abstractKey: string | undefined): Record<string, unknown> => ({
   event_id: report.eventId,
   session_id: report.sessionId,
   attendee_id: report.attendeeId,
@@ -140,6 +141,7 @@ const reportColumns = (report: SessionReport): Record<string, unknown> => ({
   is_all_day: report.isAllDay ?? null,
   speakers: report.speakers ?? null,
   abstract: report.abstract ?? null,
+  abstract_key: abstractKey ?? null,
   ...Object.fromEntries(sessionTags.map((tag) => [tagColumn(tag), report[tag] ?? null])),
   code_folded: report.code === undefined ? null : foldText(report.code),
   title_folded: report.title === undefined ? null : foldText(report.title),
@@ -319,11 +321,25 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
       });
     },
 
-    async hasReported(attendeeId, eventId) {
+    async hasCorroboratedAbstract(attendeeId, eventId) {
+      // The domain's `isCorroborated`, over the stored `abstractKey`s: the
+      // reader's reports by `session_reports_by_attendee`, each one probe of
+      // `session_reports_by_abstract` for another reporter's same key.
       const [row] = await db
         .select({ one: sql`1` })
         .from(sessionReports)
-        .where(and(eq(sessionReports.attendeeId, attendeeId), eq(sessionReports.eventId, eventId)))
+        .where(
+          and(
+            eq(sessionReports.attendeeId, attendeeId),
+            eq(sessionReports.eventId, eventId),
+            sql`${sessionReports.abstractKey} is not null`,
+            sql`exists (select 1 from session_reports other
+              where other.event_id = ${sessionReports.eventId}
+                and other.session_id = ${sessionReports.sessionId}
+                and other.abstract_key = ${sessionReports.abstractKey}
+                and other.attendee_id <> ${sessionReports.attendeeId})`,
+          ),
+        )
         .limit(1);
       return row !== undefined;
     },
@@ -391,7 +407,11 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
       ];
 
       if (reports.length > 0) {
-        const reportChunks = jsonChunks(reports.map(reportJson), syncBytesPerStatement);
+        const keys = await Promise.all(reports.map((report) => abstractKey(report.abstract)));
+        const reportChunks = jsonChunks(
+          reports.map((report, i) => reportJson(report, keys[i])),
+          syncBytesPerStatement,
+        );
         statements.push(
           // A session new to the catalog gets its row first, for the reports'
           // foreign key; the consensus below overwrites it either way.

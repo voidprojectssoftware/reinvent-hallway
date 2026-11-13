@@ -38,8 +38,9 @@ this file in the same PR.
   snapshot is that attendee's report, and the catalog shows what the reporters
   agree on (rule below, ADR 0016). We keep every field an agent sends of a
   session but AWS's live seat state, and **show the abstract only to an
-  attendee whose own agent has synced**: it is AWS's content behind a login
-  (ADR 0025, amending 0003).
+  attendee whose own agent sent one that another attendee's agent
+  corroborates**: it is AWS's content behind a login (ADR 0025, amending
+  0003; tightened by #83).
 - **LinkedIn will not give us anyone's connections.** Sign In with LinkedIn
   (OpenID Connect) gives a verified identity: `sub`, name, picture, email. The
   Connections API is partner-only and closed. So the network is Hallway's own
@@ -73,7 +74,7 @@ erDiagram
 | **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `network` \| `private`, default `network`; `network` was `connections` before #63). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
 | **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, and only to a reader `canReadAbstract` allows (rule below). Never `seatAvailability` or `isReservable` |
-| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`. One per attendee and session |
+| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`, and (stored only) `abstractKey`, the SHA-256 of the abstract's normalized text, which corroboration compares. One per attendee and session |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation or invitation), `source` (`agent-sync` \| `manual`), `invited` (bool: from AWS `invitedSessions`), `hidden` (bool, from the hidden sessions below), `addedAt` |
 | **Hidden session** | Not served on its own: a session an attendee hid, per event | `attendeeId`, `eventId`, `sessionId`. An entry is hidden while its session is here |
 | **Connection** | Two attendees who agreed to see each other | unordered pair, `since`, `via` (`request` \| `share-link`) |
@@ -202,12 +203,22 @@ We store UTC instants and the event timezone, and render in the event timezone
   reports (ADR 0016). A snapshot for an unknown event is refused.
 - **The abstract is for verified attendees (`canReadAbstract`, ADR 0025).**
   A session's abstract is shown to a signed-in attendee (as a person or
-  through their agent token) once a sync of theirs has kept one of their own
-  sessions of the event as their report: that sync is the proof AWS let them
-  read the catalog. Only session search and get carry it, over REST and MCP.
-  It never appears to anyone else, signed out included, nor on any schedule,
-  agenda, link preview, share image or calendar feed, whoever asks. Search
-  never matches on it. It is plain text and is rendered as text.
+  through their agent token) once they are corroborated for the event
+  (`isCorroborated`, issue #83): some report of theirs, kept from a sync of
+  one of their own sessions, carries an abstract that another attendee's
+  report of the same session also carries. The texts are compared trimmed
+  and with every run of whitespace as one space (`normalizeAbstract`),
+  nothing fuzzier. Every other field of a session is shown on Hallway, so a
+  sync built from them proves nothing; a matching abstract proves the sender
+  read it where AWS shows it. So the first reporter of a session is not
+  verified by it until a second reports the same text, a reporter whose
+  abstract AWS later rewrites stops being verified by that session until
+  someone else sends the new text, and two people who collude (or one with
+  two accounts) verify each other. It is decided on read, from the reports
+  as they are, in one query. Only session search and get carry it, over REST
+  and MCP. It never appears to anyone else, signed out included, nor on any
+  schedule, agenda, link preview, share image or calendar feed, whoever
+  asks. Search never matches on it. It is plain text and is rendered as text.
 - **A connection is mutual and needs consent.** A request becomes a connection
   only when the other side accepts. Connecting via someone's share link forms
   the connection at once: the link's current invite token is their consent

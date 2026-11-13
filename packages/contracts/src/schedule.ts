@@ -46,7 +46,7 @@ export const AwsSession = z
     abbreviation: text().meta({ description: "The public session code, e.g. `AIM3315`." }),
     abstract: orAbsent(z.string().max(abstractMaxLength)).meta({
       description:
-        "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees whose own agent has synced sessions.",
+        "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees one of whose synced abstracts matches another attendee's report of the same session.",
     }),
     type: text(),
     level: text(),
@@ -132,7 +132,7 @@ export const Session = z
     speakers: z.array(z.string()).optional(),
     abstract: z.string().optional().meta({
       description:
-        "AWS's plain-text description, from what attendees' agents sent. Only on search and get, and only to an attendee whose own agent has synced sessions for this event: AWS shows it only to registered attendees. Render it as text.",
+        "AWS's plain-text description, from what attendees' agents sent. Only on search and get, and only to an attendee one of whose synced abstracts for this event matches another attendee's report of the same session: AWS shows it only to registered attendees. Render it as text.",
     }),
     tracks: tagList("Programming tracks, e.g. `Developer Productivity`."),
     topics: tagList("Technology domains, e.g. `Artificial Intelligence`."),
@@ -158,7 +158,7 @@ export const Session = z
   .meta({
     id: "Session",
     description:
-      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. `abstract` only to attendees whose own agent has synced; otherwise follow `url` to read it on re:Invent.",
+      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. `abstract` only to attendees whose synced abstract another attendee corroborates; otherwise follow `url` to read it on re:Invent.",
   });
 export type Session = z.infer<typeof Session>;
 

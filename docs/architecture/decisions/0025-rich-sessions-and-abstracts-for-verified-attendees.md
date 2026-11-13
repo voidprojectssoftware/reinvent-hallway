@@ -77,11 +77,10 @@ but `topics` at the contract boundary.
   the consensus can be computed in SQL. At about 1.5 KB a report and tens of
   sessions per attendee, 60,000 attendees would be a few GB of D1, inside its
   10 GB limit but its largest table by far.
-- **The rule trusts a sync.** An agent token can send sessions it made up and
-  so verify its attendee without AWS. What it can then read is other
-  attendees' reports of abstracts, which AWS shows any registered attendee;
-  Hallway never makes the text public. Tightening this (for example, needing
-  two syncs a day apart, or a session others also reported) is open.
+- **The rule trusted a sync.** An agent token could send sessions it made up
+  and so verify its attendee without AWS. Closed by the note below (issue
+  #83): a sync now verifies only through an abstract another attendee also
+  reported.
 
 **Rejected:** showing the abstract to every signed-in user (signing in to
 Hallway proves nothing about AWS registration); showing it publicly (the Site
@@ -90,3 +89,66 @@ Terms reading above); keeping only the abstract the reader's own agent sent
 which is the least useful case); a separate table for abstracts (the consensus
 would need its own vote and its own batch statements for no gain over a column
 no read selects).
+
+## Note, 2026-11-13: verified means a corroborated abstract (issue #83)
+
+Reviewing #80 found that decision 3 could be passed by a forged sync: session
+ids and every field but the abstract are on Hallway for anyone to read, so an
+agent token could send them back as "its" sessions and be verified. Decision
+3 now reads:
+
+**A reader is verified for an event once at least one abstract from their own
+sync matches another, independent reporter's abstract for the same session.**
+Their own sync means a report kept from it (a session on their own schedule,
+as before); independent means another attendee. The texts are compared
+trimmed and with each run of whitespace as one space (`normalizeAbstract`),
+never fuzzily, since a near match is what a forger would aim for. The abstract
+is the one field Hallway never shows anyone unverified, so a match proves the
+sender read it where AWS shows it. The domain states the rule
+(`isCorroborated`, `canReadAbstract`); the D1 repository answers it in SQL,
+and `schedule-repository.test.ts` holds both to the same answers.
+
+**Computed on read, in one query.** Each report stores `abstract_key`, the
+SHA-256 of its normalized abstract (`abstractKey`), written in the sync's own
+batch (migration 0013). `hasCorroboratedAbstract` walks the reader's reports
+for the event (`session_reports_by_attendee`) and, for each, probes
+`session_reports_by_abstract (event_id, session_id, abstract_key)` for another
+attendee's same key: one statement for search or get, whatever the page size,
+never one per session. Hashing keeps that index at 64 characters a report
+rather than the whole text.
+
+What it means:
+
+- **The first honest reporter of a session is not verified by it.** Their
+  abstracts unlock once a second attendee's agent reports one of the same
+  sessions with the same text, with no further sync of theirs: the read sees
+  the second report. This is the price, and it is the same one ADR 0016
+  already pays (consensus protects a session only once someone else reports
+  it). At re:Invent most attendees share at least one keynote or popular
+  session with someone, so the wait is until the next such person syncs; an
+  attendee whose every session nobody else has synced waits longest.
+- **Two forgers colluding cannot be prevented**, nor one person with two
+  accounts: two made-up abstracts that agree corroborate each other. What
+  they unlock is other attendees' reports of abstracts, which AWS shows any
+  registered attendee, and Hallway still never makes the text public. Nor is
+  an abstract that is easy to guess (a placeholder AWS gives many sessions)
+  proof of anything; a minimum length or a denylist is open if one appears.
+- **A reporter whose abstract AWS later changes** stops being corroborated by
+  that session when their agent syncs the new text, until another reporter
+  sends the same new text; their other sessions still count. The attendees
+  who still hold the old text keep corroborating each other. Verification is
+  never stored, so nothing has to be revoked or recomputed.
+- **Reports written before migration 0013 carry no key** and verify no one
+  until their attendee's next sync writes one. Hallway is not deployed, so
+  this touches only local databases.
+- A forged sync still counts as a report for ADR 0016's consensus: a lone
+  honest reporter and a forger tie, and the newer report wins. That is ADR
+  0016's stated cost, unchanged here.
+
+**Rejected:** corroborating on a field Hallway never shows (there is no such
+field but the abstract); computing verification in the sync's batch and
+storing it (the first reporter would need a second statement over every
+earlier reporter of the session on each sync, and a stored verdict would need
+revoking when an abstract changes, for no saving over one indexed read);
+fuzzy matching (it narrows the gap a forger has to close); keeping the gate as
+it was.
