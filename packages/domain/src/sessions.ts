@@ -209,26 +209,79 @@ export function consensus(reports: readonly SessionReport[]): SessionSnapshot {
 }
 
 /**
- * Who asks for a session's abstract: an attendee, and whether their own agent
- * has had at least one session of the event kept as their report. `null` is
+ * Who asks for a session's abstract: an attendee, and whether an abstract
+ * their own agent reported is corroborated (`isCorroborated`). `null` is
  * nobody signed in.
  */
 export interface AbstractReader {
   attendeeId: string;
-  hasReportedSessions: boolean;
+  abstractCorroborated: boolean;
 }
 
 /**
- * The abstract rule (ADR 0025). The abstract is AWS's text, and AWS shows it
- * only to a signed-in attendee registered for the event. A sync that kept one
- * of their own sessions is Hallway's proof that AWS let this person read the
- * catalog, so only an attendee whose agent has reported a session may read
- * abstracts here. Everyone else, signed out included, and everything that
- * leaves Hallway (a link preview, the share image, the calendar feed) gets
- * none.
+ * The abstract rule (ADR 0025, tightened by issue #83). The abstract is AWS's
+ * text, and AWS shows it only to a signed-in attendee registered for the
+ * event. Every other field of a session is on Hallway for anyone to copy, so a
+ * sync built from them proves nothing. The abstract is not: a reader whose
+ * report of one of their own sessions carries the same abstract as another
+ * attendee's report of it has shown that AWS let them read the catalog. Only
+ * such a reader may read abstracts here. Everyone else, signed out included,
+ * and everything that leaves Hallway (a link preview, the share image, the
+ * calendar feed) gets none.
  */
 export function canReadAbstract(reader: AbstractReader | null): boolean {
-  return reader !== null && reader.hasReportedSessions;
+  return reader !== null && reader.abstractCorroborated;
+}
+
+/**
+ * An abstract as corroboration compares it: trimmed, every run of whitespace
+ * one space. Nothing fuzzier, since a near match is what a forger could make.
+ */
+export function normalizeAbstract(abstract: string): string {
+  return abstract.trim().replace(/\s+/g, " ");
+}
+
+/** Whether two abstracts are the same text by `normalizeAbstract`; an absent or blank one matches nothing. */
+export function sameAbstract(a: string | undefined, b: string | undefined): boolean {
+  if (a === undefined || b === undefined) return false;
+  const normalized = normalizeAbstract(a);
+  return normalized !== "" && normalized === normalizeAbstract(b);
+}
+
+/**
+ * Whether `attendeeId` is corroborated for the event these reports are of:
+ * some report of theirs carries an abstract that another attendee's report of
+ * the same session also carries (`sameAbstract`). Independent means another
+ * attendee; two people colluding, or one person with two accounts, still pass
+ * (ADR 0025). The first reporter of a session is not corroborated by it until
+ * a second reports the same text. The D1 repository answers the same in SQL,
+ * over `abstractKey`; schedule-repository.test.ts holds the two together.
+ */
+export function isCorroborated(attendeeId: string, reports: readonly SessionReport[]): boolean {
+  return reports.some(
+    (mine) =>
+      mine.attendeeId === attendeeId &&
+      reports.some(
+        (other) =>
+          other.attendeeId !== attendeeId &&
+          other.eventId === mine.eventId &&
+          other.sessionId === mine.sessionId &&
+          sameAbstract(mine.abstract, other.abstract),
+      ),
+  );
+}
+
+/**
+ * A report's abstract as the D1 repository keeps it for corroboration: the
+ * SHA-256 of `normalizeAbstract`, in hex, so the comparison is an index probe
+ * on 64 characters rather than on the text. Two abstracts share a key exactly
+ * when `sameAbstract` says they match; an absent or blank one has none.
+ */
+export async function abstractKey(abstract: string | undefined): Promise<string | undefined> {
+  const normalized = abstract === undefined ? "" : normalizeAbstract(abstract);
+  if (normalized === "") return undefined;
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized)));
+  return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /** A snapshot without its abstract: the session anyone who may see it sees. */
