@@ -19,7 +19,7 @@ Repository: `voidprojectssoftware/reinvent-hallway`, private. Not deployed:
 
 ## Layout (ADR 0002)
 
-`apps/api` (Worker: `/api` REST, `/mcp`, `/cal`, static web), `apps/web` (React
+`apps/api` (Worker: `/api` REST, `/mcp`, `/cal`, `/og` share cards, `/@handle` link previews, static web), `apps/web` (React
 SPA, ADR 0005), `packages/contracts` (zod resources), `packages/domain` (rules,
 imports nothing outside itself), `packages/application` (handlers over
 repository ports), `packages/infrastructure` (D1 repositories and in-memory
@@ -50,8 +50,10 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   goes through the visibility rule"), which runs each REST and MCP read path
   (person schedule, attendee card, who is going, network agenda, session
   search and get, meeting gaps) against a private attendee, a non-connection
-  and a hidden entry. A new read path adds its case there. The calendar feed,
-  share image and link preview (#16) are not covered by it yet.
+  and a hidden entry. A new read path adds its case there. What leaves
+  Hallway (calendar feed, share image, link preview) goes through
+  `shareableEntries` with the same `areConnected`, held by
+  `apps/api/src/sharing.test.ts` and `person-page.test.ts` (ADR 0012).
 - **No session abstract is stored or served (ADR 0003).** _Held by:_ the
   sessions table has no column for it and `toSession` never reads it;
   `schedule-repository.test.ts` fails on an abstract-like column, and

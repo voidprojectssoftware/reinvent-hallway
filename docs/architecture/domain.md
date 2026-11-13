@@ -100,6 +100,11 @@ We store UTC instants and the event timezone, and render in the event timezone
     counted in "who is going".
   - One function decides this (`canViewSchedule(viewer, owner, areConnected)`, with `visibleEntries` for the entries), and every read path
     (REST, MCP, calendar feed, share image, link preview) goes through it.
+  - What leaves Hallway (calendar feed, share image, link preview) goes
+    through `shareableEntries`: the visible entries, minus hidden ones even
+    when the viewer is the owner, who is about to show it to others. A link
+    preview is always the anonymous view, since everyone a link is posted to
+    sees the card (ADR 0012).
 - **Sync replaces, never duplicates.** `SyncSchedule` for an event makes the
   attendee's `agent-sync` entries exactly equal to the sent favorites and
   reservations: new ones added, missing ones removed, `reserved` beats
@@ -167,8 +172,10 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), up to 200 sessions in one read |
 | `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who |
 | `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. All-day sessions (the expo and the like) do not block a gap |
-| `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule |
-| `ShareImage(handle, day?)` | a PNG of the visible schedule, for posting |
+| `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule (`GET /cal/{token}.ics`); a rotated token finds no one |
+| `ShareImage(handle, day?)` | a PNG of the schedule as the asker may see it, hidden entries left out, for posting (`GET /og/{handle}.png`, 1200 by 627) |
+| `LinkPreview(handle)` | `/@handle`'s Open Graph and Twitter tags, always as an anonymous visitor sees it; `og:image` is the share image with a version that changes when what it shows changes |
+| `GetShareLinks` | my page, my share image and, to me signed in as a person, my calendar feed and my invite link (`GET /api/me/share`) |
 
 ## Who calls what
 
@@ -182,6 +189,7 @@ flowchart LR
   W -- REST /api --> API[REST routes]
   A -- MCP /mcp --> MCP[MCP tools]
   C -- GET /cal/:token.ics --> API
+  L[Link preview fetcher] -- "GET /@handle, /og/:handle.png" --> API
   API --> H[Application handlers]
   MCP --> H
   H --> D[Domain rules]

@@ -27,3 +27,56 @@ export function formatDay(instant: Instant): string {
 export function zoneAbbreviation(instant: Instant): string {
   return part(zone, instant, "timeZoneName");
 }
+
+const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: EVENT_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** "2026-12-01": the Las Vegas date an instant falls on, to group a week by day. */
+export function eventDate(instant: Instant): string {
+  return isoDay.format(at(instant));
+}
+
+// A date alone ("2026-12-01") names a day, not an instant, so it is read and
+// written at noon UTC in UTC, where no zone moves it to another day.
+const dateOnly = (date: string) => new Date(`${date}T12:00:00Z`);
+const chip = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", day: "numeric" });
+
+/** The day picker's two lines for a date: { weekday: "Tue", day: "1" }. */
+export function dayChip(date: string): { weekday: string; day: string } {
+  const parts = chip.formatToParts(dateOnly(date));
+  const of = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return { weekday: of("weekday"), day: of("day") };
+}
+
+/** "Tuesday 1 December" for a date alone. Noon in Las Vegas is on that date. */
+export function formatDate(date: string): string {
+  return formatDay(`${date}T20:00:00Z`);
+}
+
+/**
+ * Every date of the event, first to last. The event's dates carry its own
+ * offset (`2026-11-30T05:30-08:00`), so their date part is already local.
+ */
+export function eventDates(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const last = endDate.slice(0, 10);
+  for (let d = dateOnly(startDate.slice(0, 10)); d.toISOString().slice(0, 10) <= last; d.setUTCDate(d.getUTCDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["day", 86_400_000],
+  ["hour", 3_600_000],
+  ["minute", 60_000],
+];
+
+/** "12 minutes ago", for when a token was last used. */
+export function formatAgo(instant: Instant, now: Date = new Date()): string {
+  const elapsed = now.getTime() - at(instant).getTime();
+  for (const [unit, size] of steps) {
+    if (elapsed >= size) return relative.format(-Math.floor(elapsed / size), unit);
+  }
+  return "just now";
+}

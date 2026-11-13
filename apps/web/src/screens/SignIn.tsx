@@ -1,29 +1,45 @@
-// Sign in: LinkedIn for everyone, and on a developer's machine a dev sign-in
-// by name. The dev form shows only when the API says dev sign-in is on, so a
-// build served anywhere else never offers it; a failed or missing answer
-// counts as off.
+// Sign in: LinkedIn, and on a developer's machine a dev sign-in by name.
+// Each shows only when the API says it is on (GET /api/auth/options), so a
+// build served anywhere else never offers dev sign-in, and a server without
+// LinkedIn credentials never offers a button that answers 404. A failed or
+// missing answer counts as both off. Someone already signed in goes to their
+// week.
 import { useState, type FormEvent } from "react";
-import { useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import { api, ApiFailure, linkedInSignInHref, type SignInOptions } from "../api/client.ts";
+import { Empty } from "../shell/Empty.tsx";
 import { Screen } from "../shell/Screen.tsx";
+import { ifSignedIn } from "../shell/signed-in.ts";
 
 export async function signInLoader(): Promise<SignInOptions> {
-  return api.signInOptions().catch(() => ({ devSignIn: false, linkedIn: false }));
+  const [me, options] = await Promise.all([
+    ifSignedIn(api.me()).catch(() => null),
+    api.signInOptions().catch(() => ({ devSignIn: false, linkedIn: false })),
+  ]);
+  if (me) throw redirect("/");
+  return options;
 }
 
 export function SignIn() {
-  const { devSignIn } = useLoaderData<typeof signInLoader>();
+  const { devSignIn, linkedIn } = useLoaderData<typeof signInLoader>();
   return (
     <Screen title="Hallway" sub="See where the people you know will be at re:Invent 2026, and let your agent plan around them.">
-
-      <section className="section">
-        <a className="btn block" href={linkedInSignInHref}>
-          Sign in with LinkedIn
-        </a>
-        <p className="gfoot">Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.</p>
-      </section>
+      {linkedIn && (
+        <section className="section">
+          <a className="btn block" href={linkedInSignInHref}>
+            Sign in with LinkedIn
+          </a>
+          <p className="gfoot">Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.</p>
+        </section>
+      )}
 
       {devSignIn && <DevSignIn />}
+
+      {!linkedIn && !devSignIn && (
+        <Empty icon="lock" title="Signing in is not open yet">
+          This Hallway has no way to sign in set up. Try again later.
+        </Empty>
+      )}
     </Screen>
   );
 }

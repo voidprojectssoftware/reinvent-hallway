@@ -23,11 +23,24 @@ export interface InvitePorts {
   now: () => Date;
 }
 
+const invitePath = (handle: string, token: string) => `/@${handle}?invite=${token}`;
+
 const toInvite = (handle: string, token: string, rotatedAt: string): Invite => ({
   token,
-  path: `/@${handle}?invite=${token}`,
+  path: invitePath(handle, token),
   rotatedAt,
 });
+
+/**
+ * The share sheet's invite link for an attendee, made on first ask. Sharing
+ * calls it only for the owner signed in as a person.
+ */
+export function invitePathOf(network: NetworkRepository, now: () => Date) {
+  return async (attendee: { id: string; handle: string }) => {
+    const invite = await network.ensureInvite(attendee.id, randomSecret(), now().toISOString());
+    return invitePath(attendee.handle, invite.token);
+  };
+}
 
 /** My invite, made on first ask: there is nothing to rotate before then. */
 export function getInvite({ attendees, network, now }: InvitePorts): GetInvite {

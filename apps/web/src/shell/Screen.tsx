@@ -7,14 +7,18 @@ import { Icon } from "./Icon.tsx";
 
 interface ScreenProps {
   title: string;
+  /** The bar's title when it differs from the large one (a session's code). */
+  navTitle?: string;
+  /** False when the screen draws its own heading (a person's card). */
+  large?: boolean;
   /** A long title (a session's name) drops from Large Title to Title 1. */
   long?: boolean;
   sub?: ReactNode;
-  back?: { to: string; label: string };
+  back?: { to: string; label: string } | undefined;
   children: ReactNode;
 }
 
-export function Screen({ title, long = false, sub, back, children }: ScreenProps) {
+export function Screen({ title, navTitle = title, large = true, long = false, sub, back, children }: ScreenProps) {
   const scrolled = useScrolledPast(40);
   return (
     <>
@@ -29,16 +33,18 @@ export function Screen({ title, long = false, sub, back, children }: ScreenProps
             )}
           </div>
           <div className="nav-title" aria-hidden="true">
-            {title}
+            {navTitle}
           </div>
           <div className="nav-side right" />
         </div>
       </header>
       <main className="col gutter">
-        <div className="large">
-          <h1 className={long ? "long" : undefined}>{title}</h1>
-          {sub && <p className="large-sub">{sub}</p>}
-        </div>
+        {large && (
+          <div className="large">
+            <h1 className={long ? "long" : undefined}>{title}</h1>
+            {sub && <p className="large-sub">{sub}</p>}
+          </div>
+        )}
         {children}
       </main>
     </>

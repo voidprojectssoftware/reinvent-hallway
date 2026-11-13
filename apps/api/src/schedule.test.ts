@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
 import { syncMyScheduleDescription } from "./mcp/schedule-tools.ts";
-import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
+import { inMemoryHandlers, noPng } from "./testing/in-memory-handlers.ts";
 
 interface Fixture {
   schedule: { reserved: string[]; favorites: string[] };
@@ -31,7 +31,7 @@ let call: (input: string | URL | Request, init?: RequestInit) => Promise<Respons
 
 beforeEach(() => {
   const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
-  const app = createApp<typeof bindings>({ handlers: () => handlers });
+  const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: noPng });
   // Handlers are built per request; the fake store under them lives for the test.
   call = async (input, init) => app.fetch(new Request(input, init), bindings);
 });

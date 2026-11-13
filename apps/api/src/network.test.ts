@@ -16,6 +16,7 @@ import type {
   RequestResult,
   Session,
   SessionList,
+  ShareLinks,
   SuggestionList,
   WhoIsGoing,
 } from "@hallway/contracts";
@@ -23,7 +24,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
 import { networkToolDescriptions } from "./mcp/network-tools.ts";
-import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
+import { inMemoryHandlers, noPng } from "./testing/in-memory-handlers.ts";
 
 const bindings = { DEV_SIGN_IN: "1" };
 const origin = "http://127.0.0.1:8787";
@@ -31,7 +32,7 @@ let call: (input: string | URL | Request, init?: RequestInit) => Promise<Respons
 
 beforeEach(() => {
   const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
-  const app = createApp<typeof bindings>({ handlers: () => handlers });
+  const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: noPng });
   call = async (input, init) => app.fetch(new Request(input, init), bindings);
 });
 
@@ -213,6 +214,13 @@ describe("share-link invites", () => {
       await (await rest("/api/me", undefined, asAgent)).text(),
     ];
     for (const body of publicBodies) expect(body).not.toContain(invite.token);
+
+    // The share sheet offers the same invite to its owner, and none to the agent.
+    const sheet = (await (await rest("/api/me/share", ben.id)).json()) as ShareLinks;
+    expect(sheet.inviteUrl).toBe(`${origin}${invite.path}`);
+    expect(sheet.pageUrl).toBe(`${origin}/@${ben.handle}`);
+    const agentSheet = (await (await rest("/api/me/share", undefined, asAgent)).json()) as ShareLinks;
+    expect(agentSheet).not.toHaveProperty("inviteUrl");
   });
 });
 

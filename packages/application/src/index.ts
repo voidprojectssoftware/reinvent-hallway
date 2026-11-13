@@ -5,3 +5,4 @@ export { fail, ok, type Outcome } from "./outcome.ts";
 export * from "./identity/index.ts";
 export * from "./schedule/index.ts";
 export * from "./network/index.ts";
+export * from "./sharing/index.ts";

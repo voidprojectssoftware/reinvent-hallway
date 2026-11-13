@@ -40,6 +40,7 @@ export type {
   PlanScope,
 } from "./ports.ts";
 export { connectionsGoing } from "./schedules.ts";
+export { invitePathOf } from "./invites.ts";
 
 export interface NetworkPorts {
   attendees: AttendeeRepository;

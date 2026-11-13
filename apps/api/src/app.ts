@@ -4,6 +4,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Actor, GetEvent, IdentityHandlers } from "@hallway/application";
 import type { NetworkHandlers, ScheduleHandlers } from "@hallway/application";
+import type { SharingHandlers } from "@hallway/application";
 import type { ApiError } from "@hallway/contracts";
 import { readSessionCookie } from "./auth/cookies.ts";
 import type { DevSignInBindings } from "./auth/dev-sign-in.ts";
@@ -14,12 +15,15 @@ import { registerEventRoutes } from "./routes/events.ts";
 import { registerIdentityRoutes } from "./routes/identity.ts";
 import { registerNetworkRoutes } from "./routes/network.ts";
 import { registerScheduleRoutes } from "./routes/schedule.ts";
+import { registerSharingRoutes } from "./routes/sharing.ts";
+import type { RenderPng } from "./sharing/png.ts";
 
 /** Every handler the interfaces may call, built per request from the bindings. */
 export interface Handlers extends ScheduleHandlers {
   getEvent: GetEvent;
   identity: IdentityHandlers;
   network: NetworkHandlers;
+  sharing: SharingHandlers;
 }
 
 export interface ApiEnv<Bindings extends object> {
@@ -29,6 +33,8 @@ export interface ApiEnv<Bindings extends object> {
 
 export interface AppDependencies<Bindings extends object> {
   handlers: (bindings: Bindings) => Handlers;
+  /** The share card's renderer: wasm on the Worker (sharing/worker-renderer.ts), from files in tests. */
+  renderPng: RenderPng;
 }
 
 export type ApiApp<Bindings extends object = DevSignInBindings> = OpenAPIHono<ApiEnv<Bindings>>;
@@ -60,6 +66,7 @@ export function createApp<Bindings extends DevSignInBindings>(
   registerIdentityRoutes(app);
   registerScheduleRoutes(app);
   registerNetworkRoutes(app);
+  registerSharingRoutes(app, dependencies.renderPng);
   registerMcp(app);
 
   app.doc31("/api/openapi.json", {

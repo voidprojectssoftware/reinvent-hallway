@@ -72,3 +72,4 @@ export {
   WhoIsGoingInput,
   WhoIsGoingQuery,
 } from "./network.ts";
+export { ShareLinks } from "./sharing.ts";

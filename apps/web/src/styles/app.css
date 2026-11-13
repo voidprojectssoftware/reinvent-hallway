@@ -31,3 +31,23 @@
 .gfoot.error {
   color: var(--red);
 }
+
+/* A field's name at the head of its row in the profile form, wide enough for
+   "Profile URL" so the fields line up, as iOS's contact editor does. */
+.form-k {
+  flex: none;
+  width: 96px;
+  font: var(--t-body);
+  color: var(--label);
+}
+
+/* A URL under a cell's title (the calendar link) breaks anywhere rather than
+   pushing the cell wider than the screen at 390. */
+.cellsub.url {
+  overflow-wrap: anywhere;
+}
+
+/* A segmented button while the change it asked for is on its way. */
+.seg button:disabled {
+  cursor: default;
+}

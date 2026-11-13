@@ -117,5 +117,13 @@ export function calendarFeedsOnD1(db: Database): CalendarFeedRepository {
         .limit(1);
       return row;
     },
+    async ownerOf(token) {
+      const [row] = await db
+        .select({ attendeeId: calendarFeeds.attendeeId })
+        .from(calendarFeeds)
+        .where(eq(calendarFeeds.token, token))
+        .limit(1);
+      return row?.attendeeId;
+    },
   };
 }

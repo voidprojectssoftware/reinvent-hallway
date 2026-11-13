@@ -51,6 +51,7 @@ function setup(options: { linkedIn?: IdentityProvider | null } = {}) {
     calendarFeeds: {
       replace: async (id, token, rotatedAt) => void feeds.set(id, { token, rotatedAt }),
       get: async (id) => feeds.get(id),
+      ownerOf: async (token) => [...feeds].find(([, feed]) => feed.token === token)?.[0],
     },
     areConnected: async (a, b) => connected.some(([x, y]) => (x === a && y === b) || (x === b && y === a)),
     linkedIn: options.linkedIn === null ? undefined : (options.linkedIn ?? stubLinkedIn),

@@ -6,11 +6,12 @@ import { reinvent2026 } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.ts";
-import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
+import { inMemoryHandlers, noPng } from "./testing/in-memory-handlers.ts";
 
 const bindings = { DEV_SIGN_IN: "1" };
 const app = createApp<typeof bindings>({
   handlers: () => inMemoryHandlers().handlers,
+  renderPng: noPng,
 });
 const origin = "http://127.0.0.1:8787";
 const call = async (input: string | URL | Request, init?: RequestInit) =>

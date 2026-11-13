@@ -16,12 +16,14 @@ const origin = "http://127.0.0.1:8787";
 function otherHandlers() {
   return inMemoryHandlers().handlers;
 }
+/** No share cards are drawn in this file. */
+const renderPng = async () => new Uint8Array();
 
 function world(bindings: { DEV_SIGN_IN?: string } = { DEV_SIGN_IN: "1" }) {
   const linkedIn = fakeLinkedIn();
   const identity = identityHandlers(identityInMemory({ linkedIn: linkedInOidc(linkedIn) }));
   const others = otherHandlers();
-  const app = createApp<typeof bindings>({ handlers: () => ({ ...others, identity }) });
+  const app = createApp<typeof bindings>({ handlers: () => ({ ...others, identity }), renderPng });
   const call = async (input: string | URL | Request, init?: RequestInit) =>
     app.fetch(new Request(input, init), bindings);
   return { linkedIn, call };
@@ -74,6 +76,7 @@ describe("GET /api/auth/options", () => {
 
     const unconfigured = createApp<object>({
       handlers: () => ({ ...otherHandlers(), identity: identityHandlers(identityInMemory()) }),
+      renderPng,
     });
     const response = await unconfigured.fetch(new Request(`${origin}/api/auth/options`), {});
     expect(await response.json()).toEqual({ devSignIn: false, linkedIn: false });
@@ -191,6 +194,7 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
   it("answers 404 when LinkedIn is not configured", async () => {
     const app = createApp<object>({
       handlers: () => ({ ...otherHandlers(), identity: identityHandlers(identityInMemory()) }),
+      renderPng,
     });
     expect((await app.fetch(new Request(`${origin}/api/auth/linkedin`), {})).status).toBe(404);
   });

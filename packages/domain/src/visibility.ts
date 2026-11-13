@@ -43,3 +43,19 @@ export function visibleEntries(
   if (viewer === owner.id) return [...entries];
   return entries.filter((entry) => !entry.hidden);
 }
+
+/**
+ * The entries of `owner` that may leave Hallway in something `viewer` takes
+ * away: the calendar feed, the share image, a link preview. The same as
+ * `visibleEntries`, except that a hidden entry stays out even when the viewer
+ * is the owner: the owner posts the image and subscribes others' eyes to it,
+ * so it shows what everyone else would see.
+ */
+export function shareableEntries(
+  viewer: ViewerId,
+  owner: Owner,
+  entries: readonly PlanEntry[],
+  areConnected: boolean,
+): PlanEntry[] {
+  return visibleEntries(viewer, owner, entries, areConnected).filter((entry) => !entry.hidden);
+}
