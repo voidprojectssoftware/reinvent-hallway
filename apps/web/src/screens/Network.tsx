@@ -1,16 +1,19 @@
 // Network (docs/design/network.html): what needs an answer first (requests
 // to me), then who to add (people from my LinkedIn connections), then the
 // requests I sent, then who is already in, then the people I follow (GitHub,
-// my LinkedIn import: ADR 0019). Only mine, so a signed-out visitor is sent
+// my LinkedIn import: ADR 0019). Each person shows once, in the strongest of
+// those (network/rows.ts). Only mine, so a signed-out visitor is sent
 // to sign in like the other tabs.
 import type { ConnectionList, Following as FollowingList, Person, RequestList, SuggestionList } from "@hallway/contracts";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
 import { EVENT_ID } from "../event.ts";
 import { ContactsImport } from "../network/ContactsImport.tsx";
 import { sessionCounts } from "../network/counts.ts";
 import { Following } from "../network/Following.tsx";
+import { PersonRow } from "../network/PersonRow.tsx";
+import { knownFrom, networkRows } from "../network/rows.ts";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
@@ -62,6 +65,7 @@ export function Network() {
     requests.incoming.length === 0 &&
     requests.outgoing.length === 0 &&
     suggestions.suggestions.length === 0;
+  const rows = networkRows(connections, requests, suggestions, following);
   const q = query.trim().toLowerCase();
   const shown = connections.connections.filter(
     ({ person }) => !q || person.displayName.toLowerCase().includes(q) || person.handle.toLowerCase().includes(q),
@@ -83,36 +87,33 @@ export function Network() {
             Requests <span>{requests.incoming.length}</span>
           </h2>
           <ul className="group">
-            {requests.incoming.map((request) => (
-              <li key={request.id}>
-                <div className="cell lead-av">
-                  <Link to={personPath(request.from)} aria-label={request.from.displayName}>
-                    <Avatar person={request.from} />
-                  </Link>
-                  <div className="cellmain">
-                    <span className="celltitle">{request.from.displayName}</span>
-                    {request.from.headline && <span className="cellsub">{request.from.headline}</span>}
-                    <div className="cell-actions">
-                      <button
-                        className="minibtn filled"
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={() => act("incoming", request.id, () => api.acceptRequest(request.id))}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        className="minibtn"
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={() => act("incoming", request.id, () => api.declineRequest(request.id))}
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </li>
+            {rows.incoming.map((request) => (
+              <PersonRow
+                key={request.id}
+                person={request.from}
+                lines={[request.from.headline, knownFrom(request.known)]}
+                below
+                actions={
+                  <>
+                    <button
+                      className="minibtn filled"
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => act("incoming", request.id, () => api.acceptRequest(request.id))}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="minibtn"
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => act("incoming", request.id, () => api.declineRequest(request.id))}
+                    >
+                      Decline
+                    </button>
+                  </>
+                }
+              />
             ))}
           </ul>
           <Foot failed={errorIn("incoming")}>Accept and you see each other's weeks.</Foot>
@@ -123,30 +124,38 @@ export function Network() {
         <section className="section">
           <h2 className="ghead">From your LinkedIn connections</h2>
           <ul className="group">
-            {suggestions.suggestions.length === 0 ? (
+            {rows.suggestions.length === 0 ? (
               <li>
                 <div className="cell">
                   <span className="cellmain cellsub">No one new from your file to add. People appear here as they join Hallway.</span>
                 </div>
               </li>
             ) : (
-              suggestions.suggestions.map(({ person }) => (
-                <PersonRow key={person.id} person={person}>
-                  <button
-                    className="minibtn"
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => act("suggestions", person.id, () => api.requestConnection(person.handle))}
-                  >
-                    Connect
-                  </button>
-                </PersonRow>
+              rows.suggestions.map(({ person, known }) => (
+                <PersonRow
+                  key={person.id}
+                  person={person}
+                  // The heading already says LinkedIn; GitHub is news.
+                  lines={[person.headline, known.length > 1 ? knownFrom(known) : null]}
+                  actions={
+                    <button
+                      className="minibtn"
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => act("suggestions", person.id, () => api.requestConnection(person.handle))}
+                    >
+                      Connect
+                    </button>
+                  }
+                />
               ))
             )}
           </ul>
           <Foot failed={errorIn("suggestions")}>
             People on Hallway whose LinkedIn profile and name, or email, match a row of the file you imported on{" "}
-            {formatDate(eventDate(suggestions.contactImport.importedAt))}. <Link to="/settings">Import again</Link>
+            {formatDate(eventDate(suggestions.contactImport.importedAt))}. <Link className="linkbtn" to="/settings">
+              Import again
+            </Link>
           </Foot>
         </section>
       ) : (
@@ -160,16 +169,21 @@ export function Network() {
           </h2>
           <ul className="group">
             {requests.outgoing.map((request) => (
-              <PersonRow key={request.id} person={request.to}>
-                <button
-                  className="minibtn"
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => act("outgoing", request.id, () => api.withdrawRequest(request.id))}
-                >
-                  Withdraw
-                </button>
-              </PersonRow>
+              <PersonRow
+                key={request.id}
+                person={request.to}
+                lines={[request.to.headline]}
+                actions={
+                  <button
+                    className="minibtn"
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => act("outgoing", request.id, () => api.withdrawRequest(request.id))}
+                  >
+                    Withdraw
+                  </button>
+                }
+              />
             ))}
           </ul>
           <Foot failed={errorIn("outgoing")}>Waiting for them to accept.</Foot>
@@ -212,24 +226,13 @@ export function Network() {
         )
       )}
 
-      <Following following={following} />
+      <Following
+        github={rows.github}
+        githubElsewhere={rows.githubElsewhere}
+        linkedin={rows.linkedin}
+        linked={following.github.linked}
+        notOnHallway={following.github.notOnHallway}
+      />
     </Screen>
-  );
-}
-
-function PersonRow({ person, children }: { person: Person; children: ReactNode }) {
-  return (
-    <li>
-      <div className="cell lead-av">
-        <Link to={personPath(person)} aria-label={person.displayName}>
-          <Avatar person={person} />
-        </Link>
-        <div className="cellmain">
-          <span className="celltitle">{person.displayName}</span>
-          {person.headline && <span className="cellsub">{person.headline}</span>}
-        </div>
-        {children}
-      </div>
-    </li>
   );
 }

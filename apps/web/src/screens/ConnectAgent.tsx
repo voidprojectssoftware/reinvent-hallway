@@ -9,6 +9,10 @@
 // sync is re-read without a reload (which would lose the token): whenever
 // the window comes back into view, and every few seconds while the sync it
 // asks for has not arrived.
+//
+// Once something has synced, the last sync leads and the steps fold under
+// "Set up another agent": they are for a computer, and on a phone the last
+// sync is the one line worth reading (#113, finding 21).
 import type { IssuedAgentToken, MySchedule } from "@hallway/contracts";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLoaderData, useRevalidator } from "react-router";
@@ -73,12 +77,16 @@ export function ConnectAgent() {
   const schedule = useLoaderData<typeof connectAgentLoader>();
   const [agent, setAgent] = useState<Agent>("claude");
   const [issued, setIssued] = useState<IssuedAgentToken | null>(null);
-  const chosen = agents[agent];
   useSyncWatch(schedule, issued);
+  // Decided once, on arrival: a first sync landing while the steps are open
+  // must not move the last sync out from under the person waiting for it.
+  const [synced] = useState(schedule.lastSync !== undefined);
+  const [setUp, setSetUp] = useState(!synced);
 
   return (
     <Screen
       title="Connect your agent"
+      navTitle="Agent"
       long
       sub={
         <>
@@ -87,6 +95,41 @@ export function ConnectAgent() {
         </>
       }
     >
+      {synced && <SyncedSoFar schedule={schedule} />}
+
+      {setUp ? (
+        <Steps agent={agent} onAgent={setAgent} issued={issued} onIssued={setIssued} />
+      ) : (
+        <section className="section">
+          <ul className="group">
+            <li>
+              <button className="cell" type="button" onClick={() => setSetUp(true)}>
+                <span className="cellmain">Set up another agent</span>
+                <Icon name="chev" className="chev" />
+              </button>
+            </li>
+          </ul>
+          <p className="gfoot">Three steps on a computer: add AWS's server and Hallway's, then ask your agent.</p>
+        </section>
+      )}
+
+      {!synced && <SyncedSoFar schedule={schedule} />}
+    </Screen>
+  );
+}
+
+interface StepsProps {
+  agent: Agent;
+  onAgent: (agent: Agent) => void;
+  issued: IssuedAgentToken | null;
+  onIssued: (token: IssuedAgentToken) => void;
+}
+
+/** The three steps: AWS's server, Hallway's with a token, and the prompt. */
+function Steps({ agent, onAgent: setAgent, issued, onIssued: setIssued }: StepsProps) {
+  const chosen = agents[agent];
+  return (
+    <>
       <section className="section">
         <div className="seg" role="group" aria-label="Your agent">
           {(Object.keys(agents) as Agent[]).map((key) => (
@@ -121,9 +164,7 @@ export function ConnectAgent() {
           Ask again whenever you change your favorites or reservations. A sync replaces what the last one sent and keeps what you added or hid here.
         </p>
       </section>
-
-      <SyncedSoFar schedule={schedule} />
-    </Screen>
+    </>
   );
 }
 

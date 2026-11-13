@@ -18,7 +18,7 @@ import { Going } from "../schedule/Going.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn } from "../shell/signed-in.ts";
-import { dayChip, eventDates, formatDate, zoneAbbreviation } from "../time.ts";
+import { dayChip, eventDate, eventDates, formatDate, zoneAbbreviation } from "../time.ts";
 import { WhyLink } from "../why/WhySheet.tsx";
 
 type Intent = "interested" | "reserved";
@@ -67,6 +67,17 @@ export function Sessions() {
   }, [typed, asked, day]);
 
   const dates = eventDates(event.startDate, event.endDate);
+  const cell = (session: Session) => {
+    const going = session.connectionsGoing;
+    return (
+      <EntryCell
+        key={session.sessionId}
+        session={session}
+        intent={mine?.get(session.sessionId)}
+        going={going && going.count > 0 && <Going people={going.people} total={going.count} />}
+      />
+    );
+  };
   const heading = asked.trim() ? `Matching "${asked.trim()}"` : "Sessions";
 
   return (
@@ -88,9 +99,14 @@ export function Sessions() {
       </form>
 
       <div className="days" role="group" aria-label="Day">
-        <button type="button" className="day any" aria-pressed={day === ""} onClick={() => setSearch(params(asked, ""), { replace: true })}>
-          <small>Any</small>
-          <b>day</b>
+        <button
+          type="button"
+          className="day any"
+          aria-pressed={day === ""}
+          aria-label="Any day"
+          onClick={() => setSearch(params(asked, ""), { replace: true })}
+        >
+          <b>All</b>
         </button>
         {dates.map((date) => {
           const chip = dayChip(date);
@@ -115,19 +131,17 @@ export function Sessions() {
           {heading} <small>{count(sessions.length)}</small>
         </h2>
         {sessions.length > 0 ? (
-          <ul className="group">
-            {sessions.map((session) => {
-              const going = session.connectionsGoing;
-              return (
-                <EntryCell
-                  key={session.sessionId}
-                  session={session}
-                  intent={mine?.get(session.sessionId)}
-                  going={going && going.count > 0 && <Going people={going.people} total={going.count} />}
-                />
-              );
-            })}
-          </ul>
+          day ? (
+            <ul className="group">{sessions.map(cell)}</ul>
+          ) : (
+            // Any day: a heading per day, or "8:30 AM" could be any of five.
+            byDay(sessions).map(([date, daySessions]) => (
+              <section className="section day-group" key={date}>
+                <h3 className="ghead">{date === later ? "Time not announced yet" : formatDate(date)}</h3>
+                <ul className="group">{daySessions.map(cell)}</ul>
+              </section>
+            ))
+          )
         ) : (
           <div className="group">
             <div className="empty">
@@ -150,6 +164,18 @@ function params(q: string, day: string): URLSearchParams {
   if (q) next.set("q", q);
   if (day) next.set("day", day);
   return next;
+}
+
+const later = "later";
+
+/** The results under their day, first day first and untimed ones (`later`) last; within a day, in the order they came. */
+function byDay(sessions: Session[]): [string, Session[]][] {
+  const days = new Map<string, Session[]>();
+  for (const session of sessions) {
+    const key = session.startsAt ? eventDate(session.startsAt) : later;
+    days.set(key, [...(days.get(key) ?? []), session]);
+  }
+  return [...days].sort(([a], [b]) => (a === later ? 1 : b === later ? -1 : a.localeCompare(b)));
 }
 
 const count = (n: number) => (n === 1 ? "1 session" : n >= shownAtMost ? `first ${shownAtMost}` : `${n} sessions`);

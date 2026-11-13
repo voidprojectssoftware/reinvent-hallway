@@ -27,6 +27,7 @@ import { Empty } from "../shell/Empty.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
+import { Sheet } from "../shell/Sheet.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { eventDate, eventDates, formatDate, formatMinute, zoneAbbreviation } from "../time.ts";
 import { NotFound } from "./NotFound.tsx";
@@ -153,6 +154,7 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Failed | null>(null);
+  const [removing, setRemoving] = useState(false);
   const name = firstName(card);
 
   async function act(call: () => Promise<unknown>) {
@@ -263,11 +265,7 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
           className="btn gray"
           type="button"
           disabled={busy}
-          onClick={() => {
-            if (window.confirm(`Remove ${card.displayName} from your connections? You stop seeing each other's weeks, unless a week is public or the one who keeps it follows the other.`)) {
-              void act(() => api.removeConnection(card.handle));
-            }
-          }}
+          onClick={() => setRemoving(true)}
         >
           <Icon name="check" />
           Connected
@@ -284,6 +282,25 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
         <div className="person-actions">{actions}</div>
       </div>
       <Foot failed={failed}>{note}</Foot>
+      {removing && (
+        // The app's own action sheet, not the browser's grey confirm() (#113, finding 17).
+        <Sheet labelledBy="remove-t" onClose={() => setRemoving(false)} closeLabel="Cancel">
+          <div className="sheet-t">
+            <b id="remove-t">Remove {card.displayName} from your connections?</b>
+            You stop seeing each other's weeks, unless a week is public or the one who keeps it follows the other.
+          </div>
+          <button
+            className="sheet-b danger"
+            type="button"
+            onClick={() => {
+              setRemoving(false);
+              void act(() => api.removeConnection(card.handle));
+            }}
+          >
+            Remove
+          </button>
+        </Sheet>
+      )}
     </div>
   );
 }

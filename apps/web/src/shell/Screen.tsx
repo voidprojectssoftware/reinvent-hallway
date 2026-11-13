@@ -6,8 +6,13 @@
 // so history, tabs and screen readers can tell screens apart, and draws the
 // back button: to the screen I came from when this tab saw it (back.ts),
 // else to the screen's parent.
+//
+// A signed-out visitor's screen with nothing on either side of the bar says
+// "Hallway" in it: an empty blurred band read as unfinished, and on an
+// invite it is the first thing a newcomer sees (#113, finding 19).
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useNavigationType } from "react-router";
+import { useMe } from "./AppLayout.tsx";
 import { backLabel, previousVisit, recordVisit } from "./back.ts";
 import { Icon } from "./Icon.tsx";
 
@@ -37,6 +42,7 @@ export function Screen({ title, navTitle = title, large = true, long = false, su
   const location = useLocation();
   const kind = useNavigationType();
   const navigate = useNavigate();
+  const signedIn = useMe() !== null;
 
   useEffect(() => {
     document.title = title === "Hallway" ? "Hallway" : `${title} · Hallway`;
@@ -44,6 +50,7 @@ export function Screen({ title, navTitle = title, large = true, long = false, su
   useEffect(() => recordVisit(location.key, kind, navTitle), [location.key, kind, navTitle]);
 
   const came = back === undefined ? null : previousVisit(location.key, kind);
+  const brand = !signedIn && !came && !back && !action;
   return (
     <>
       <header className={scrolled ? "nav scrolled" : "nav"}>
@@ -63,8 +70,8 @@ export function Screen({ title, navTitle = title, large = true, long = false, su
               )
             )}
           </div>
-          <div className="nav-title" aria-hidden="true">
-            {navTitle}
+          <div className={brand ? "nav-title brand" : "nav-title"} aria-hidden="true">
+            {brand ? "Hallway" : navTitle}
           </div>
           <div className="nav-side right">{action}</div>
         </div>

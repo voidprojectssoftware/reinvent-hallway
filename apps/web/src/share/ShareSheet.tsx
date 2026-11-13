@@ -1,14 +1,18 @@
-// The share sheet over My week (docs/design/my-week-share.html): the two
-// pictures, my page's link, my invite link, LinkedIn, the picture to save and
-// the calendar to subscribe to, all from GET /api/me/share.
+// The share sheet over My week (docs/design/my-week-share.html): my page's
+// link, my invite link, LinkedIn, who can see my week, the two pictures, the
+// picture to save and the calendar to subscribe to, all from GET
+// /api/me/share.
+//
+// The actions come first and who can see my week is one row opening
+// Settings: on a phone the pictures, the switch and its explanations above
+// them pushed Copy link off the screen (#113, finding 8).
 //
 // Two pictures, each labelled for what it is, because they differ (ADR
 // 0012): a posted link's preview is the card an anonymous visitor gets,
 // which for a week that is not public shows only my name, while the picture
 // to save is my own full week. Each has its own address (#70): the preview's
 // is always the anonymous card, whoever asks, so it is a plain <img> showing
-// exactly what LinkedIn will; mine is only ever mine. The visibility switch
-// sits beside them when the week is not public.
+// exactly what LinkedIn will; mine is only ever mine.
 //
 // Posting goes through the composer (/share/post, ADR 0026), where the
 // person picks the week, a day or sessions and edits the text.
@@ -16,19 +20,18 @@
 // Two links, said plainly, because they differ in what they let a stranger
 // do: the page link shows my week as my visibility allows and connects no
 // one; the invite link lets whoever has it connect with me at once, so it
-// comes with a way to reset it.
+// comes with a way to reset it. Copying each says which it was.
 //
 // A placeholder handle (issue #48) is nudged at the top until it is replaced:
 // the page link is the handle, and a made-up one is a poor thing to post.
 //
 // It is the shared action sheet (Sheet), modal for the keyboard too: focus
 // stays in it, and goes back to the Share button when it closes.
-import type { ShareLinks } from "@hallway/contracts";
+import type { ShareLinks, Visibility } from "@hallway/contracts";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { api } from "../api/client.ts";
 import { copyText } from "../copy.ts";
-import { WhoCanSee } from "../settings/WhoCanSee.tsx";
 import { useMe } from "../shell/AppLayout.tsx";
 import { ProblemText, type Failed } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
@@ -88,8 +91,7 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
     <Sheet labelledBy="share-t" onClose={onClose} closeLabel="Cancel">
       <div className="sheet-t">
         <b id="share-t">Share my week</b>
-        {page ? `${page.host}${page.pathname} shows your week to whoever your settings allow.` : "Getting your links…"}
-        {links?.inviteUrl && " Your invite link also lets whoever has it connect with you in one tap."}
+        {page ? `${page.host}${page.pathname}` : "Getting your links…"}
         {placeholder && (
           <span className="sheet-note">Your link uses a handle Hallway made up. Choose your own before you share it.</span>
         )}
@@ -99,30 +101,6 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
           </span>
         )}
       </div>
-      {links && (
-        <div className="sheet-pics">
-          <figure>
-            <img src={links.imageUrl} alt="The link preview people see when you post your link" width={1200} height={627} />
-            <figcaption>When you post the link, people see</figcaption>
-          </figure>
-          {links.myImageUrl && (
-            <figure>
-              <img src={links.myImageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
-              <figcaption>Your week, to save and post as a picture</figcaption>
-            </figure>
-          )}
-        </div>
-      )}
-      {links && visibility !== "public" && (
-        <div className="sheet-vis">
-          <p className="sheet-vis-t">
-            {visibility === "private"
-              ? "Your week is private, so the link preview shows only your name."
-              : "Your week is for your network, so the link preview shows only your name."}
-          </p>
-          <WhoCanSee visibility={visibility} onChanged={() => void load()} />
-        </div>
-      )}
       {placeholder && (
         <Link className="sheet-b" to="/settings/profile" onClick={onClose}>
           <Icon name="gear" />
@@ -131,7 +109,7 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
       )}
       {links && (
         <>
-          <SheetButton icon="link" onClick={() => copy(links.pageUrl, "Link copied.")}>
+          <SheetButton icon="link" onClick={() => copy(links.pageUrl, "Link copied. It shows your week to whoever your settings allow.")}>
             Copy link
           </SheetButton>
           {links.inviteUrl && (
@@ -143,6 +121,23 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
             <Icon name="share" />
             Post on LinkedIn
           </Link>
+          <Link className="sheet-row" to="/settings" onClick={onClose}>
+            <span className="sheet-row-k">Who can see my week</span>
+            <span className="sheet-row-v">{visibilityLabel[visibility]}</span>
+            <Icon name="chev" className="chev" />
+          </Link>
+          <div className="sheet-pics">
+            <figure>
+              <img src={links.imageUrl} alt="The link preview people see when you post your link" width={1200} height={627} />
+              <figcaption>{visibility === "public" ? "When you post the link, people see" : "When you post the link, people see only your name"}</figcaption>
+            </figure>
+            {links.myImageUrl && (
+              <figure>
+                <img src={links.myImageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
+                <figcaption>Your week, to save and post as a picture</figcaption>
+              </figure>
+            )}
+          </div>
           {links.myImageUrl && (
             <a className="sheet-b" href={links.myImageUrl} download="hallway-week.png">
               <Icon name="photo" />
@@ -169,6 +164,9 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
     </Sheet>
   );
 }
+
+/** The switch's words, as Settings shows them (WhoCanSee). */
+const visibilityLabel: Record<Visibility, string> = { public: "Anyone", network: "My network", private: "Only me" };
 
 interface SheetButtonProps {
   icon: IconName;
