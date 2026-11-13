@@ -79,6 +79,22 @@ async function devSignedIn(name = "Jane Doe") {
   return { ...w, browser, response };
 }
 
+describe("GET /api/auth/options", () => {
+  it("offers dev sign-in only where it is allowed, and LinkedIn only when configured", async () => {
+    const options = async (call: (input: string) => Promise<Response>, url = `${origin}/api/auth/options`) =>
+      (await call(url)).json();
+    expect(await options(world().call)).toEqual({ devSignIn: true, linkedIn: true });
+    expect(await options(world({}).call)).toEqual({ devSignIn: false, linkedIn: true });
+    expect(await options(world().call, "https://hallway.example/api/auth/options")).toEqual({ devSignIn: false, linkedIn: true });
+
+    const unconfigured = createApp<object>({
+      handlers: () => ({ ...otherHandlers(), identity: identityHandlers(identityInMemory()) }),
+    });
+    const response = await unconfigured.fetch(new Request(`${origin}/api/auth/options`), {});
+    expect(await response.json()).toEqual({ devSignIn: false, linkedIn: false });
+  });
+});
+
 describe("dev sign-in", () => {
   it("creates the attendee, sets an HttpOnly SameSite=Lax session cookie, and /api/me answers", async () => {
     const { browser, response } = await devSignedIn();

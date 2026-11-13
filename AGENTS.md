@@ -93,7 +93,9 @@ you started), never with a pattern that matches other worktrees' servers.
   `.dev.vars.example` on first run) and only on a loopback host. LinkedIn
   sign-in answers 404 until `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`
   are set there. In application tests, build an `Actor` directly:
-  `{ kind: "attendee", attendeeId }`.
+  `{ kind: "attendee", attendeeId, via: "session" }`. An agent token
+  (`via: "agent-token"`) is refused (403) on token management and the
+  calendar feed, so get those with the cookie, not the token.
 - `npm run db:generate -- <name>` writes the next migration from
   `packages/infrastructure/src/persistence/d1/entities/`; add `--custom` for a
   hand-written data migration. `npm run types -w @hallway/api` after changing

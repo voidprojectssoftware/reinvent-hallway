@@ -67,6 +67,14 @@ export type UpdateProfileInput = z.infer<typeof UpdateProfileInput>;
 export const SetVisibilityInput = z.object({ visibility: Visibility }).meta({ id: "SetVisibility" });
 export type SetVisibilityInput = z.infer<typeof SetVisibilityInput>;
 
+export const SignInOptions = z
+  .object({
+    devSignIn: z.boolean().meta({ description: "Dev sign-in by name is on: DEV_SIGN_IN=1 and a loopback host." }),
+    linkedIn: z.boolean().meta({ description: "Sign In with LinkedIn is configured." }),
+  })
+  .meta({ id: "SignInOptions", description: "Which ways to sign in this server offers." });
+export type SignInOptions = z.infer<typeof SignInOptions>;
+
 export const DevSignInInput = z
   .object({ name: z.string().trim().min(1).max(100).meta({ example: "Jane Doe" }) })
   .meta({ id: "DevSignIn" });

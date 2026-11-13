@@ -15,6 +15,7 @@ import {
   Me,
   RevokeAgentTokenInput,
   SetVisibilityInput,
+  SignInOptions,
   UpdateProfileInput,
 } from "@hallway/contracts";
 import type { ApiApp } from "../app.ts";
@@ -73,6 +74,15 @@ const devSignInRoute = createRoute({
   tags,
   request: body(DevSignInInput),
   responses: { 200: json("Signed in; the session cookie is set.", Me), ...errorResponses },
+});
+
+const signInOptionsRoute = createRoute({
+  method: "get",
+  path: "/api/auth/options",
+  operationId: "getSignInOptions",
+  summary: "Which ways to sign in this server offers, so the sign-in screen shows only those",
+  tags,
+  responses: { 200: json("The sign-in options.", SignInOptions), ...errorResponses },
 });
 
 const signOutRoute = createRoute({
@@ -202,6 +212,13 @@ export function registerIdentityRoutes<B extends DevSignInBindings>(app: ApiApp<
     setSessionCookie(c, signedIn.value.session.secret, signedIn.value.session.expiresAt);
     return c.json(signedIn.value.me, 200);
   });
+
+  app.openapi(signInOptionsRoute, async (c) =>
+    respond(
+      c,
+      await c.var.handlers.identity.getSignInOptions({ devSignIn: devSignInAllowed(c.req.raw, c.env).ok }),
+    ),
+  );
 
   app.openapi(signOutRoute, async (c) => {
     const secret = readSessionCookie(c);

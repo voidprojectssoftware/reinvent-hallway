@@ -13,6 +13,7 @@ export {
   Me,
   RevokeAgentTokenInput,
   SetVisibilityInput,
+  SignInOptions,
   UpdateProfileInput,
   Visibility,
 } from "./identity.ts";

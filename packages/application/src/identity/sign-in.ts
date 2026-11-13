@@ -1,7 +1,7 @@
 // SignIn (domain.md): a verified identity in, a web session out. LinkedIn and
 // dev sign-in both end here, so an attendee is created, and refreshed, in one
 // place whichever door was used.
-import type { DevSignInInput, Me } from "@hallway/contracts";
+import type { DevSignInInput, Me, SignInOptions } from "@hallway/contracts";
 import { handleFromName, hashEmail, normalizeName } from "@hallway/domain";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type {
@@ -36,6 +36,12 @@ export type CompleteLinkedInSignIn = (input: {
   redirectUri: string;
 }) => Promise<Outcome<SignedIn>>;
 export type SignOut = (input: { sessionSecret: string }) => Promise<Outcome<Record<string, never>>>;
+/** `devSignIn` is the interface's answer: only it knows the bindings and the host. */
+export type GetSignInOptions = (input: { devSignIn: boolean }) => Promise<Outcome<SignInOptions>>;
+
+export function getSignInOptions(provider: IdentityProvider | undefined): GetSignInOptions {
+  return async ({ devSignIn }) => ok({ devSignIn, linkedIn: provider !== undefined });
+}
 
 export function signIn(
   attendees: AttendeeRepository,

@@ -8,7 +8,7 @@ import { api, ApiFailure, linkedInSignInHref, type SignInOptions } from "../api/
 import { Screen } from "../shell/Screen.tsx";
 
 export async function signInLoader(): Promise<SignInOptions> {
-  return api.signInOptions().catch(() => ({ devSignIn: false }));
+  return api.signInOptions().catch(() => ({ devSignIn: false, linkedIn: false }));
 }
 
 export function SignIn() {

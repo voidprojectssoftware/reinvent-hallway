@@ -8,7 +8,9 @@
 // signed in" by the same names the handlers use. Two more kinds cover what no
 // handler said: the server could not be reached, or it answered with
 // something the contract does not describe (a proxy's HTML page, a 500).
-import { ApiError, Event, type ErrorKind } from "@hallway/contracts";
+import { ApiError, Event, SignInOptions, type ErrorKind } from "@hallway/contracts";
+
+export type { SignInOptions };
 
 /** What a contract schema offers here. Structural, so apps/web needs no zod import of its own. */
 export interface Schema<T> {
@@ -28,20 +30,6 @@ export class ApiFailure extends Error {
     super(message);
   }
 }
-
-// What dev sign-in reports, until identity (#12) puts the real resource in
-// packages/contracts; then this goes and the contract's schema is used.
-export interface SignInOptions {
-  devSignIn: boolean;
-}
-const PendingSignInOptions: Schema<SignInOptions> = {
-  parse(input) {
-    if (typeof input === "object" && input !== null && "devSignIn" in input) {
-      return { devSignIn: input.devSignIn === true };
-    }
-    throw new TypeError("Expected { devSignIn: boolean }.");
-  },
-};
 
 /** A schema for calls whose answer the app does not read (the cookie is the point). */
 const ignored: Schema<void> = { parse: () => undefined };
@@ -79,10 +67,10 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
   return {
     getEvent: (eventId: string) => request("GET", `/api/events/${encodeURIComponent(eventId)}`, Event),
 
-    /** Pending identity (#12): whether the dev sign-in button may be shown. */
-    signInOptions: () => request("GET", "/api/sign-in/options", PendingSignInOptions),
+    /** Which ways to sign in the server offers: whether to show dev sign-in, and LinkedIn. */
+    signInOptions: () => request("GET", "/api/auth/options", SignInOptions),
 
-    /** Pending identity (#12): `POST /api/dev/sign-in { name }` sets the session cookie. */
+    /** `POST /api/dev/sign-in { name }` sets the session cookie. */
     devSignIn: (name: string) => request("POST", "/api/dev/sign-in", ignored, { name }),
   };
 }
@@ -91,5 +79,5 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 
 export const api = createApiClient();
 
-/** Pending identity (#12): a page navigation, not a fetch, because it redirects to LinkedIn. */
-export const linkedInSignInHref = "/api/sign-in/linkedin";
+/** A page navigation, not a fetch, because it redirects to LinkedIn and back with a cookie. */
+export const linkedInSignInHref = "/api/auth/linkedin";

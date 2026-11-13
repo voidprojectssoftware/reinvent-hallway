@@ -38,11 +38,13 @@ import {
   beginLinkedInSignIn,
   completeLinkedInSignIn,
   devSignIn,
+  getSignInOptions,
   signIn,
   signOut,
   type BeginLinkedInSignIn,
   type CompleteLinkedInSignIn,
   type DevSignIn,
+  type GetSignInOptions,
   type SignOut,
 } from "./sign-in.ts";
 
@@ -63,6 +65,7 @@ export interface IdentityHandlers {
   beginLinkedInSignIn: BeginLinkedInSignIn;
   completeLinkedInSignIn: CompleteLinkedInSignIn;
   signOut: SignOut;
+  getSignInOptions: GetSignInOptions;
   getMe: GetMe;
   updateProfile: UpdateProfile;
   setVisibility: SetVisibility;
@@ -83,6 +86,7 @@ export function identityHandlers(ports: IdentityPorts): IdentityHandlers {
     beginLinkedInSignIn: beginLinkedInSignIn(ports.linkedIn),
     completeLinkedInSignIn: completeLinkedInSignIn(ports.linkedIn, signInWith),
     signOut: signOut(ports.webSessions),
+    getSignInOptions: getSignInOptions(ports.linkedIn),
     getMe: getMe(ports.attendees),
     updateProfile: updateProfile(ports.attendees),
     setVisibility: setVisibility(ports.attendees),
