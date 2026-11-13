@@ -27,7 +27,18 @@ const shared = (overrides: Partial<SharedSchedule> = {}): SharedSchedule => ({
   attendee: { id: "a1", handle: "jane.doe", displayName: 'Jane "JD" <Doe>', headline: "Engineer, Example & Co" },
   event: reinvent2026,
   scheduleVisible: true,
-  entries: [],
+  entries: [
+    {
+      intent: "reserved",
+      session: {
+        sessionId: "s1",
+        eventId: reinvent2026.eventId,
+        title: "Keynote",
+        startsAt: "2026-12-01T16:00:00.000Z",
+        lastSeenAt: "2026-11-13T12:00:00.000Z",
+      },
+    },
+  ],
   version: "0123456789abcdef",
   ...overrides,
 });
@@ -76,7 +87,8 @@ describe("/@handle", () => {
     const response = await personPage(new URL("https://hallway.example/@jane.doe"), assets(), answering(shared()));
     const html = await response.text();
     expect(meta(html, "og:title")).toBe("Jane &quot;JD&quot; &lt;Doe&gt; at re:Invent 2026");
-    expect(meta(html, "og:description")).toBe("Engineer, Example &amp; Co · 0 sessions, 30 Nov to 4 Dec, on Hallway.");
+    expect(meta(html, "og:description")).toBe("Engineer, Example &amp; Co · 1 session, 30 Nov to 4 Dec, on Hallway.");
+    expect(meta(html, "og:image:alt")).toBe("Jane &quot;JD&quot; &lt;Doe&gt;&#39;s week at re:Invent 2026");
     expect(meta(html, "og:image")).toBe("https://hallway.example/og/jane.doe.png?v=0123456789abcdef");
     expect(meta(html, "og:url")).toBe("https://hallway.example/@jane.doe");
     expect(meta(html, "twitter:card")).toBe("summary_large_image");
@@ -102,6 +114,19 @@ describe("/@handle", () => {
     const html = await response.text();
     expect(meta(html, "og:description")).toBe("Engineer, Example &amp; Co · On Hallway for re:Invent 2026.");
     expect(meta(html, "robots")).toBe("noindex");
+    expect(html).not.toMatch(/session/i);
+  });
+
+  it("previews an empty public week as the name alone, not as 0 sessions, and leaves it to search engines", async () => {
+    const response = await personPage(
+      new URL("https://hallway.example/@jane.doe"),
+      assets(),
+      answering(shared({ entries: [] })),
+    );
+    const html = await response.text();
+    expect(meta(html, "og:description")).toBe("Engineer, Example &amp; Co · On Hallway for re:Invent 2026.");
+    expect(meta(html, "og:image:alt")).toBe("Jane &quot;JD&quot; &lt;Doe&gt;");
+    expect(meta(html, "robots")).toBeUndefined();
     expect(html).not.toMatch(/session/i);
   });
 

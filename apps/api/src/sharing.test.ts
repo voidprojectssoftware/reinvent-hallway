@@ -6,25 +6,37 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { Me, ShareLinks } from "@hallway/contracts";
 import { reinvent2026 } from "@hallway/infrastructure";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.ts";
 import { escapeText, foldLine } from "./sharing/ical.ts";
+import { fallbacksFor, fallbackSubsets } from "./sharing/fallback-fonts.ts";
 import { cardRenderer } from "./sharing/png.ts";
-import { shareCard, type CardNode } from "./sharing/share-card.ts";
+import { cardTexts, shareCard } from "./sharing/share-card.ts";
 import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
 
 const require = createRequire(import.meta.url);
 const file = (specifier: string) => new Uint8Array(readFileSync(require.resolve(specifier)));
-const font = (name: string, weight: 400 | 600 | 700) => ({
+const inter = (weight: 400 | 600 | 700) => ({
   name: "Inter",
-  data: file(`@fontsource/inter/files/inter-${name}-${weight}-normal.woff`).buffer as ArrayBuffer,
+  data: file(`@fontsource/inter/files/inter-latin-${weight}-normal.woff`).buffer as ArrayBuffer,
   weight,
   style: "normal" as const,
 });
+/** Each fallback font file the renderer asked for, in order: the Worker fetches these from its assets. */
+const fontsLoaded: string[] = [];
+/** The package a fallback file comes from, as copy-card-fonts.mjs finds it. */
+const fallbackFile = (name: string) => {
+  const subset = fallbackSubsets.find((s) => s.weights.some((w) => s.file(w) === name))!;
+  return `${subset.pkg}/files/${name}`;
+};
 const renderer = cardRenderer({
   yoga: file("satori/yoga.wasm"),
   resvg: file("@resvg/resvg-wasm/index_bg.wasm"),
-  fonts: [font("latin", 400), font("latin", 600), font("latin", 700), font("latin-ext", 400)],
+  fonts: [inter(400), inter(600), inter(700)],
+  loadFont: async (name) => {
+    fontsLoaded.push(name);
+    return file(fallbackFile(name)).buffer as ArrayBuffer;
+  },
 });
 
 interface Fixture {
@@ -75,12 +87,6 @@ function pngSize(bytes: Uint8Array): [number, number] {
   const view = new DataView(bytes.buffer, bytes.byteOffset);
   return [view.getUint32(16), view.getUint32(20)];
 }
-
-/** Every string a card tree would draw. */
-const texts = (node: CardNode | string): string[] =>
-  typeof node === "string"
-    ? [node]
-    : [node.props.children ?? []].flat().flatMap((child) => texts(child as CardNode | string));
 
 describe("GET /api/me/share", () => {
   it("gives my page, my versioned card and, once made, my calendar feed", async () => {
@@ -162,7 +168,7 @@ describe("the share card", () => {
       },
       { pageLabel: "hallway.example/@sam" },
     );
-    const drawn = texts(card);
+    const drawn = cardTexts(card);
     expect(drawn).toEqual(expect.arrayContaining(["Sam Okafor at re:Invent 2026", "10:00 AM", "8:00 AM", "11:30 AM", "and 1 more"]));
     expect(drawn).toContain("Platform Engineer · 4 sessions, 30 Nov to 4 Dec");
     expect(drawn).toContain("· times are Las Vegas time (PST)");
@@ -192,9 +198,84 @@ describe("the share card", () => {
       { attendee: attendeeCard, event, scheduleVisible: false, version: "x", entries: [] },
       { pageLabel: "hallway.example/@sam" },
     );
-    const drawn = texts(card).join(" ");
+    const drawn = cardTexts(card).join(" ");
     expect(drawn).toContain("Sam Okafor at re:Invent 2026");
     expect(drawn).not.toMatch(/session|Mon|Tue|Dec/);
+  });
+
+  it("shows the name alone for an empty week, not 0 sessions over five blank days", () => {
+    const card = shareCard(
+      { attendee: attendeeCard, event, scheduleVisible: true, version: "x", entries: [] },
+      { pageLabel: "hallway.example/@sam" },
+    );
+    const drawn = cardTexts(card).join(" ");
+    expect(drawn).toContain("Sam Okafor at re:Invent 2026");
+    expect(drawn).toContain("Nothing planned this week yet.");
+    expect(drawn).not.toMatch(/session|Mon|Tue|Dec|Las Vegas/);
+  });
+});
+
+describe("the share card's fonts", () => {
+  const attendeeLatin = { id: "a1", handle: "sam", displayName: "Sam Okafor", headline: "Platform Engineer" };
+  /** The SVG of `text` alone in the card's name style: its glyph outlines, or Inter's missing-glyph box. */
+  const outline = (text: string) =>
+    renderer.svg({ type: "div", props: { style: { display: "flex", fontFamily: "Inter", fontSize: 40, fontWeight: 700 }, children: text } });
+
+  it("draws each script's letters as their own shapes, not as the missing-glyph box", async () => {
+    const pairs = [
+      ["Ł", "Ś"], // Latin Extended (Polish)
+      ["Ж", "П"], // Cyrillic
+      ["Ω", "Σ"], // Greek
+      ["Ư", "Ở"], // Vietnamese
+      ["山", "田"], // Han, from Noto Sans JP
+      ["か", "な"], // Kana
+      ["한", "국"], // Hangul
+      ["这", "们"], // Simplified Chinese, not in Noto Sans JP
+    ];
+    for (const [a, b] of pairs) expect(await outline(a!), `${a} and ${b}`).not.toBe(await outline(b!));
+  });
+
+  it("would catch a dropped glyph: two characters no font has draw the same box, and the server says so", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(await outline("ก")).toBe(await outline("ข")); // Thai
+      expect(warn).toHaveBeenCalledWith("share card: no font draws U+0E01");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("loads no fallback for a Latin card, and a fallback once for every card after", async () => {
+    fontsLoaded.length = 0;
+    const card = (displayName: string) =>
+      shareCard(
+        { attendee: { ...attendeeLatin, displayName }, event: reinvent2026, scheduleVisible: false, version: "x", entries: [] },
+        { pageLabel: "hallway.example/@sam" },
+      );
+    await renderer.svg(card("Sam Okafor"));
+    expect(fontsLoaded).toEqual([]);
+    await renderer.svg(card("Ꙗрослава")); // a Cyrillic Extended capital, which no other test asks for
+    expect(fontsLoaded).toEqual([400, 600, 700].map((w) => `inter-cyrillic-ext-${w}-normal.woff`));
+    await renderer.svg(card("Ꙗрослава Ꙗ"));
+    expect(fontsLoaded).toHaveLength(3);
+  });
+
+  it("picks fallbacks by code point: Inter's own subsets first, then Noto Sans JP, KR and SC", () => {
+    const names = (text: string) => fallbacksFor(text).subsets.map((s) => s.name);
+    expect(fallbacksFor("Sam Okafor, Café Zoë")).toEqual({ subsets: [], uncovered: [] });
+    expect(names("Łukasz")).toEqual(["inter latin-ext"]);
+    expect(names("Ольга Петрова")).toEqual(["inter cyrillic"]);
+    expect(names("Γιώργος")).toEqual(["inter greek"]);
+    expect(names("山田 太郎").every((name) => name.startsWith("noto-sans-jp "))).toBe(true);
+    expect(names("김민준").every((name) => name.startsWith("noto-sans-kr "))).toBe(true);
+    expect(names("这们").every((name) => name.startsWith("noto-sans-sc "))).toBe(true);
+    expect(fallbacksFor("שלום 😀").uncovered).toEqual([0x5e9, 0x5dc, 0x5d5, 0x5dd, 0x1f600]);
+  });
+
+  it("names only files that exist, so the copy script and the Worker's fetch find every one", () => {
+    for (const subset of fallbackSubsets) {
+      for (const weight of subset.weights) expect(() => require.resolve(`${subset.pkg}/files/${subset.file(weight)}`)).not.toThrow();
+    }
   });
 });
 
