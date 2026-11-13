@@ -6,7 +6,7 @@ import { maxContactsCsvBytes, type ContactImport } from "@hallway/contracts";
 import { useId, useState, type ChangeEvent } from "react";
 import { useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
-import { Foot, failureText } from "../shell/Foot.tsx";
+import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { formatDate, eventDate } from "../time.ts";
 
@@ -14,7 +14,7 @@ export function ContactsImport({ last }: { last: ContactImport | undefined }) {
   const revalidator = useRevalidator();
   const inputId = useId();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
@@ -22,10 +22,10 @@ export function ContactsImport({ last }: { last: ContactImport | undefined }) {
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    setError(null);
+    setFailed(null);
     setDone(null);
     if (file.size > maxContactsCsvBytes) {
-      setError(`That file is ${Math.round(file.size / 1_000_000)} MB. LinkedIn's Connections.csv is far smaller: check it is the right file.`);
+      setFailed({ failure: `That file is ${Math.round(file.size / 1_000_000)} MB. LinkedIn's Connections.csv is far smaller: check it is the right file.` });
       return;
     }
     setBusy(true);
@@ -34,7 +34,8 @@ export function ContactsImport({ last }: { last: ContactImport | undefined }) {
       await revalidator.revalidate();
       setDone(`Imported: ${kept.count === 1 ? "1 contact" : `${kept.count} contacts`} kept.`);
     } catch (failure) {
-      setError(failureText(failure));
+      // No retry button: trying again means choosing the file again.
+      setFailed({ failure });
     } finally {
       setBusy(false);
     }
@@ -67,7 +68,7 @@ export function ContactsImport({ last }: { last: ContactImport | undefined }) {
           <input id={inputId} className="vh" type="file" accept=".csv,text/csv" disabled={busy} onChange={upload} />
         </li>
       </ul>
-      <Foot error={error}>
+      <Foot failed={failed}>
         {done && `${done} `}
         From LinkedIn: Settings, Data privacy, Get a copy of your data, Connections. Hallway keeps each contact's profile link, name and a
         one-way hash of the email, to find them here, and drops the rest.

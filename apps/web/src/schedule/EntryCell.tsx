@@ -12,7 +12,8 @@ type Intent = PlanEntry["intent"];
 
 interface EntryCellProps {
   session: Session;
-  intent: Intent;
+  /** Mine or theirs; absent for a session on no one's week here (a search result). */
+  intent?: Intent | undefined;
   hidden?: boolean;
   /** "Same time as SVS401", when another of my entries overlaps this one. */
   clash?: string | undefined;
@@ -29,7 +30,7 @@ export function EntryCell({ session, intent, hidden = false, clash, going }: Ent
           <span className="celltitle">{sessionName(session)}</span>
           <SessionLine session={session} />
           <div className="meta">
-            <IntentBadge intent={intent} />
+            {intent && <IntentBadge intent={intent} />}
             {clash && <span className="clash">{clash}</span>}
           </div>
           {going}

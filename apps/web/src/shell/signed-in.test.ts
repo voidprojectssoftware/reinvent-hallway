@@ -6,6 +6,8 @@ const at = (search: string) => new URL(`https://hallway.example/sign-in${search}
 describe("coming back after sign-in", () => {
   it("keeps the page that sent me, query and all", () => {
     expect(signInPath("/@sam")).toBe("/sign-in?returnTo=%2F%40sam");
+    expect(signInPath("/")).toBe("/sign-in");
+    expect(signInPath("/network?x=1")).toBe("/sign-in?returnTo=%2Fnetwork%3Fx%3D1");
     expect(returnPathOf(at(`?returnTo=${encodeURIComponent("/@sam?day=2026-12-01")}`))).toBe("/@sam?day=2026-12-01");
     expect(returnPathOf(at(""))).toBeNull();
   });
