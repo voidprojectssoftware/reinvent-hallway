@@ -1,0 +1,12 @@
+// Every workspace except apps/api, which runs on Workers and has its own two
+// programs (apps/api/tsconfig.json for the Worker, tsconfig.node.json for its
+// tests and dev script). `npm run typecheck` runs all three. Packages get
+// Node's types because their tests and the local D1 helper run under Node;
+// what reaches the Worker is checked again, without them, by apps/api.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["packages/*/src", "packages/*/*.ts", "*.ts"]
+}

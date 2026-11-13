@@ -1,0 +1,14 @@
+// The code that runs on Cloudflare Workers, checked against the Workers
+// runtime and nothing else. Its globals come only from
+// worker-configuration.d.ts (`npm run types -w @hallway/api` regenerates it;
+// `npm run typecheck` fails when it is stale). `types` is empty, so `process`,
+// `Buffer` and `node:*` fail here instead of at the first request.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src", "worker-configuration.d.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

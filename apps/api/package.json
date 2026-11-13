@@ -1,0 +1,22 @@
+{
+  "name": "@hallway/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "wrangler types --strict-vars=false --env-file .dev.vars.example",
+    "types:check": "wrangler types --strict-vars=false --env-file .dev.vars.example --check"
+  },
+  "dependencies": {
+    "@hallway/application": "*",
+    "@hallway/contracts": "*",
+    "@hallway/infrastructure": "*",
+    "@hono/zod-openapi": "1.6.3",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "hono": "4.13.14",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "wrangler": "4.160.1"
+  }
+}

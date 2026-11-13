@@ -39,7 +39,9 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   a Mermaid diagram (screens: a screenshot) in its description.** _Held by:_ the
   `visual` check, `scripts/check-pr-visual.mjs`.
 - **ADR numbers are unique.** _Held by:_ `scripts/check-adr-numbers.mjs`.
-- **Layer boundaries (ADR 0002).** _Held by:_ nothing yet.
+- **Layer boundaries (ADR 0002).** _Held by:_ `npm run boundaries`
+  (dependency-cruiser, `.dependency-cruiser.mjs`) in `npm run verify`;
+  `scripts/boundaries.test.mjs` proves each rule fails on a violation.
 - **One visibility rule for every read path (domain.md).** _Held by:_ nothing yet.
 - **No session abstract is stored or served (ADR 0003).** _Held by:_ nothing yet.
 
@@ -58,5 +60,27 @@ marks work not ready to dispatch.
 
 ## Running things
 
-There is no app yet; the scaffold issue adds `npm run verify` and `npm run dev`
-and replaces this line with how to run them.
+Node 22.18 or later. From the root of your checkout:
+
+```bash
+npm ci
+npm run verify   # ADR and script checks, typecheck, boundaries, tests: what CI runs
+npm run dev      # the Worker with local D1, migrations applied first; prints its URL
+```
+
+`npm run dev` picks a port from this checkout's path (20000 to 29999, the next
+free one if taken; `HALLWAY_PORT` overrides) and keeps D1 under this checkout's
+`.wrangler/state`, so worktrees never share a port or a database. Read the URL
+it prints; never assume 8787. Stop it by its own process (Ctrl-C, or the pid
+you started), never with a pattern that matches other worktrees' servers.
+
+- `GET /api/events/reinvent2026`, `GET /api/openapi.json`, MCP at `/mcp`
+  (streamable HTTP, stateless).
+- Dev sign-in, a stand-in until real sign-in lands: send
+  `Authorization: Bearer dev:<attendeeId>`. It works only with
+  `DEV_SIGN_IN=1` in `apps/api/.dev.vars` (copied from `.dev.vars.example` on
+  first run) and only on a loopback host.
+- `npm run db:generate -- <name>` writes the next migration from
+  `packages/infrastructure/src/persistence/d1/entities/`; add `--custom` for a
+  hand-written data migration. `npm run types -w @hallway/api` after changing
+  `apps/api/wrangler.jsonc`.
