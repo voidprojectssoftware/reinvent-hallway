@@ -787,9 +787,16 @@ body:has(.cal.week) .nav-row {
   border-top: 0.5px solid var(--sep);
 }
 .post-bar .btn {
+  min-width: 0;
   min-height: 44px;
   padding-inline: var(--sp-3);
   white-space: nowrap;
+}
+/* At 320 px two labels and their icons are wider than the row; the words stay. */
+@media (max-width: 359px) {
+  .post-bar .btn svg {
+    display: none;
+  }
 }
 .post-bar .gfoot:empty {
   display: none;
