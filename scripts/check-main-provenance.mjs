@@ -53,7 +53,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 // real violation gets absorbed into "history we agreed not to look at".
 // SETUP: the commit that first made the PR-only rule a control rather than a
 // sentence, normally the one that adds this script and the merge wrapper.
-const BASELINE = '7e01cd2'
+const BASELINE = 'af66af3'
 
 // Commits at or below this are not asked for the `Landed-by` trailer. Leave it
 // equal to BASELINE when you install this and `merge-pr.mjs` together, because
