@@ -91,7 +91,7 @@ export type Intent = z.infer<typeof Intent>;
  */
 export const GoingPerson = Person.extend({
   intent: Intent.meta({ description: "`reserved`: they have a seat. `interested`: a favorite or added on Hallway." }),
-}).meta({ id: "GoingPerson", description: "One of my connections going to a session, and whether they have a seat." });
+}).meta({ id: "GoingPerson", description: "Someone in my network going to a session (a connection, or someone I follow who lets me see their week), and whether they have a seat." });
 export type GoingPerson = z.infer<typeof GoingPerson>;
 
 /** How many faces a session carries beside its count. */
@@ -99,7 +99,7 @@ export const goingFacesShown = 5;
 
 export const ConnectionsGoing = z
   .object({
-    count: z.int().min(0).meta({ description: "How many of my connections plan this session and let me see it." }),
+    count: z.int().min(0).meta({ description: "How many people in my network plan this session and let me see it." }),
     people: z.array(GoingPerson).max(goingFacesShown).meta({ description: `Up to ${goingFacesShown} of them, by display name, for avatars.` }),
   })
   .meta({ id: "ConnectionsGoing", description: "My connections going to a session, as their visibility lets me see." });
@@ -127,7 +127,7 @@ export const Session = z
       .optional()
       .meta({ description: "The session on the re:Invent site, where reading and reserving happen. Absent without a code." }),
     connectionsGoing: ConnectionsGoing.optional().meta({
-      description: "On search and get, to a signed-in asker: how many of my connections are going, with a few faces.",
+      description: "On search and get, to a signed-in asker: how many people in my network are going, with a few faces. Named for connections before #63; it counts everyone in my network who lets me see their week.",
     }),
     lastSeenAt: instant.meta({ description: "When an agent last reported this session." }),
   })

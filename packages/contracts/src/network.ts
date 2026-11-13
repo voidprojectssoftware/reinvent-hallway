@@ -26,10 +26,10 @@ export const Connection = z
       description: "With `eventId` asked: how many of those sessions are also on my schedule.",
     }),
   })
-  .meta({ id: "Connection", description: "Someone I am connected to. Connections see each other's `connections` schedules." });
+  .meta({ id: "Connection", description: "Someone I am connected to. Connections see each other's `network` schedules." });
 export type Connection = z.infer<typeof Connection>;
 
-/** `GET /api/me/connections?eventId=` and `list_my_connections`: the event to count sessions at. */
+/** `GET /api/me/connections`, `/api/me/network`, `/api/me/following` and `list_my_network`, with `?eventId=`: the event to count sessions at. */
 export const ListConnectionsInput = z.object({
   eventId: EventId.optional().meta({
     description: "Count each connection's sessions at this event (`sessions`, `sharedWithMe`). Without it, no counts.",
@@ -280,7 +280,7 @@ export const SessionGoing = z.object({
   sessionId: SessionId,
   people: z
     .array(GoingPerson)
-    .meta({ description: "Every connection of mine going whose entry I may see, by display name, each with their intent." }),
+    .meta({ description: "Everyone in my network going whose entry I may see, by display name, each with their intent." }),
 });
 
 export const WhoIsGoing = z
@@ -291,7 +291,7 @@ export const WhoIsGoing = z
         "Present when some asked ids are not in Hallway's catalog: those ids, which nobody can be going to here. Ids are AWS's `sessionId`, not the code (`AIM3315`): find a session's id with search_sessions.",
     }),
   })
-  .meta({ id: "WhoIsGoing", description: "Per session, which of my connections plan to be there." });
+  .meta({ id: "WhoIsGoing", description: "Per session, which people in my network plan to be there, as far as each lets me see." });
 export type WhoIsGoing = z.infer<typeof WhoIsGoing>;
 
 // ---- Network agenda ----
@@ -306,7 +306,7 @@ export type NetworkAgendaInput = z.infer<typeof NetworkAgendaInput>;
 
 export const AgendaItem = z.object({
   session: Session,
-  people: z.array(GoingPerson).meta({ description: "My connections going, by display name, each with their intent." }),
+  people: z.array(GoingPerson).meta({ description: "People in my network going, by display name, each with their intent." }),
 });
 
 export const NetworkAgenda = z
@@ -317,7 +317,7 @@ export const NetworkAgenda = z
     to: instant,
     items: z.array(AgendaItem).meta({ description: "Sessions starting in the window, in start order." }),
   })
-  .meta({ id: "NetworkAgenda", description: "What my connections plan to attend in a window." });
+  .meta({ id: "NetworkAgenda", description: "What people in my network plan to attend in a window." });
 export type NetworkAgenda = z.infer<typeof NetworkAgenda>;
 
 // ---- Meeting gaps ----
