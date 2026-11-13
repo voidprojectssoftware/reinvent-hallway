@@ -6,6 +6,11 @@ export type Visibility = "public" | "connections" | "private";
 export interface Attendee {
   id: string;
   handle: string;
+  /**
+   * The handle is the "attendee-" one Hallway made because the name had no
+   * Latin letter to make one from. Cleared when the attendee chooses one.
+   */
+  handlePlaceholder: boolean;
   displayName: string;
   headline?: string;
   avatarUrl?: string;

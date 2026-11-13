@@ -61,7 +61,9 @@ export function updateProfile(attendees: AttendeeRepository): UpdateProfile {
       if (isReservedHandle(handle)) return fail("conflict", `@${handle} is reserved.`);
       const holder = await attendees.byHandle(handle);
       if (holder && holder.id !== next.id) return fail("conflict", `@${handle} is taken.`);
-      next.handle = handle;
+      // Saving the form as it was is not choosing: the placeholder stays
+      // until the handle actually changes.
+      if (handle !== next.handle) next = { ...next, handle, handlePlaceholder: false };
     }
     if (input.displayName !== undefined) next.displayName = input.displayName;
     if (input.headline !== undefined) next = withOptional(next, "headline", input.headline || null);

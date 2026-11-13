@@ -32,7 +32,7 @@ export {
   type SuggestionReason,
 } from "./contacts";
 export { findGaps, type Gap, type Placed } from "./gaps";
-export { normalizeHandle, isValidHandle, isReservedHandle, handleFromName } from "./handles";
+export { normalizeHandle, isValidHandle, isReservedHandle, handleFromName, placeholderHandle } from "./handles";
 export {
   connectionBetween,
   decideRequest,

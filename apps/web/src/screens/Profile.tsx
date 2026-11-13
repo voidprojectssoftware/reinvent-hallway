@@ -3,7 +3,7 @@
 // field per row, the reason under the group, Save at the foot.
 import type { Me, UpdateProfileInput } from "@hallway/contracts";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate, useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
 import { Foot, failureText } from "../shell/Foot.tsx";
 import { Screen } from "../shell/Screen.tsx";
@@ -16,6 +16,7 @@ export function profileLoader(): Promise<Me> {
 export function Profile() {
   const me = useLoaderData<typeof profileLoader>();
   const navigate = useNavigate();
+  const revalidator = useRevalidator();
   const [form, setForm] = useState({
     displayName: me.displayName,
     handle: me.handle,
@@ -43,6 +44,9 @@ export function Profile() {
     };
     try {
       await api.updateProfile(input);
+      // The frame's `me` too, so a handle just chosen stops the prompt and
+      // the share sheet's nudge.
+      await revalidator.revalidate();
       await navigate("/settings");
     } catch (failure) {
       setError(failureText(failure));
@@ -69,12 +73,28 @@ export function Profile() {
           <h2 className="ghead">Your link</h2>
           <ul className="group">
             <Row label="Handle">
-              <input className="field" name="handle" autoCapitalize="none" spellCheck={false} required value={form.handle} onChange={set("handle")} />
+              <input
+                className="field"
+                name="handle"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+                autoFocus={me.handlePlaceholder}
+                value={form.handle}
+                onChange={set("handle")}
+              />
             </Row>
           </ul>
-          <p className="gfoot">
-            Your page is /@{form.handle.trim() || me.handle}. Changing it breaks links you already shared.
-          </p>
+          {me.handlePlaceholder ? (
+            <p className="gfoot">
+              Hallway made /@{me.handle} because it could not make a link from your name. Choose one people will recognise: a-z, 0-9
+              and hyphens, as LinkedIn and other sites show a link plainly only in those letters.
+            </p>
+          ) : (
+            <p className="gfoot">
+              Your page is /@{form.handle.trim() || me.handle}. Changing it breaks links you already shared.
+            </p>
+          )}
         </section>
 
         <section className="section">
