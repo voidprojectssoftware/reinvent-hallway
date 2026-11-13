@@ -143,6 +143,13 @@
   max-height: 100dvh;
   overflow-y: auto;
 }
+/* No ring round the panel itself: it takes focus only so the keyboard can
+   scroll it (Tab never lands there), and a ring drawn round the whole sheet
+   on opening would be new to how a sheet looks. Its controls keep theirs. */
+.sheet-in:focus-visible {
+  outline: none;
+  border-radius: 0;
+}
 
 /* The Connections.csv picker: a label drawn as an action row, over a
    visually hidden file input. The row shows the keyboard focus the input
