@@ -3,6 +3,7 @@
 // flags under it. Session titles are text from agents, so they are only ever
 // rendered as text (React escapes them), never as HTML.
 import type { PlanEntry, Session } from "@hallway/contracts";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Icon } from "../shell/Icon.tsx";
 import { formatTime } from "../time.ts";
@@ -15,9 +16,11 @@ interface EntryCellProps {
   hidden?: boolean;
   /** "Same time as SVS401", when another of my entries overlaps this one. */
   clash?: string | undefined;
+  /** The who-is-going row (Going), when the screen knows who is. */
+  going?: ReactNode;
 }
 
-export function EntryCell({ session, intent, hidden = false, clash }: EntryCellProps) {
+export function EntryCell({ session, intent, hidden = false, clash, going }: EntryCellProps) {
   return (
     <li>
       <Link className={hidden ? "cell lead-time hidden-entry" : "cell lead-time"} to={sessionPath(session.sessionId)}>
@@ -29,8 +32,7 @@ export function EntryCell({ session, intent, hidden = false, clash }: EntryCellP
             <IntentBadge intent={intent} />
             {clash && <span className="clash">{clash}</span>}
           </div>
-          {/* TODO(#33): the who-is-going row (.going: faces, then names) goes
-              here, from #15's who-is-going fields on the schedule. */}
+          {going}
           {hidden && (
             <span className="hiddennote">
               <Icon name="eye-off" />

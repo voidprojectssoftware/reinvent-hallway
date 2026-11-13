@@ -5,7 +5,9 @@
 // public /@handle (every other screen sends them to sign in), and sees it
 // without tabs that would each send them to sign in (docs/design/README.md,
 // open points). So the layout asks GET /api/me once, and the screens read the
-// answer with useMe().
+// answer with useMe(). It also counts the requests waiting for me, for the
+// red badge on the Network tab (network.html); revalidating after an accept
+// or decline updates it.
 import type { Me } from "@hallway/contracts";
 import { useEffect } from "react";
 import { NavLink, Outlet, useRouteLoaderData } from "react-router";
@@ -22,17 +24,25 @@ const tabs: { to: string; label: string; icon: IconName }[] = [
 
 export const APP_ROUTE_ID = "app";
 
-export function appLoader(): Promise<Me | null> {
-  return ifSignedIn(api.me());
+export async function appLoader(): Promise<{ me: Me | null; waiting: number }> {
+  const me = await ifSignedIn(api.me());
+  if (!me) return { me, waiting: 0 };
+  // The badge is a nicety: a failed count must not take the whole frame down.
+  const waiting = await api.requests().then(
+    (requests) => requests.incoming.length,
+    () => 0,
+  );
+  return { me, waiting };
 }
 
 /** The signed-in attendee, or null for a signed-out visitor. */
 export function useMe(): Me | null {
-  return useRouteLoaderData<typeof appLoader>(APP_ROUTE_ID) ?? null;
+  return useRouteLoaderData<typeof appLoader>(APP_ROUTE_ID)?.me ?? null;
 }
 
 export function AppLayout() {
   const me = useMe();
+  const waiting = useRouteLoaderData<typeof appLoader>(APP_ROUTE_ID)?.waiting ?? 0;
   useEffect(() => {
     if (!me) return;
     document.body.classList.add("app");
@@ -49,6 +59,11 @@ export function AppLayout() {
             <NavLink key={tab.to} to={tab.to} end={tab.to === "/"}>
               <Icon name={tab.icon} />
               <span>{tab.label}</span>
+              {tab.to === "/network" && waiting > 0 && (
+                <span className="badge-n" aria-label={waiting === 1 ? "1 request" : `${waiting} requests`}>
+                  {waiting}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

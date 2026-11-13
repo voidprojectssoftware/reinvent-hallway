@@ -51,3 +51,46 @@
 .seg button:disabled {
   cursor: default;
 }
+
+/* The share sheet's destructive action (reset the invite link), in the red
+   the grouped lists use for one (.cell.action.danger), AA on the cell. */
+.sheet-b.danger {
+  color: var(--red);
+}
+.sheet-b:disabled {
+  color: var(--label2);
+  cursor: default;
+}
+/* What the last action in the sheet did, or why it failed, under its title. */
+.sheet-note {
+  display: block;
+  margin-top: var(--sp-1);
+  color: var(--label);
+}
+.sheet-note.error {
+  color: var(--red);
+}
+.sheet-preview {
+  height: auto;
+}
+/* With the picture on top the share sheet is about 790 px tall; on a
+   shorter window it scrolls rather than losing its top off screen. */
+.sheet-in {
+  max-height: 100dvh;
+  overflow-y: auto;
+}
+
+/* The Connections.csv picker: a label drawn as an action row, over a
+   visually hidden file input. The row shows the keyboard focus the input
+   has, and a pointer, as a button row would. */
+label.cell.action {
+  cursor: pointer;
+}
+label.cell.action.busy {
+  color: var(--label2);
+  cursor: default;
+}
+li:has(> input.vh:focus-visible) > label.cell {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+}

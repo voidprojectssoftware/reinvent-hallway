@@ -14,6 +14,8 @@ import { Foot, failureText } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
+import { sessions, syncCounts } from "../schedule/sync.ts";
+import { formatAgo } from "../time.ts";
 
 export function connectAgentLoader(): Promise<MySchedule> {
   return requireSignIn(api.mySchedule(EVENT_ID));
@@ -191,25 +193,30 @@ function CopyCell({ text, label }: { text: string; label: string }) {
 }
 
 function SyncedSoFar({ schedule }: { schedule: MySchedule }) {
-  const synced = schedule.entries.filter((entry) => entry.source === "agent-sync");
-  const reserved = synced.filter((entry) => entry.intent === "reserved").length;
-  // TODO: the design's "14 sessions, 12 minutes ago" and "3 added, 1 removed,
-  // 10 unchanged" need the last sync's time and SyncResult, which no
-  // resource returns yet. Until then this counts what the agent has put here.
+  const last = schedule.lastSync;
   return (
     <section className="section">
-      <h2 className="ghead">From your agent</h2>
+      <h2 className="ghead">Last sync</h2>
       <ul className="group">
         <li>
           <div className="cell lead-ico">
-            <span className={synced.length > 0 ? "ico green" : "ico gray"}>
-              <Icon name={synced.length > 0 ? "check" : "agent"} />
+            <span className={last ? "ico green" : "ico gray"}>
+              <Icon name={last ? "check" : "agent"} />
             </span>
             <div className="cellmain">
-              <span>{synced.length === 0 ? "Nothing synced yet" : synced.length === 1 ? "1 session synced" : `${synced.length} sessions synced`}</span>
-              <span className="cellsub">
-                {synced.length === 0 ? "Ask your agent once the steps above are done." : `${reserved} reserved, ${synced.length - reserved} interested`}
-              </span>
+              {last ? (
+                <>
+                  <span>
+                    {sessions(last.added + last.changed + last.unchanged)}, {formatAgo(last.syncedAt)}
+                  </span>
+                  <span className="cellsub">{syncCounts(last)}</span>
+                </>
+              ) : (
+                <>
+                  <span>Nothing synced yet</span>
+                  <span className="cellsub">Ask your agent once the steps above are done.</span>
+                </>
+              )}
             </div>
           </div>
         </li>

@@ -14,13 +14,23 @@ import {
   ApiError,
   AttendeeCard,
   CalendarFeed,
+  Connection,
+  ConnectionList,
+  ContactImport,
   Event,
   IssuedAgentToken,
+  Invite,
   Me,
   MySchedule,
+  PersonSchedule,
   PlanEntry,
+  RequestList,
+  RequestResult,
   Session,
+  ShareLinks,
   SignInOptions,
+  SuggestionList,
+  WhoIsGoing,
   type ErrorKind,
   type UpdateProfileInput,
   type Visibility,
@@ -55,16 +65,31 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 const myScheduleOf = (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/my-schedule`;
 const entryOf = (eventId: string, sessionId: string) =>
   `${myScheduleOf(eventId)}/entries/${encodeURIComponent(sessionId)}`;
+const requestOf = (requestId: string) => `/api/me/connection-requests/${encodeURIComponent(requestId)}`;
+const attendeeOf = (handle: string) => `/api/attendees/${encodeURIComponent(handle)}`;
+
+/** A body sent as it is, under its own content type (the Connections.csv upload), rather than as JSON. */
+class RawBody {
+  constructor(
+    readonly text: string,
+    readonly contentType: string,
+  ) {}
+}
 
 export function createApiClient(send: typeof fetch = (input, init) => fetch(input, init)) {
   async function request<T>(method: Method, path: string, schema: Schema<T>, body?: unknown): Promise<T> {
     let response: Response;
     try {
-      response = await send(path, {
-        method,
-        headers: body === undefined ? { accept: "application/json" } : { accept: "application/json", "content-type": "application/json" },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
+      const headers: Record<string, string> = { accept: "application/json" };
+      let sent: string | undefined;
+      if (body instanceof RawBody) {
+        headers["content-type"] = body.contentType;
+        sent = body.text;
+      } else if (body !== undefined) {
+        headers["content-type"] = "application/json";
+        sent = JSON.stringify(body);
+      }
+      response = await send(path, { method, headers, ...(sent === undefined ? {} : { body: sent }) });
     } catch (cause) {
       throw new ApiFailure("unreachable", `Could not reach Hallway: ${String(cause)}`);
     }
@@ -107,7 +132,35 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
     calendarFeed: () => request("GET", "/api/me/calendar-feed", CalendarFeed),
     rotateCalendarFeed: () => request("POST", "/api/me/calendar-feed/rotate", CalendarFeed),
 
-    attendee: (handle: string) => request("GET", `/api/attendees/${encodeURIComponent(handle)}`, AttendeeCard),
+    attendee: (handle: string) => request("GET", attendeeOf(handle), AttendeeCard),
+    /** Their entries I may see; a `forbidden` failure when their visibility does not let me. */
+    personSchedule: (handle: string, eventId: string) =>
+      request("GET", `${attendeeOf(handle)}/schedule?eventId=${encodeURIComponent(eventId)}`, PersonSchedule),
+
+    connections: () => request("GET", "/api/me/connections", ConnectionList),
+    removeConnection: (handle: string) => request("DELETE", `/api/me/connections/${encodeURIComponent(handle)}`, Connection),
+    requests: () => request("GET", "/api/me/connection-requests", RequestList),
+    requestConnection: (handle: string) => request("POST", "/api/me/connection-requests", RequestResult, { handle }),
+    acceptRequest: (requestId: string) => request("POST", `${requestOf(requestId)}/accept`, RequestResult),
+    declineRequest: (requestId: string) => request("POST", `${requestOf(requestId)}/decline`, RequestResult),
+    withdrawRequest: (requestId: string) => request("DELETE", requestOf(requestId), RequestResult),
+    /** Connect at once with the invite from their share link. The token goes in the body, never in a path or a message. */
+    connectWithInvite: (handle: string, invite: string) => request("POST", `${attendeeOf(handle)}/connect`, Connection, { invite }),
+    rotateInvite: () => request("POST", "/api/me/invite/rotate", Invite),
+
+    /** LinkedIn's Connections.csv, as the file reads; it replaces my last upload. */
+    importContacts: (csv: string) => request("POST", "/api/me/contacts", ContactImport, new RawBody(csv, "text/csv")),
+    suggestions: () => request("GET", "/api/me/suggestions", SuggestionList),
+
+    /** Per session, my connections going. At most 200 ids a call (the contract's limit). */
+    whoIsGoing: (eventId: string, sessionIds: readonly string[]) =>
+      request(
+        "GET",
+        `/api/events/${encodeURIComponent(eventId)}/who-is-going?sessionIds=${sessionIds.map(encodeURIComponent).join(",")}`,
+        WhoIsGoing,
+      ),
+
+    shareLinks: () => request("GET", "/api/me/share", ShareLinks),
 
     mySchedule: (eventId: string) => request("GET", myScheduleOf(eventId), MySchedule),
     addToPlan: (eventId: string, sessionId: string) => request("POST", entryOf(eventId, sessionId), PlanEntry),

@@ -2,11 +2,12 @@
 // calendar feed, agent tokens, sign out. Token management and the feed are
 // for a person signed in, never an agent token (ADR 0008); the web app is
 // always the person, by its cookie.
-import type { AgentToken, CalendarFeed, Me, Visibility } from "@hallway/contracts";
+import type { AgentToken, CalendarFeed, ContactImport, Me, Visibility } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useNavigate, useRevalidator } from "react-router";
 import { api, ApiFailure } from "../api/client.ts";
 import { copyText } from "../copy.ts";
+import { ContactsImport } from "../network/ContactsImport.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Foot, failureText } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
@@ -14,8 +15,13 @@ import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { formatAgo } from "../time.ts";
 
-export async function settingsLoader(): Promise<{ me: Me; feed: CalendarFeed | null; tokens: AgentToken[] }> {
-  const [me, feed, list] = await Promise.all([
+export async function settingsLoader(): Promise<{
+  me: Me;
+  feed: CalendarFeed | null;
+  tokens: AgentToken[];
+  contactImport: ContactImport | undefined;
+}> {
+  const [me, feed, list, suggestions] = await Promise.all([
     requireSignIn(api.me()),
     // A new attendee has no feed until the first rotate makes one (404).
     requireSignIn(api.calendarFeed()).catch((failure: unknown) => {
@@ -23,12 +29,13 @@ export async function settingsLoader(): Promise<{ me: Me; feed: CalendarFeed | n
       throw failure;
     }),
     requireSignIn(api.agentTokens()),
+    requireSignIn(api.suggestions()),
   ]);
-  return { me, feed, tokens: list.tokens.filter((token) => !token.revokedAt) };
+  return { me, feed, tokens: list.tokens.filter((token) => !token.revokedAt), contactImport: suggestions.contactImport };
 }
 
 export function Settings() {
-  const { me, feed, tokens } = useLoaderData<typeof settingsLoader>();
+  const { me, feed, tokens, contactImport } = useLoaderData<typeof settingsLoader>();
   return (
     <Screen title="Settings">
       <section className="section">
@@ -52,8 +59,7 @@ export function Settings() {
       <WhoCanSee visibility={me.visibility} />
       <CalendarLink feed={feed} />
       <Tokens tokens={tokens} />
-      {/* TODO(#33): "LinkedIn connections", the Connections.csv import,
-          needs #15's POST /api/me/contacts. */}
+      <ContactsImport last={contactImport} />
       <SignOut />
     </Screen>
   );
