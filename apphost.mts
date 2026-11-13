@@ -17,6 +17,8 @@
 //   api   wrangler dev: /api, /mcp, /cal, /og, /@handle and the web app's files
 //   seed  a one-shot that loads demo people once api is healthy (npm run seed:demo)
 //   lan   with HALLWAY_LAN=1 only: the LAN proxy (scripts/lan-proxy.mjs)
+//   notes the checkout's note channel for the owner's annotation toolbar
+//         (ADR 0028); HALLWAY_NOTES=0 leaves it and the toolbar out
 import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
@@ -26,6 +28,7 @@ import {
   refExpr,
   UrlDisplayLocation,
 } from "./.aspire/modules/aspire.mjs";
+import { channelFor, type Channel } from "./scripts/lib/note-channel.mjs";
 
 const root = import.meta.dirname;
 const state = path.join(root, ".state");
@@ -124,6 +127,44 @@ if (process.env.HALLWAY_LAN === "1") {
     .withUrl(`${lan}/api/docs`, { displayText: "API reference (LAN)" })
     .withUrl(`${lan}/api/openapi.json`, { displayText: "OpenAPI document (LAN)" })
     .waitFor(api);
+}
+
+// notes: the owner's annotation toolbar (#105, ADR 0028). The checkout's note
+// channel (port 4761 for the main checkout and the owner's live preview, a
+// port of its own from 4800-4999 for any other worktree) is derived from this
+// directory, so web builds the toolbar pointed at the same port this resource
+// serves. A server this resource started stops with it; one already running
+// (from `npm run dev`, `npm run notes -- serve` or the MCP wrapper) is kept,
+// with this run's origins added. `npm run notes -- channel` says which.
+let noteChannel: Channel | undefined;
+if (process.env.HALLWAY_NOTES !== "0") {
+  try {
+    noteChannel = await channelFor(root);
+  } catch (error) {
+    console.error(`No note channel, so no toolbar: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+if (noteChannel) {
+  const { port } = noteChannel;
+  const lanPort = process.env.HALLWAY_LAN === "1" ? (process.env.HALLWAY_LAN_PORT ?? "8796") : undefined;
+  const lanHost = process.env.HALLWAY_LAN_HOST ?? lanAddress();
+  await webBuild.withEnvironment("VITE_NOTES", "1").withEnvironment("VITE_NOTE_PORT", String(port));
+  const notes = await builder
+    .addExecutable("notes", "node", root, ["scripts/notes.mjs", "serve", "--stay"])
+    // The origins the server accepts: the app on Aspire's port and, in LAN
+    // mode, on the LAN port, each under every name this machine is reached by.
+    .withArgsCallback(async (context) => {
+      const args = context.args();
+      await args.add("--app-port");
+      await args.add(api.getEndpoint("http").property(EndpointProperty.Port));
+      if (lanPort) {
+        await args.add("--app-port");
+        await args.add(lanPort);
+      }
+    })
+    .withUrl(`http://127.0.0.1:${port}/pending`, { displayText: `Notes (${noteChannel.channel} channel)` })
+    .withParentRelationship(api);
+  if (lanPort) await notes.withUrl(`http://${lanHost}:${port}/pending`, { displayText: "Notes (LAN)" });
 }
 
 await builder.build().run();
