@@ -67,21 +67,21 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   by:_ the token lives in `linkedInPoster`'s closure and no repository has a
   column for it; `apps/api/src/post.test.ts` checks no token reaches a draft
   or a redirect, and refuses an agent token on every posting route.
-- **A session abstract reaches only a verified attendee, and only through
-  session search and get (ADR 0025).** Verified is the domain's
-  `canReadAbstract`: signed in, and an abstract a sync of theirs kept for one
-  of their own sessions matches another attendee's report of that session
-  (`isCorroborated`, issue #83). _Held by:_ `CatalogSession` has no abstract and every read of a
-  session selects `catalogColumns`, so only the repository's `abstracts`
-  reads it, called by the search and get handlers after asking the rule;
+- **A session abstract is public on Hallway but leaves only through session
+  search and get, and never leaves Hallway (ADR 0025, corrected by #103).**
+  Anyone who can see a session reads its consensus abstract (ADR 0016), and
+  `SHOW_SESSION_DESCRIPTIONS="0"` hides it everywhere at once. Hallway never
+  fetches AWS's catalog page or the service behind it. _Held by:_
+  `CatalogSession` has no abstract and every read of a session selects
+  `catalogColumns`, so only the repository's `abstracts` reads it, called by
+  the search and get handlers while the switch is on;
   `schedule-repository.test.ts` checks every other repository read leaves it
   out; `apps/api/src/schedule.test.ts` runs search and get over REST and MCP
-  for a corroborated reader, the first honest reporter (not yet corroborated),
-  a sync forged from Hallway's public session data, one who never synced, one
-  whose sync kept nothing and a signed-out caller, and every other REST and MCP read for a verified one;
-  `sharing.test.ts` and the e2e suite check the share card, the link preview
-  and the calendar feed. A new read path that returns sessions adds its case
-  there.
+  signed out, for a reporter and for one who never synced, a lone forger
+  against two honest reporters, the switch off, and every other REST and MCP
+  read; `sharing.test.ts` and the e2e suite check the share card, the owner's
+  picture, the link preview and the calendar feed. A new read path that
+  returns sessions adds its case there.
 
 ## Enforcement layers
 

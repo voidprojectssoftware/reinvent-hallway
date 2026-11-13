@@ -7,12 +7,16 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-10",
 
-  // A session's link is this with `{code}` filled in (domain.md "Session
-  // link"). ASSUMPTION: the re:Invent catalog searched for the code, until the
-  // owner confirms the deep-link format (issue #19); changing it needs no
-  // migration, since the link is derived, never stored.
   "vars": {
-    "SESSION_URL_TEMPLATE": "https://registration.awsevents.com/flow/awsevents/reinvent2026/event-catalog/page/eventCatalog?search={code}",
+    // A session's link is this with `{code}` filled in (domain.md "Session
+    // link"): AWS's public catalog searched for the code, which opens with
+    // that session first (measured 2026-11-13, issue #103, closing #19).
+    // Changing it needs no migration, since the link is derived, never stored.
+    "SESSION_URL_TEMPLATE": "https://registration.awsevents.com/flow/awsevents/reinvent2026/eventcatalog/page/eventcatalog?search={code}",
+    // The off switch for session descriptions (issue #103): "0" hides them
+    // from session search and get, the only reads that carry them, so from
+    // REST, MCP and the web at once. Anything else, or unset, shows them.
+    "SHOW_SESSION_DESCRIPTIONS": "1",
   },
 
   // D1, read as `env.DB`. No database_id: locally wrangler keeps it under

@@ -280,7 +280,7 @@ describe("sync_my_schedule over MCP", () => {
     const tool = (await client.listTools()).tools.find((t) => t.name === "sync_my_schedule");
     await client.close();
     expect(tool?.description).toBe(syncMyScheduleDescription);
-    for (const phrase of ["GetSchedule", "GetSession", "ListSessions", "reinvent2026", "abstract", "never reserves"]) {
+    for (const phrase of ["GetSchedule", "GetSession", "ListSessions", "reinvent2026", "abstract", "never a dump of the catalog", "never reserves"]) {
       expect(syncMyScheduleDescription).toContain(phrase);
     }
   });
@@ -395,12 +395,12 @@ describe("the session catalog over REST", () => {
   });
 });
 
-describe("the abstract reaches only an attendee whose synced abstract another attendee corroborates (ADR 0025, #83)", () => {
+describe("session descriptions: public on search and get, nowhere else, and one switch hides them (ADR 0025, #103)", () => {
   const signIn = async (name: string) =>
     (await (await rest("/api/dev/sign-in", undefined, { method: "POST", body: JSON.stringify({ name }) })).json()) as Me;
   const abstract = "ABSTRACT-TEXT-AIM3315";
 
-  /** Every path that may carry an abstract: search and get, over REST and MCP. */
+  /** Every path that carries an abstract: search and get, over REST and MCP. */
   async function carryingReads(reader: string | undefined) {
     const bodies = [
       await (await rest("/api/events/reinvent2026/sessions/s-aim3315", reader)).text(),
@@ -422,10 +422,6 @@ describe("the abstract reaches only an attendee whose synced abstract another at
     return bodies;
   }
 
-  /** What my schedule says about my reading abstracts, for the Session screen's reason (issue #88). */
-  const readsAbstracts = async (reader: string) =>
-    ((await (await rest("/api/events/reinvent2026/my-schedule", reader)).json()) as MySchedule).readsAbstracts;
-
   const expectNone = async (who: string, reader: string | undefined) => {
     for (const body of await carryingReads(reader)) {
       expect(body, who).toContain("AIM3315");
@@ -434,48 +430,51 @@ describe("the abstract reaches only an attendee whose synced abstract another at
     }
   };
 
-  it("search and get carry it to a corroborated reader, over REST and MCP, and to no one else", async () => {
-    const [ana, bo, cy, dee] = [
-      await signIn("Ana Silva"),
-      await signIn("Bo Chen"),
-      await signIn("Cy Ramos"),
-      await signIn("Dee Forge"),
-    ];
-    // Ana is the first to report any of these sessions: honest, but nothing
-    // yet corroborates her abstracts, so she cannot read them (issue #83).
+  it("search and get carry it to everyone who can see the session, signed out included, over REST and MCP", async () => {
+    const [ana, bo] = [await signIn("Ana Silva"), await signIn("Bo Chen")];
+    // Ana is the only reporter of these sessions; Bo has never synced.
     await syncOverMcp(ana.id, syncInput());
-    await expectNone("first reporter", ana.id);
-    expect(await readsAbstracts(ana.id)).toBe(false);
-
-    // Cy's agent synced, but its one snapshot was of a session not on Cy's
-    // schedule: nothing was kept, so nothing proves AWS let Cy read the catalog.
-    const cys = await syncOverMcp(cy.id, { eventId: "reinvent2026", sessions: [fixture.sessions[2]], favorites: [], reserved: [] });
-    expect(cys.structuredContent).toMatchObject({ sessionsStored: 0 });
-
-    // Dee forges a sync from what Hallway shows anyone: every field of the
-    // session but the abstract, which Dee has to make up or leave out.
-    const { abstract: _real, ...visible } = fixture.sessions[2]!;
-    for (const forged of [visible, { ...visible, abstract: "ABSTRACT-TEXT-GUESSED: a session about agents." }]) {
-      const result = await syncOverMcp(dee.id, { eventId: "reinvent2026", sessions: [forged], favorites: ["s-aim3315"], reserved: [] });
-      expect(result.structuredContent).toMatchObject({ sessionsStored: 1 });
-      await expectNone("forged sync", dee.id);
+    for (const [who, reader] of [["the reporter", ana.id], ["never synced", bo.id], ["signed out", undefined]] as const) {
+      for (const body of await carryingReads(reader)) expect(body, who).toContain(abstract);
     }
-
-    for (const [who, reader] of [["never synced", bo.id], ["synced nothing kept", cy.id], ["signed out", undefined]] as const) {
-      await expectNone(who, reader);
-    }
-
-    // Bo's agent syncs one session of Bo's own, its abstract the same as
-    // Ana's: each corroborates the other, and both may read every abstract.
-    await syncOverMcp(bo.id, { eventId: "reinvent2026", sessions: [fixture.sessions[0]], favorites: ["s-keynote-mon"], reserved: [] });
-    for (const body of await carryingReads(bo.id)) expect(body).toContain(abstract);
-    for (const body of await carryingReads(ana.id)) expect(body).toContain(abstract);
-    await expectNone("forger, after honest reporters agree", dee.id);
-    const readers = [ana, bo, cy, dee].map((who) => who.id);
-    expect(await Promise.all(readers.map(readsAbstracts))).toEqual([true, true, false, false]);
+    // The schedule no longer says whether its owner reads descriptions: everyone does.
+    expect(await mySchedule(ana.id)).not.toHaveProperty("readsAbstracts");
   });
 
-  it("no other read path carries it, even to a verified reader", async () => {
+  it("a lone forger cannot change a description two honest reporters agree on", async () => {
+    const [ana, bo, dee] = [await signIn("Ana Silva"), await signIn("Bo Chen"), await signIn("Dee Forge")];
+    await syncOverMcp(ana.id, syncInput());
+    clock = new Date("2026-11-13T12:05:00.000Z");
+    await syncOverMcp(bo.id, syncInput());
+    // Dee syncs last, so a tie would go to Dee; two against one is no tie.
+    clock = new Date("2026-11-13T12:10:00.000Z");
+    const honest = fixture.sessions.find((session) => session.sessionId === "s-aim3315")!;
+    const forged = { ...honest, abstract: "FORGED: buy my course." };
+    const result = await syncOverMcp(dee.id, { eventId: "reinvent2026", sessions: [forged], favorites: ["s-aim3315"], reserved: [] });
+    expect(result.structuredContent).toMatchObject({ sessionsStored: 1 });
+    for (const reader of [undefined, ana.id, dee.id]) {
+      for (const body of await carryingReads(reader)) {
+        expect(body).toContain(abstract);
+        expect(body).not.toContain("FORGED");
+      }
+    }
+  });
+
+  it("SHOW_SESSION_DESCRIPTIONS off removes it from every path at once, for everyone", async () => {
+    const { handlers, schedule } = inMemoryHandlers({ now: () => clock, showSessionDescriptions: false });
+    const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: noPng });
+    call = async (input, init) => app.fetch(new Request(input, init), bindings);
+    const [ana, bo] = [await signIn("Ana Silva"), await signIn("Bo Chen")];
+    await syncOverMcp(ana.id, syncInput());
+    await syncOverMcp(bo.id, syncInput());
+    for (const [who, reader] of [["a reporter", ana.id], ["another", bo.id], ["signed out", undefined]] as const) {
+      await expectNone(who, reader);
+    }
+    // Hidden, not dropped: switching it back on shows it again without a resync.
+    expect((await schedule.abstracts("reinvent2026", ["s-aim3315"])).get("s-aim3315")).toContain(abstract);
+  });
+
+  it("no other read path carries it, to anyone", async () => {
     const [ana, ben] = [await signIn("Ana Silva"), await signIn("Ben Ode")];
     await syncOverMcp(ana.id, syncInput());
     await syncOverMcp(ben.id, syncInput());

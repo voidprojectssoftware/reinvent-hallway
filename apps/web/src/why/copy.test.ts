@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { whyAgentLine, whyNext, whyNoDescription, whySections, whyTitle } from "./copy.ts";
+import { descriptionCredit, noDescription, whyAgentLine, whyNext, whySections, whyTitle } from "./copy.ts";
 
 const everything = [
   whyTitle,
   whyAgentLine,
   ...Object.values(whyNext),
-  ...Object.values(whyNoDescription),
+  noDescription,
+  descriptionCredit,
   ...Object.values(whySections).flatMap((part) => [part.heading, ...part.paragraphs]),
 ];
 

@@ -1,8 +1,8 @@
 // The session catalog, its reports, plan entries and hidden sessions (Drizzle
-// models). The abstract is kept (ADR 0025, amending 0003) but it is AWS's
-// text behind a login: the repository reads it in exactly one place,
-// `abstracts`, which only a reader the domain's `canReadAbstract` allows
-// reaches. Every other read selects `catalogColumns`, which leave it out.
+// models). The abstract is kept (ADR 0025, amending 0003): it is the largest
+// field, so the repository reads it in exactly one place, `abstracts`, which
+// only session search and get call (issue #103). Every other read selects
+// `catalogColumns`, which leave it out.
 //
 // Plan entries, reports and hidden sessions carry the attendee's id without a
 // foreign key: the attendees table belongs to the identity slice, which may
@@ -80,12 +80,6 @@ export const sessionReports = sqliteTable(
     attendeeId: text("attendee_id").notNull(),
     reportedAt: text("reported_at").notNull(),
     ...sessionFields(),
-    /**
-     * The domain's `abstractKey` of this report's abstract (SHA-256 of its
-     * normalized text), null when it has none: what corroborates a reader for
-     * abstracts (ADR 0025, issue #83). Only `hasCorroboratedAbstract` reads it.
-     */
-    abstractKey: text("abstract_key"),
   },
   (table) => [
     primaryKey({ columns: [table.eventId, table.sessionId, table.attendeeId] }),
@@ -95,9 +89,6 @@ export const sessionReports = sqliteTable(
     }),
     // An attendee's own reports, read before their next sync merges into them.
     index("session_reports_by_attendee").on(table.attendeeId, table.eventId),
-    // Whether another reporter of a session sent the same abstract: one probe
-    // per report of the reader's, however many report the session.
-    index("session_reports_by_abstract").on(table.eventId, table.sessionId, table.abstractKey),
   ],
 );
 

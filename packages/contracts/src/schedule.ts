@@ -6,8 +6,8 @@
 // `GetSession` output straight through. Hallway keeps all of it but AWS's
 // live state (`isReservable`, `seatAvailability`), which is accepted so the
 // pass-through validates and never read (ADR 0025). The abstract leaves
-// Hallway only on search and get, and only to a reader the domain's
-// `canReadAbstract` allows.
+// Hallway only on search and get, to anyone who can see the session, while
+// SHOW_SESSION_DESCRIPTIONS is on (issue #103).
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { Person } from "./identity.ts";
@@ -46,7 +46,7 @@ export const AwsSession = z
     abbreviation: text().meta({ description: "The public session code, e.g. `AIM3315`." }),
     abstract: orAbsent(z.string().max(abstractMaxLength)).meta({
       description:
-        "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees one of whose synced abstracts matches another attendee's report of the same session.",
+        "AWS's description of the session, as `GetSession` gives it. Shown with the session to anyone who can see it; what most attendees' agents report is what shows.",
     }),
     type: text(),
     level: text(),
@@ -132,7 +132,7 @@ export const Session = z
     speakers: z.array(z.string()).optional(),
     abstract: z.string().optional().meta({
       description:
-        "AWS's plain-text description, from what attendees' agents sent. Only on search and get, and only to an attendee one of whose synced abstracts for this event matches another attendee's report of the same session: AWS shows it only to registered attendees. Render it as text.",
+        "AWS's plain-text description, as most attendees' agents reported it. Only on search and get, to anyone; absent when no agent sent one or descriptions are switched off. Render it as text, with the credit \"Session details from the AWS re:Invent catalog\" linking to `url`.",
     }),
     tracks: tagList("Programming tracks, e.g. `Developer Productivity`."),
     topics: tagList("Technology domains, e.g. `Artificial Intelligence`."),
@@ -158,7 +158,7 @@ export const Session = z
   .meta({
     id: "Session",
     description:
-      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. `abstract` only to attendees whose synced abstract another attendee corroborates; otherwise follow `url` to read it on re:Invent.",
+      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. `abstract` when an agent sent one; otherwise follow `url` to read it on re:Invent.",
   });
 export type Session = z.infer<typeof Session>;
 
@@ -203,10 +203,6 @@ export const MySchedule = z
     timezone: z.string().meta({ description: "The event's IANA timezone, to show times in.", example: "America/Los_Angeles" }),
     entries: z.array(PlanEntry),
     lastSync: LastSync.optional().meta({ description: "Absent until my agent first syncs this event." }),
-    readsAbstracts: z.boolean().meta({
-      description:
-        "True once a description my agent synced matches another attendee's report of the same session (ADR 0025): search and get then carry `abstract`. False until then, so a screen can say why it shows none.",
-    }),
   })
   .meta({ id: "MySchedule", description: "My entries for one event, hidden ones included, in start order." });
 export type MySchedule = z.infer<typeof MySchedule>;
