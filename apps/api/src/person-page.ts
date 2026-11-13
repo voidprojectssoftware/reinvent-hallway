@@ -11,7 +11,7 @@
 // see, whoever asks: a preview card is shown to everyone in a feed, so a
 // connections-only or private schedule previews as the name alone.
 import { anonymous, shareImagePath, type GetSharedSchedule, type SharedSchedule } from "@hallway/application";
-import { cardHeight, cardWidth, eventSpan } from "./sharing/share-card.ts";
+import { cardHeight, cardWidth, eventSpan, showsWeek } from "./sharing/share-card.ts";
 
 /** The part of the ASSETS binding this needs. */
 export interface Assets {
@@ -30,14 +30,17 @@ export function previewTags(shared: SharedSchedule, origin: string): { title: st
   const { attendee, event } = shared;
   const title = `${attendee.displayName} at ${event.name}`;
   const n = shared.entries.length;
-  const description = shared.scheduleVisible
+  // An empty public week previews like a hidden one (issue #41), and its
+  // image is the name-only card for the same reason (showsWeek).
+  const week = showsWeek(shared);
+  const description = week
     ? [attendee.headline, `${n} ${n === 1 ? "session" : "sessions"}, ${eventSpan(event)}, on Hallway.`]
         .filter(Boolean)
         .join(" · ")
     : [attendee.headline, `On Hallway for ${event.name}.`].filter(Boolean).join(" · ");
   const page = new URL(`/@${attendee.handle}`, origin).href;
   const image = new URL(shareImagePath(attendee.handle, shared.version), origin).href;
-  const alt = shared.scheduleVisible ? `${attendee.displayName}'s week at ${event.name}` : attendee.displayName;
+  const alt = week ? `${attendee.displayName}'s week at ${event.name}` : attendee.displayName;
   const meta = (key: "name" | "property", name: string, content: string) =>
     `<meta ${key}="${name}" content="${escapeAttribute(content)}" />`;
   const tags = [

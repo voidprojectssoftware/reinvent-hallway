@@ -41,4 +41,9 @@
   // The share card's font files arrive as ArrayBuffers (src/sharing/
   // worker-renderer.ts); a `.wasm` import is a compiled module by default.
   "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }],
+
+  // The share card's fallback fonts (CJK, Cyrillic, Greek...) are static
+  // assets, too big for the bundle: copied into the assets directory, after
+  // apps/web's build, before every `wrangler dev` and deploy (ADR 0012).
+  "build": { "command": "node scripts/copy-card-fonts.mjs" },
 }

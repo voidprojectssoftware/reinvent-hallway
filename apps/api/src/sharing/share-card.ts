@@ -39,6 +39,10 @@ const el = (type: string, style: Style, ...children: Child[]): CardNode => ({
   props: { style: { display: "flex", ...style }, children: children.length === 1 ? children[0]! : children },
 });
 
+/** Every string a card tree draws. */
+export const cardTexts = (node: Child): string[] =>
+  typeof node === "string" ? [node] : [node.props.children ?? []].flat().flatMap(cardTexts);
+
 /** The event's days, "2026-11-30" through "2026-12-04", from its own dates. */
 export function eventDays(event: SharedSchedule["event"]): string[] {
   const days: string[] = [];
@@ -139,16 +143,23 @@ export interface CardOptions {
   pageLabel: string;
 }
 
+/**
+ * Whether the week card and the link preview show the week, with its count
+ * and days: not when the viewer may not see it (design README rule 9), and
+ * not when it is empty (issue #41), where "0 sessions" over five blank
+ * columns says less than the name alone.
+ */
+export const showsWeek = (shared: SharedSchedule) => shared.scheduleVisible && shared.entries.length > 0;
+
 export function shareCard(shared: SharedSchedule, { day, pageLabel }: CardOptions): CardNode {
   const { attendee, event } = shared;
   const tz = event.timezone;
   const { time, zone } = clock(tz);
   const days = byDay(shared.entries, tz);
 
-  let subtitle = attendee.headline ?? "";
-  let body: CardNode;
-  if (!shared.scheduleVisible) {
-    body = el(
+  /** The card without the week: one line in a cell where the days would be. */
+  const nameOnly = (line: string) =>
+    el(
       "div",
       {
         flexGrow: 1,
@@ -159,8 +170,13 @@ export function shareCard(shared: SharedSchedule, { day, pageLabel }: CardOption
         fontSize: 26,
         color: color.label2,
       },
-      `${attendee.displayName}'s week is on Hallway, for the people they choose.`,
+      line,
     );
+
+  let subtitle = attendee.headline ?? "";
+  let body: CardNode;
+  if (!shared.scheduleVisible) {
+    body = nameOnly(`${attendee.displayName}'s week is on Hallway, for the people they choose.`);
   } else if (day) {
     const list = days.get(day) ?? [];
     const shown = list.slice(0, 6);
@@ -184,6 +200,8 @@ export function shareCard(shared: SharedSchedule, { day, pageLabel }: CardOption
       ...(list.length > shown.length ? [more(list.length - shown.length)] : []),
       ...(list.length === 0 ? [el("div", { fontSize: 22, color: color.label2 }, "Nothing planned this day yet.")] : []),
     );
+  } else if (!showsWeek(shared)) {
+    body = nameOnly("Nothing planned this week yet.");
   } else {
     subtitle = [attendee.headline, `${plural(shared.entries.length, "session")}, ${eventSpan(event)}`].filter(Boolean).join(" · ");
     body = el(
@@ -266,7 +284,7 @@ export function shareCard(shared: SharedSchedule, { day, pageLabel }: CardOption
         // Said once, here, as the design does, and only when there are times.
         // The zone's name comes from the week itself: re:Invent is PST,
         // whatever AWS's own label says.
-        ...(shared.scheduleVisible ? [`· times are Las Vegas time (${zone(`${eventDays(event)[0]}T20:00:00Z`)})`] : []),
+        ...((day ? shared.scheduleVisible : showsWeek(shared)) ? [`· times are Las Vegas time (${zone(`${eventDays(event)[0]}T20:00:00Z`)})`] : []),
       ),
       el("span", { color: color.tint, fontWeight: 600 }, pageLabel),
     ),
