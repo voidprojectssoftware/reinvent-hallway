@@ -46,10 +46,8 @@ function family(slug: string, ranges: Ranges, weights: readonly Weight[], skip: 
     .filter((key) => !skip.includes(key))
     .map((key) => {
       const subset = key.replace(/^\[(\d+)\]$/, "$1");
-      return {
-        subset: { name: `${slug} ${subset}`, pkg: `@fontsource/${slug}`, file: (w: Weight) => `${slug}-${subset}-${w}-normal.woff`, weights },
-        range: ranges[key]!,
-      };
+      const file = (weight: Weight) => `${slug}-${subset}-${weight}-normal.woff`;
+      return { subset: { name: `${slug} ${subset}`, pkg: `@fontsource/${slug}`, file, weights }, range: ranges[key]! };
     });
 }
 
@@ -74,6 +72,9 @@ const parseRange = (range: string) =>
     return [Number.parseInt(from!, 16), Number.parseInt(to!, 16)] as const;
   });
 
+const covers = (ranges: readonly (readonly [number, number])[], code: number) =>
+  ranges.some(([from, to]) => code >= from && code <= to);
+
 /** Inter Latin, which is always loaded: its characters never need a fallback. */
 const latin = parseRange(inter.latin);
 
@@ -87,12 +88,9 @@ export function latinOnly(text: string): boolean {
 // most cards never do.
 let index: { subset: FallbackSubset; ranges: (readonly [number, number])[] }[] | undefined;
 
-const covers = (ranges: readonly (readonly [number, number])[], code: number) =>
-  ranges.some(([from, to]) => code >= from && code <= to);
-
 /**
  * The subsets that draw `text`'s characters outside Inter Latin, and the
- * characters none of them draws (emoji, Arabic, Thai and so on), as code points.
+ * characters none of them draws (emoji, Thai, Hebrew and so on), as code points.
  */
 export function fallbacksFor(text: string): { subsets: FallbackSubset[]; uncovered: number[] } {
   index ??= ordered.map(({ subset, range }) => ({ subset, ranges: parseRange(range) }));

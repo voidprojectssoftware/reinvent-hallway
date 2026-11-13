@@ -49,8 +49,31 @@ the Worker; these are the choices it left open.
   reads TTF, OTF and WOFF, not WOFF2). The app's system font does not exist on
   a Worker, and SF Pro may not be redistributed. The OFL allows embedding the
   font in software and drawing with it; the PNG carries glyph shapes, not the
-  font. A name in a script outside Latin (Cyrillic, Greek, CJK) draws without
-  those glyphs; adding a subset is one import and one line.
+  font. Only Latin is in the bundle now; see the next point.
+- **Other scripts: fallback fonts from the static assets, only when the text
+  needs them (issue #40, 2026-11-13).** Inter's Latin Extended, Cyrillic,
+  Cyrillic Extended, Greek, Greek Extended and Vietnamese subsets, then Noto
+  Sans JP, KR and SC (Google, SIL Open Font License 1.1, from `@fontsource`
+  5.3.1) in Fontsource's chunks of a few hundred characters, CJK at 400 and
+  700 only. `fallback-fonts.ts` maps each code point to the first subset in
+  that order whose `unicode.json` range holds it (Han goes to JP before SC).
+  `png.ts` hands Satori a `loadAdditionalAsset` only when some string on the
+  card is outside Inter Latin; Satori calls it with just the characters no
+  loaded font draws, and the Worker fetches those files from `env.ASSETS`
+  (`/share-card-fonts/`) once per isolate. Satori then keeps them for later
+  cards. CJK is 13 MB a weight for three languages, so it cannot go in the
+  bundle; `scripts/copy-card-fonts.mjs` copies the 720 files (20 MB, with each
+  family's licence) into the assets directory, run by wrangler's `build`
+  command before every `wrangler dev` and deploy. Each subset has its own
+  family name, because Satori keeps one font per name and weight: the
+  Latin Extended file bundled before this as a second "Inter" was never used,
+  and "Łukasz" drew a missing-glyph box. A character no subset has (emoji,
+  Thai, Hebrew, Devanagari) still draws as Inter's box, and the Worker logs its
+  code points (not the text) with `console.warn`. Arabic and Hebrew would also
+  need shaping and right-to-left order, which Satori 0.32 does not do.
+  Rejected: Google Fonts' `text=` API at render time (a third party on every
+  non-Latin card, sent the characters of someone's name); all of CJK in the
+  bundle (over the 3 MiB limit by itself).
 - **Cost, measured 2026-11-13.** The Worker's upload went from 1,824.58 KiB
   (327.89 KiB gzipped) to 5,337.71 KiB (1,695.63 KiB gzipped), under the free
   plan's 3 MiB compressed limit. resvg's WebAssembly is 2.4 MiB of it. One
@@ -59,6 +82,15 @@ the Worker; these are the choices it left open.
   request. **Deploying this needs Workers Paid** (30 s of CPU by default), or
   a cache in front so a card is drawn once per version. Nothing is deployed,
   so that choice waits for the owner.
+- **Cost of the fallbacks, measured 2026-11-13.** Upload 5,338.07 KiB (1,695.79
+  KiB gzipped) before, 5,404.96 KiB (1,640.04 KiB gzipped) after: the three
+  Latin Extended files left the bundle and the four `unicode.json` indexes
+  came in. A Latin card renders as before (Node, median of 60: 60.2 to 61.0
+  ms before, 61.2 to 63.2 ms after, within the noise of a shared machine;
+  under `npm run dev`, 94 to 107 ms a request both before and after). A card
+  needing fallbacks pays once per isolate for the fetch and parse (the first
+  Cyrillic, Japanese or mixed card took 86 to 125 ms in Node, against 63 ms
+  warm) and then about what a Latin card costs (64 to 71 ms).
 
 ## Link previews: tags in index.html, always the anonymous view
 
@@ -70,6 +102,10 @@ the Worker; these are the choices it left open.
   preview card is shown to everyone a link is posted to, so a connections-only
   or private schedule previews as the name and headline alone, with
   `robots: noindex`, and its image is the card without the week.
+- **An empty week previews the same way, still indexable (issue #41).** A
+  public schedule with nothing in it says "On Hallway for re:Invent 2026."
+  and its card says "Nothing planned this week yet." instead of "0 sessions"
+  over five empty columns (`showsWeek` in `share-card.ts`, used by both).
 - **`og:image` carries a version**, `?v=` and sixteen hex digits of the
   SHA-256 of everything the card shows (name, headline, whether the schedule
   is visible, and each shown session's id, intent, code, title, times and
