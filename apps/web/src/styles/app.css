@@ -71,8 +71,8 @@
   color: var(--red);
 }
 /* The share sheet's two pictures side by side, each captioned for what it
-   is: the link preview others get, and my own week to save. Side by side
-   keeps the actions in view on a phone. */
+   is: the link preview others get, and my own week to save. They come
+   under the actions, over Save picture. */
 .sheet-pics {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -102,22 +102,34 @@
   font: var(--t-footnote);
   color: var(--label2);
 }
-/* What a week that is not public means for the link, and the switch. */
-.sheet-vis {
-  padding: 0 var(--sp-4) var(--sp-3);
+/* Who can see my week, in the share sheet: one row, as a settings row,
+   opening Settings (#113, finding 8). */
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 50px;
+  padding: 0 var(--sp-4);
+  border-top: 0.5px solid var(--sep);
   border-bottom: 0.5px solid var(--sep);
-}
-.sheet-vis-t {
-  margin: var(--sp-3) 0 0;
-  font: var(--t-footnote);
+  font: var(--t-body);
   color: var(--label);
 }
-.sheet-vis .section {
-  margin-top: var(--sp-2);
+.sheet-row:active {
+  background: var(--fill);
 }
-.sheet-vis .ghead,
-.sheet-vis .gfoot {
-  margin-inline: 0;
+.sheet-row-k {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet-row-k,
+.sheet-row-v {
+  white-space: nowrap;
+}
+.sheet-row-v {
+  color: var(--label2);
 }
 /* The "Why?" sheet's two parts (issue #87): text, left aligned, in the
    sheet's panel, each under its own sentence-case heading. */
@@ -140,7 +152,7 @@
    screen; the panel is the dialog that takes focus, so the keyboard scrolls
    it too (Sheet.tsx, issue #97). */
 .sheet-in {
-  max-height: 100dvh;
+  max-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-top, 0px));
   overflow-y: auto;
 }
 /* No ring round the panel itself: it takes focus only so the keyboard can
@@ -228,11 +240,6 @@ body.loading main {
   body.loading main {
     transition: none;
   }
-}
-
-/* The search's "Any day" chip says it in two short lines like the dates. */
-.day.any b {
-  font: 600 15px/1.15 var(--font);
 }
 
 /* Sign-in provider buttons (#61). Each is its provider's published button,
@@ -800,9 +807,107 @@ body:has(.cal.week) .nav-row {
 .post-vis > .gfoot {
   margin-top: 0;
 }
+/* The composer's main actions, held above the tab bar while the page
+   scrolls (#113, finding 15), on the bar's material. */
+.post-bar {
+  position: sticky;
+  bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  margin: var(--sp-5) calc(-1 * var(--gutter)) 0;
+  padding: var(--sp-2) var(--gutter);
+  background: var(--bar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid var(--sep);
+}
+.post-bar .btn {
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: var(--sp-3);
+  white-space: nowrap;
+}
+/* At 320 px two labels and their icons are wider than the row; the words stay. */
+@media (max-width: 359px) {
+  .post-bar .btn svg {
+    display: none;
+  }
+}
+.post-bar .gfoot:empty {
+  display: none;
+}
+@media (min-width: 1000px) {
+  .post-bar {
+    bottom: 0;
+  }
+}
 /* The composer's day chips sit under a footnote, not a title. */
 .post-days {
   margin-top: var(--sp-5);
+}
+
+/* A person on Network with buttons (PersonRow.tsx, #113): the avatar and
+   the text are one link, and the link's ::after stretches over the whole
+   cell, so the row is its target; the buttons are positioned, so they paint
+   above it and keep their own taps. 48 px is the avatar and the gap after
+   it, so text and buttons line up when the buttons go under the text. */
+.person-row {
+  row-gap: var(--sp-2);
+}
+.person-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: inherit;
+}
+.person-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.person-link:active {
+  opacity: 0.6;
+}
+/* Two buttons beside the text would squeeze the name into four lines, so a
+   request's go under it. */
+.person-row.below {
+  flex-wrap: wrap;
+}
+.person-row.below > .person-link {
+  flex-basis: 100%;
+}
+.person-row > .cell-actions {
+  margin: 0 0 0 48px;
+}
+/* On a narrow phone (an iPhone SE) a pill beside a name and the line under
+   it wrapped them into three lines (finding 18), so there the pill goes
+   under the text. A name alone fits beside it and stays. */
+@media (max-width: 379px) {
+  .person-row:has(.cellsub) {
+    flex-wrap: wrap;
+  }
+  .person-row:has(.cellsub) > .person-link {
+    flex-basis: 100%;
+  }
+  .person-row:has(.cellsub) > .minibtn {
+    margin-left: 48px;
+  }
+}
+
+/* Find a session's day row has six chips with "Any day": at 375 px six
+   52 px chips and 8 px gaps are wider than the column (#113, finding 2).
+   The chip itself says "All" in the dates' style (Sessions.tsx). */
+.days:has(.day.any) {
+  gap: clamp(4px, 1.5vw, 8px);
+}
+.days:has(.day.any) .day {
+  min-width: 0;
+}
+/* With "Any day", the results come under a heading per day (finding 3); the
+   first sits close under the count. */
+.day-group:first-of-type {
+  margin-top: var(--sp-3);
 }
 
 /* The Map view of a week (#93). The map sits in a grouped cell, 360 px tall

@@ -95,6 +95,40 @@ export function Session() {
     >
       <Details session={session} />
 
+      {/* What Hallway knows and re:Invent does not comes first: who is going,
+          and its place on my week (#113, finding 9). */}
+      {signedIn && <ConnectionsGoing people={going} />}
+
+      {signedIn ? (
+        <OnMyWeek sessionId={session.sessionId} entry={entry} />
+      ) : (
+        <section className="section">
+          <ul className="group">
+            <li>
+              <Link className="cell action lead" to={signInPath(`/sessions/${encodeURIComponent(session.sessionId)}`)}>
+                Sign in to add it to your week
+              </Link>
+            </li>
+          </ul>
+        </section>
+      )}
+
+      <section className="section">
+        {session.url ? (
+          <a className="btn block" href={session.url} target="_blank" rel="noopener">
+            Open on re:Invent <Icon name="out" />
+          </a>
+        ) : null}
+        <p className="gfoot">
+          {!session.url
+            ? "This session has no code yet, so there is no re:Invent link for it."
+            : session.abstract
+              ? "Seats and reservations are on the re:Invent site."
+              : `${noDescription} Seats and reservations are there too.`}{" "}
+          <WhyLink section={session.abstract ? "schedule" : "description"} sessionUrl={session.url} />
+        </p>
+      </section>
+
       {session.abstract && (
         <section className="section">
           <h2 className="ghead">About this session</h2>
@@ -114,38 +148,6 @@ export function Session() {
       )}
 
       <Tags session={session} />
-
-      <section className="section">
-        {session.url ? (
-          <a className="btn block" href={session.url} target="_blank" rel="noopener">
-            Open on re:Invent <Icon name="out" />
-          </a>
-        ) : null}
-        <p className="gfoot">
-          {!session.url
-            ? "This session has no code yet, so there is no re:Invent link for it."
-            : session.abstract
-              ? "Seats and reservations are on the re:Invent site."
-              : `${noDescription} Seats and reservations are there too.`}{" "}
-          <WhyLink section={session.abstract ? "schedule" : "description"} sessionUrl={session.url} />
-        </p>
-      </section>
-
-      {signedIn ? (
-        <OnMyWeek sessionId={session.sessionId} entry={entry} />
-      ) : (
-        <section className="section">
-          <ul className="group">
-            <li>
-              <Link className="cell action lead" to={signInPath(`/sessions/${encodeURIComponent(session.sessionId)}`)}>
-                Sign in to add it to your week
-              </Link>
-            </li>
-          </ul>
-        </section>
-      )}
-
-      {signedIn && <ConnectionsGoing people={going} />}
     </Screen>
   );
 }

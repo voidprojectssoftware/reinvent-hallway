@@ -51,7 +51,8 @@ export function SignIn() {
   const { returnTo, refusal, providers, devSignIn } = useLoaderData<typeof signInLoader>();
   return (
     <Screen
-      title="Hallway"
+      // The bar says "Hallway" (Screen.tsx), so the large title says what the screen is for.
+      title="Sign in"
       sub={
         returnTo
           ? "Sign in and you go straight back to the page you were on."

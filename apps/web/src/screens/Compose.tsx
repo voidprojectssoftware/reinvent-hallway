@@ -7,6 +7,11 @@
 // with `posted` or `error`; the server holds the draft meanwhile, and this
 // tab keeps the text so a refusal returns to my own words. The fallback
 // (copy, save, open LinkedIn) needs no LinkedIn app and is always offered.
+//
+// On a phone (#113, finding 15): opened for one session, the list shows the
+// chosen sessions and a "Choose sessions" row rather than all of my week, and
+// Copy text with the main action sits in a bar above the tab bar, so neither
+// is ten screens down.
 import type { PostDraft } from "@hallway/contracts";
 import { useEffect, useState } from "react";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
@@ -37,8 +42,21 @@ export async function composeLoader({ request }: { request: Request }): Promise<
 export function Compose() {
   const { draft, pick } = useLoaderData<typeof composeLoader>();
   const [search] = useSearchParams();
+  // The whole list rather than only the chosen sessions, once asked for. Held
+  // here, since each tick remounts the form below.
+  const [choosing, setChoosing] = useState(false);
   // A fresh form for each selection: its suggestion, or the words I left with.
-  return <Composer key={searchOf(pick)} draft={draft} pick={pick} posted={search.get("posted")} error={search.get("error")} />;
+  return (
+    <Composer
+      key={searchOf(pick)}
+      draft={draft}
+      pick={pick}
+      posted={search.get("posted")}
+      error={search.get("error")}
+      choosing={choosing}
+      onChoose={() => setChoosing(true)}
+    />
+  );
 }
 
 interface ComposerProps {
@@ -46,9 +64,12 @@ interface ComposerProps {
   pick: Pick;
   posted: string | null;
   error: string | null;
+  /** "Choose sessions" was tapped. */
+  choosing: boolean;
+  onChoose: () => void;
 }
 
-function Composer({ draft, pick, posted, error }: ComposerProps) {
+function Composer({ draft, pick, posted, error, choosing, onChoose }: ComposerProps) {
   const navigate = useNavigate();
   const me = useMe();
   const nothingPicked = pick.kind === "sessions" && pick.sessionIds.length === 0;
@@ -66,6 +87,8 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
   const firstDay = draft.offered.find((s) => s.day)?.day ?? draft.days[0] ?? "";
   const chosen = new Set(nothingPicked ? [] : draft.selected);
   const empty = chosen.size === 0;
+  // With nothing chosen there is nothing to show but the whole list.
+  const listAll = choosing || empty;
 
   function toggle(sessionId: string) {
     const ids = pick.kind === "sessions" ? pick.sessionIds : [];
@@ -99,7 +122,7 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
   const linkHere = encodeURIComponent(`/share/post${searchOf(pick)}`);
 
   return (
-    <Screen title="Tell people you're going" back={{ to: "/", label: "My week" }}>
+    <Screen title="Tell people you're going" navTitle="Post" back={{ to: "/", label: "My week" }}>
       {postUrl && (
         <section className="section">
           <ul className="group">
@@ -157,7 +180,7 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
       {pick.kind === "sessions" && (
         <section className="section">
           <ul className="group">
-            {draft.offered.map((session) => (
+            {(listAll ? draft.offered : draft.offered.filter((session) => chosen.has(session.sessionId))).map((session) => (
               <li key={session.sessionId}>
                 <button
                   className="cell"
@@ -180,6 +203,15 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
                 </button>
               </li>
             ))}
+            {!listAll && (
+              <li>
+                <button className="cell" type="button" onClick={onChoose}>
+                  <span className="cellmain">Choose sessions</span>
+                  <span className="cellval">{draft.offered.length} on your week</span>
+                  <Icon name="chev" className="chev" />
+                </button>
+              </li>
+            )}
           </ul>
           <Foot failed={null}>{empty ? "Tick the sessions to tell people about." : `${chosen.size} chosen.`}</Foot>
         </section>
@@ -224,12 +256,8 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
           )}
 
           <section className="section">
-            {draft.direct.available ? (
-              <button className="btn block" type="button" disabled={busy || text.trim() === ""} onClick={() => void postToLinkedIn()}>
-                Post to LinkedIn
-              </button>
-            ) : null}
-            <Foot failed={failed}>
+            <h2 className="ghead">Posting</h2>
+            <Foot failed={null}>
               {draft.direct.available
                 ? "LinkedIn asks you to allow one post. Hallway posts this text and picture in your name, then forgets LinkedIn's permission."
                 : draft.direct.reason === "no-linkedin-identity"
@@ -247,25 +275,44 @@ function Composer({ draft, pick, posted, error }: ComposerProps) {
             <h2 className="ghead">Or take it to LinkedIn yourself</h2>
             <ul className="group">
               <li>
-                <button className="cell action lead" type="button" onClick={() => void copy()}>
-                  <Icon name="copy" /> Copy text
-                </button>
-              </li>
-              <li>
                 <a className="cell action lead" href={draft.imageUrl} download="hallway-sessions.png">
                   <Icon name="photo" /> Save picture
                 </a>
               </li>
-              <li>
-                <a className="cell action lead" href={linkedInShareUrl(draft.pageUrl)} target="_blank" rel="noopener">
-                  <Icon name="out" /> Open LinkedIn
-                </a>
-              </li>
+              {draft.direct.available && (
+                <li>
+                  <a className="cell action lead" href={linkedInShareUrl(draft.pageUrl)} target="_blank" rel="noopener">
+                    <Icon name="out" /> Open LinkedIn
+                  </a>
+                </li>
+              )}
             </ul>
-            <p className="gfoot" role="status">
-              {note ?? "Open LinkedIn shares your page's link; paste the text and add the picture in its post box."}
-            </p>
+            <p className="gfoot">Open LinkedIn shares your page's link; copy the text, then paste it and add the picture in its post box.</p>
           </section>
+
+          <div className="post-bar">
+            <div className="btnrow">
+              <button className="btn gray" type="button" onClick={() => void copy()}>
+                <Icon name="copy" /> Copy text
+              </button>
+              {draft.direct.available ? (
+                <button className="btn" type="button" disabled={busy || text.trim() === ""} onClick={() => void postToLinkedIn()}>
+                  Post to LinkedIn
+                </button>
+              ) : (
+                <a className="btn" href={linkedInShareUrl(draft.pageUrl)} target="_blank" rel="noopener">
+                  Open LinkedIn <Icon name="out" />
+                </a>
+              )}
+            </div>
+            {failed ? (
+              <Foot failed={failed} />
+            ) : (
+              <p className="gfoot" role="status">
+                {note}
+              </p>
+            )}
+          </div>
         </>
       )}
     </Screen>

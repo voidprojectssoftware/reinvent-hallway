@@ -66,7 +66,7 @@ const titles: Record<string, string> = {
   "/settings": "Settings",
   "/settings/profile": "Profile",
   "/share/post": "Tell people you're going",
-  "/sign-in": "Hallway",
+  "/sign-in": "Sign in",
   "/sign-in/account-exists": "You already have an account",
 };
 

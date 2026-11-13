@@ -55,8 +55,10 @@ p {
   max-width: var(--col);
   margin: 0 auto;
 }
+/* 48 px of air above the tab bar, which is taller by the home indicator's
+   inset on an iPhone (#113, finding 16). */
 main {
-  padding-block: var(--sp-2) calc(var(--tab-h) + 48px);
+  padding-block: var(--sp-2) calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 48px);
 }
 .vh {
   position: absolute;
@@ -83,6 +85,8 @@ svg.g {
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 0.5px solid transparent;
+  /* Under the status bar when Hallway is added to the Home Screen. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .nav.scrolled {
   border-bottom-color: var(--sep);
@@ -104,7 +108,8 @@ svg.g {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.nav.scrolled .nav-title {
+.nav.scrolled .nav-title,
+.nav-title.brand {
   opacity: 1;
 }
 .nav-side {
@@ -147,6 +152,13 @@ svg.g {
 }
 .large h1.long {
   font: var(--t-title1);
+}
+/* On a phone, Title 2: an 80-character session name in Title 1 filled an
+   iPhone SE's first screen (#113, finding 13). */
+@media (max-width: 429px) {
+  .large h1.long {
+    font: var(--t-title2);
+  }
 }
 .large-sub {
   margin-top: 4px;
@@ -474,6 +486,7 @@ button.cell:active {
   gap: 2px;
 }
 .seg button {
+  position: relative;
   flex: 1;
   height: 32px;
   padding: 0 10px;
@@ -485,6 +498,18 @@ button.cell:active {
 .seg button[aria-pressed='true'] {
   background: var(--seg-on);
   box-shadow: var(--shadow-sm);
+}
+/* A 44 px target around a 32 px segment, as .minibtn does: these switch who
+   sees a week with one tap (#113, finding 12). */
+.seg button::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+@media (max-width: 379px) {
+  .seg button {
+    padding: 0 6px;
+  }
 }
 
 /* Buttons. Filled for the one main action on a screen; gray for the rest;
@@ -732,6 +757,14 @@ button.cell:active {
 .empty .btn {
   margin-top: var(--sp-2);
   min-height: 44px;
+}
+/* Two buttons stack at one width rather than each its text's (#113,
+   finding 20). */
+.empty .btn + .btn {
+  margin-top: 0;
+}
+.empty:has(.btn + .btn) .btn {
+  justify-self: stretch;
 }
 
 /* Action sheet, as Halloween's: the dimmed page, a grabber, a grouped panel
