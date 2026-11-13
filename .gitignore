@@ -4,3 +4,4 @@ dist/
 .bodies/
 .dev.vars
 *.log
+.claude/worktrees/
