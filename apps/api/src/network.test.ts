@@ -5,6 +5,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
   AttendeeCard,
+  Invite,
+  IssuedAgentToken,
   ConnectionList,
   MeetingGaps,
   Me,
@@ -74,8 +76,14 @@ const sync = (as: string, sessions: ReturnType<typeof aws>[], favorites = sessio
 const hide = (as: string, sessionId: string) =>
   rest(`/api/events/reinvent2026/my-schedule/entries/${sessionId}`, as, post({ hidden: true }, "PATCH"));
 
+/** Other's share link, as its owner sees it. */
+const inviteOf = async (owner: Me) => (await (await rest("/api/me/invite", owner.id)).json()) as Invite;
+const connectWith = (viewer: string | undefined, owner: Me, invite?: string, body: object = { invite }) =>
+  rest(`/api/attendees/${owner.handle}/connect`, viewer, post(body));
+
+/** One opens the other's share link and connects. */
 async function connect(one: Me, other: Me) {
-  const response = await rest(`/api/attendees/${other.handle}/connect`, one.id, { method: "POST" });
+  const response = await connectWith(one.id, other, (await inviteOf(other)).token);
   expect(response.status).toBe(200);
 }
 
@@ -139,7 +147,72 @@ describe("connection requests", () => {
 
     expect((await rest(`/api/me/connections/${ana.handle}`, ben.id, { method: "DELETE" })).status).toBe(200);
     expect(((await (await rest("/api/me/connections", ana.id)).json()) as ConnectionList).connections).toEqual([]);
-    expect((await rest(`/api/attendees/${ben.handle}/connect`, undefined, { method: "POST" })).status).toBe(401);
+    expect((await connectWith(undefined, ben, (await inviteOf(ben)).token)).status).toBe(401);
+  });
+});
+
+describe("share-link invites", () => {
+  const connections = async (who: Me) =>
+    ((await (await rest("/api/me/connections", who.id)).json()) as ConnectionList).connections;
+
+  it("refuses a bare handle, a wrong token and a rotated one, and connects no one; the current token connects", async () => {
+    const [ana, ben] = [await signIn("Ana Silva"), await signIn("Ben Ode")];
+    const first = await inviteOf(ben);
+    expect(first.path).toBe(`/@${ben.handle}?invite=${first.token}`);
+    expect((await inviteOf(ben)).token).toBe(first.token);
+
+    const refusals = [
+      // No body at all, as a bare form post or curl -X POST sends it.
+      await call(`${origin}/api/attendees/${ben.handle}/connect`, {
+        method: "POST",
+        headers: { authorization: `Bearer dev:${ana.id}` },
+      }),
+      await connectWith(ana.id, ben, undefined, {}),
+      await connectWith(ana.id, ben, ""),
+      await connectWith(ana.id, ben, `${first.token.slice(0, -1)}x`),
+      await connectWith(ana.id, ben, (await inviteOf(ana)).token),
+    ];
+    const rotated = (await (await rest("/api/me/invite/rotate", ben.id, { method: "POST" })).json()) as Invite;
+    expect(rotated.token).not.toBe(first.token);
+    refusals.push(await connectWith(ana.id, ben, first.token));
+    for (const response of refusals) {
+      expect(response.status).toBe(403);
+      expect(((await response.json()) as { kind: string }).kind).toBe("forbidden");
+    }
+    expect(await connections(ana)).toEqual([]);
+
+    // Refused, Ana can still ask; the request waits for Ben.
+    const asked = (await (await rest("/api/me/connection-requests", ana.id, post({ handle: ben.handle }))).json()) as RequestResult;
+    expect(asked.request.status).toBe("pending");
+
+    expect((await connectWith(ana.id, ben, rotated.token)).status).toBe(200);
+    expect((await connections(ana)).map((c) => c.person.handle)).toEqual([ben.handle]);
+  });
+
+  it("keeps existing connections when the owner rotates, and refuses connecting to yourself", async () => {
+    const [ana, ben] = [await signIn("Ana Silva"), await signIn("Ben Ode")];
+    await connect(ana, ben);
+    await rest("/api/me/invite/rotate", ben.id, { method: "POST" });
+    expect((await connections(ana)).map((c) => c.person.handle)).toEqual([ben.handle]);
+    expect((await connectWith(ben.id, ben, (await inviteOf(ben)).token)).status).toBe(400);
+  });
+
+  it("never shows the invite to an agent token, nor lets one rotate it, and keeps it out of public resources", async () => {
+    const ben = await signIn("Ben Ode");
+    const invite = await inviteOf(ben);
+    const issued = (await (await rest("/api/me/tokens", ben.id, post({ label: "agent" }))).json()) as IssuedAgentToken;
+    const asAgent = { headers: { authorization: `Bearer ${issued.secret}` } };
+    expect((await rest("/api/me/invite", undefined, asAgent)).status).toBe(403);
+    expect((await rest("/api/me/invite/rotate", undefined, { method: "POST", ...asAgent })).status).toBe(403);
+    expect((await inviteOf(ben)).token).toBe(invite.token);
+    expect((await rest("/api/me/invite")).status).toBe(401);
+
+    const publicBodies = [
+      await (await rest(`/api/attendees/${ben.handle}`)).text(),
+      await (await rest("/api/me", ben.id)).text(),
+      await (await rest("/api/me", undefined, asAgent)).text(),
+    ];
+    for (const body of publicBodies) expect(body).not.toContain(invite.token);
   });
 });
 

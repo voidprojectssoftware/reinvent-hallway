@@ -23,7 +23,13 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { compact } from "../identity/d1-identity-repositories.ts";
 import type { Database } from "../persistence/d1/database.ts";
 import { attendees } from "../persistence/d1/entities/identity.ts";
-import { connectionRequests, connections, contactImports, importedContacts } from "../persistence/d1/entities/network.ts";
+import {
+  connectionRequests,
+  connections,
+  contactImports,
+  importedContacts,
+  inviteTokens,
+} from "../persistence/d1/entities/network.ts";
 import { planEntries, sessions } from "../persistence/d1/entities/schedule.ts";
 import { fromEntryRow, fromSessionRow } from "../schedule/d1-schedule-repository.ts";
 
@@ -130,6 +136,35 @@ export function networkOnD1(db: Database): NetworkRepository {
 
     async removeConnection(one, other) {
       await db.delete(connections).where(pairIs(one, other));
+    },
+
+    async invite(attendeeId) {
+      const [row] = await db
+        .select({ token: inviteTokens.token, rotatedAt: inviteTokens.rotatedAt })
+        .from(inviteTokens)
+        .where(eq(inviteTokens.attendeeId, attendeeId))
+        .limit(1);
+      return row;
+    },
+
+    async ensureInvite(attendeeId, token, at) {
+      // Insert-if-absent, then read: two first asks at once agree on one token.
+      await db.insert(inviteTokens).values({ attendeeId, token, rotatedAt: at }).onConflictDoNothing({
+        target: inviteTokens.attendeeId,
+      });
+      const [row] = await db
+        .select({ token: inviteTokens.token, rotatedAt: inviteTokens.rotatedAt })
+        .from(inviteTokens)
+        .where(eq(inviteTokens.attendeeId, attendeeId))
+        .limit(1);
+      return row!;
+    },
+
+    async replaceInvite(attendeeId, token, at) {
+      await db
+        .insert(inviteTokens)
+        .values({ attendeeId, token, rotatedAt: at })
+        .onConflictDoUpdate({ target: inviteTokens.attendeeId, set: { token, rotatedAt: at } });
     },
 
     async request(id) {

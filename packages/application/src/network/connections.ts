@@ -6,6 +6,7 @@ import type {
   Connection as ConnectionResource,
   ConnectionList,
   ConnectionRequest as ConnectionRequestResource,
+  ConnectInput,
   PersonScope,
   RequestConnectionInput,
   RequestList,
@@ -17,12 +18,13 @@ import type { Actor } from "../actor.ts";
 import type { AttendeeRecord, AttendeeRepository } from "../identity/ports.ts";
 import { signedInAttendee } from "../identity/profile.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
+import { isCurrentInvite } from "./invites.ts";
 import type { ConnectionRequestRecord, NetworkRepository } from "./ports.ts";
 import { byName, connectionResource, requestResource } from "./views.ts";
 
 export type RequestConnection = (actor: Actor, input: RequestConnectionInput) => Promise<Outcome<RequestResult>>;
 export type DecideRequest = (actor: Actor, input: RequestScope) => Promise<Outcome<RequestResult>>;
-export type ConnectViaShareLink = (actor: Actor, input: PersonScope) => Promise<Outcome<ConnectionResource>>;
+export type ConnectViaShareLink = (actor: Actor, input: ConnectInput) => Promise<Outcome<ConnectionResource>>;
 export type RemoveConnection = (actor: Actor, input: PersonScope) => Promise<Outcome<ConnectionResource>>;
 export type ListConnections = (actor: Actor) => Promise<Outcome<ConnectionList>>;
 export type ListRequests = (actor: Actor) => Promise<Outcome<RequestList>>;
@@ -120,16 +122,24 @@ async function decide(
 }
 
 /**
- * The share link is the owner's consent and the click is mine (domain.md),
- * so the connection forms at once. Already connected returns the connection
+ * The invite token in the owner's share link is their consent and the click
+ * is mine (domain.md), so the connection forms at once. A handle alone is not
+ * consent: without the owner's current token this refuses, and the viewer can
+ * still ask with RequestConnection. Already connected returns the connection
  * as it is; any request pending between us is settled as accepted.
  */
 export function connectViaShareLink({ attendees, network, now }: ConnectionPorts): ConnectViaShareLink {
-  return async (actor, { handle }) => {
+  return async (actor, { handle, invite }) => {
     const me = await signedInAttendee(attendees, actor);
     if (!me.ok) return me;
     const owner = await someoneElse(attendees, me.value, handle);
     if (!owner.ok) return owner;
+    if (!(await isCurrentInvite(network, owner.value.id, invite))) {
+      return fail(
+        "forbidden",
+        `That is not @${owner.value.handle}'s current invite link. Ask them for it, or send a connection request.`,
+      );
+    }
     const existing = await network.connection(me.value.id, owner.value.id);
     if (existing) return ok(connectionResource(existing, owner.value));
     const at = now().toISOString();

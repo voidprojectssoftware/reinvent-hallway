@@ -18,6 +18,7 @@ import {
   type RequestConnection,
 } from "./connections.ts";
 import { importContacts, listSuggestions, type ImportContacts, type ListSuggestions } from "./contacts.ts";
+import { getInvite, rotateInvite, type GetInvite, type RotateInvite } from "./invites.ts";
 import type { NetworkRepository } from "./ports.ts";
 import {
   findMeetingGaps,
@@ -34,6 +35,7 @@ export type {
   ConnectionPlan,
   ConnectionRequestRecord,
   ContactImportRecord,
+  InviteRecord,
   NetworkRepository,
   PlanScope,
 } from "./ports.ts";
@@ -54,6 +56,8 @@ export interface NetworkHandlers {
   acceptRequest: DecideRequest;
   declineRequest: DecideRequest;
   connectViaShareLink: ConnectViaShareLink;
+  getInvite: GetInvite;
+  rotateInvite: RotateInvite;
   removeConnection: RemoveConnection;
   listConnections: ListConnections;
   listRequests: ListRequests;
@@ -75,6 +79,8 @@ export function networkHandlers(ports: NetworkPorts): NetworkHandlers {
     acceptRequest: decideOn(writes, "accept"),
     declineRequest: decideOn(writes, "decline"),
     connectViaShareLink: connectViaShareLink(writes),
+    getInvite: getInvite(writes),
+    rotateInvite: rotateInvite(writes),
     removeConnection: removeConnection(writes),
     listConnections: listConnections(writes),
     listRequests: listRequests(writes),

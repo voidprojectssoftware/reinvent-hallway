@@ -105,6 +105,21 @@ describe.each(implementations)("NetworkRepository %s", (_, make) => {
     expect(await world.network.areConnected(ana.id, ben.id)).toBe(false);
   });
 
+  it("makes an invite once, keeps it on later asks, and replaces it on rotation", async () => {
+    const world = make();
+    const ana = await person(world, "ana");
+    expect(await world.network.invite(ana.id)).toBeUndefined();
+    const first = fresh("tok");
+    expect(await world.network.ensureInvite(ana.id, first, at)).toEqual({ token: first, rotatedAt: at });
+    expect(await world.network.ensureInvite(ana.id, fresh("tok"), "2026-11-14T00:00:00.000Z")).toEqual({
+      token: first,
+      rotatedAt: at,
+    });
+    const second = fresh("tok");
+    await world.network.replaceInvite(ana.id, second, "2026-11-15T00:00:00.000Z");
+    expect(await world.network.invite(ana.id)).toEqual({ token: second, rotatedAt: "2026-11-15T00:00:00.000Z" });
+  });
+
   it("allows one pending request per direction, and connecting settles both crossed requests", async () => {
     const world = make();
     const [ana, ben] = [await person(world, "ana"), await person(world, "ben")];

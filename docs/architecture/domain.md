@@ -58,6 +58,7 @@ erDiagram
   CONTACT_IMPORT ||--o{ IMPORTED_CONTACT : holds
   ATTENDEE ||--o{ AGENT_TOKEN : issues
   ATTENDEE ||--o| CALENDAR_FEED : owns
+  ATTENDEE ||--o| INVITE : "shares (one, rotatable)"
 ```
 
 | Resource | What it is | Key fields |
@@ -73,6 +74,7 @@ erDiagram
 | **Suggestion** | Derived, not stored: an attendee who matches one of my imported contacts and is not yet connected | `attendee`, `reason` |
 | **Agent token** | A personal token an agent uses for MCP and REST | `id`, `label`, `prefix` (shown), hash (stored), `createdAt`, `lastUsedAt`, `revokedAt`. Secret shown once |
 | **Calendar feed** | A secret iCalendar URL of my visible schedule | `token` (rotatable; stored readable so its owner can see the link again, unlike every other secret; shown only to its owner signed in as a person, never in a public resource). One per attendee |
+| **Invite** | The secret in my share link, `/@handle?invite=<token>`: whoever opens it may connect to me at once | `token` (32 random bytes, base64url; made on first ask, rotatable; stored readable like the calendar feed so its owner can copy the link again; shown only to its owner signed in as a person, never in a public resource or a log), `rotatedAt`. One per attendee |
 
 ### Session link
 
@@ -114,15 +116,20 @@ We store UTC instants and the event timezone, and render in the event timezone
   its fields; a field absent from the snapshot keeps its old value. A snapshot
   for an unknown event is refused.
 - **A connection is mutual and needs consent.** A request becomes a connection
-  only when the other side accepts. Accepting via someone's share link counts as
-  their consent (they shared it) and yours (you clicked Connect).
+  only when the other side accepts. Connecting via someone's share link forms
+  the connection at once: the link's current invite token is their consent
+  (they shared it) and the click is yours. A bare `/@handle` is not consent
+  and connects no one; without the current token the viewer can still send a
+  request. Rotating the invite stops old links connecting and leaves existing
+  connections alone. Decided in review of #38, after the first build connected
+  anyone who knew a handle.
 - **Suggestions need two matching facts.** A contact suggests an attendee when
   the profile URL matches **and** the contact's name matches the attendee's
   `verifiedName` (accents, case and spacing ignored, nothing fuzzier), or the email hash matches the attendee's verified email. A
   claimed URL alone suggests no one: anyone can claim any URL.
 - **Agent tokens act as their attendee**, for that attendee's data and that
   attendee's view of others. Never more: an agent token may not issue, list
-  or revoke agent tokens, nor rotate or read the calendar feed (`forbidden`),
+  or revoke agent tokens, nor rotate or read the calendar feed or the invite (`forbidden`),
   so a stolen token cannot outlive its own revocation (ADR 0008).
 
 ## Commands
@@ -140,7 +147,8 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows (exact duplicates folded), replace my previous import, all or nothing (ADR 0011) |
 | `RequestConnection` / `WithdrawRequest` | me | |
 | `AcceptRequest` / `DeclineRequest` | the recipient | |
-| `ConnectViaShareLink` | signed-in viewer of `/@handle` | connection formed at once (rule above) |
+| `ConnectViaShareLink` | signed-in viewer of `/@handle?invite=<token>` | with the owner's current invite token, connection formed at once (rule above); otherwise `forbidden`. Connecting to yourself is refused |
+| `RotateInvite` | me, signed in as a person (not an agent token) | a new invite token; old links stop connecting, connections stay |
 | `RemoveConnection` | either side | |
 
 ## Queries
@@ -149,6 +157,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | --- | --- |
 | `GetMe` | my attendee, with private fields |
 | `GetCalendarFeed` | my current feed URL, to me signed in as a person (not an agent token) |
+| `GetInvite` | my share link with its invite token, made on first ask, to me signed in as a person (not an agent token) |
 | `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |

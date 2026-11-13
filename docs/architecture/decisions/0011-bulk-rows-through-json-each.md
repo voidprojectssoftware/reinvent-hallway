@@ -29,6 +29,15 @@ Here the row count is the user's, so per-row parameters cannot fit; the
 `insert ... select` keeps the model for the column list, and only the
 expansion is SQL.
 
+**Note, same slice: the share link carries an invite token.** Review of #38
+decided that `ConnectViaShareLink` needs the owner's current invite token
+(`/@handle?invite=<token>`), not a bare handle, which anyone could type. The
+token is 32 random bytes, one per attendee in `invite_tokens`, made on first
+ask and rotatable. It is stored readable for ADR 0008's calendar-feed reason
+(the owner copies the link again; hashing protects nothing the database does
+not already expose), returned only to its owner signed in as a person, and
+compared without an early exit. domain.md holds the rule.
+
 **Rejected:** several invocations for one import (no longer atomic); a
 Queue or Durable Object for the import (machinery for a once-a-week upload);
 dropping rows that match no attendee today (an attendee who signs up next

@@ -67,6 +67,29 @@ export type RequestScope = z.infer<typeof RequestScope>;
 export const PersonScope = z.object({ handle: Handle });
 export type PersonScope = z.infer<typeof PersonScope>;
 
+export const ConnectBody = z
+  .object({
+    invite: z
+      .string()
+      .max(128)
+      .optional()
+      .meta({ description: "The `invite` from their share link (`/@handle?invite=...`). Without the current one, 403." }),
+  })
+  .meta({ id: "ConnectViaShareLink" });
+export type ConnectBody = z.infer<typeof ConnectBody>;
+
+export const ConnectInput = PersonScope.extend(ConnectBody.shape);
+export type ConnectInput = z.infer<typeof ConnectInput>;
+
+export const Invite = z
+  .object({
+    token: z.string().meta({ description: "The share link's secret, shown only to its owner. Rotating replaces it." }),
+    path: z.string().meta({ description: "The share link: anyone signed in who opens it can connect at once.", example: "/@jane-doe?invite=AbC" }),
+    rotatedAt: instant,
+  })
+  .meta({ id: "Invite", description: "My share link, which connects whoever opens it. Never in a public resource." });
+export type Invite = z.infer<typeof Invite>;
+
 /** A LinkedIn export is a few MB for 30,000 connections; ten is room to spare. */
 export const maxContactsCsvBytes = 10_000_000;
 

@@ -58,6 +58,20 @@ export const connectionRequests = sqliteTable(
   ],
 );
 
+/**
+ * The secret in an attendee's share link (`/@handle?invite=<token>`): showing
+ * it is their consent to connect. One per attendee, rotatable. Kept readable,
+ * like the calendar feed token (ADR 0008), so its owner can copy the link
+ * again; only ever returned to its owner, signed in as a person.
+ */
+export const inviteTokens = sqliteTable("invite_tokens", {
+  attendeeId: text("attendee_id")
+    .primaryKey()
+    .references(() => attendees.id),
+  token: text("token").notNull().unique(),
+  rotatedAt: text("rotated_at").notNull(),
+});
+
 /** One per attendee: an upload replaces the last one. */
 export const contactImports = sqliteTable("contact_imports", {
   id: text("id").primaryKey(),

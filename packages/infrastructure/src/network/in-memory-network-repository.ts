@@ -9,6 +9,7 @@ import {
   type ConnectionPlan,
   type ConnectionRequestRecord,
   type ContactImportRecord,
+  type InviteRecord,
   type NetworkRepository,
   type ScheduleRepository,
 } from "@hallway/application";
@@ -32,8 +33,24 @@ export function networkInMemory({
   const key = (one: string, other: string) => (one < other ? `${one}\n${other}` : `${other}\n${one}`);
   const otherEnd = (connection: Connection, me: string) => (connection.a === me ? connection.b : connection.a);
   const pending = () => [...requests.values()].filter((request) => request.status === "pending");
+  const invites = new Map<string, InviteRecord>();
+  const putInvite = (attendeeId: string, token: string, rotatedAt: string) => {
+    for (const [other, invite] of invites) {
+      if (other !== attendeeId && invite.token === token) throw new Error("UNIQUE constraint failed: invite_tokens.token");
+    }
+    invites.set(attendeeId, { token, rotatedAt });
+  };
 
   return {
+    invite: async (attendeeId) => structuredClone(invites.get(attendeeId)),
+    async ensureInvite(attendeeId, token, at) {
+      if (!invites.has(attendeeId)) putInvite(attendeeId, token, at);
+      return structuredClone(invites.get(attendeeId)!);
+    },
+    async replaceInvite(attendeeId, token, at) {
+      putInvite(attendeeId, token, at);
+    },
+
     areConnected: async (one, other) => pairs.has(key(one, other)),
     connection: async (one, other) => structuredClone(pairs.get(key(one, other))),
 

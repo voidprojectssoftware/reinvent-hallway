@@ -9,6 +9,12 @@ export interface ConnectionRequestRecord extends ConnectionRequest {
   id: string;
 }
 
+/** Kept readable so its owner can copy the link again, like the calendar feed (ADR 0008). */
+export interface InviteRecord {
+  token: string;
+  rotatedAt: string;
+}
+
 export interface ContactImportRecord {
   id: string;
   attendeeId: string;
@@ -41,6 +47,13 @@ export interface NetworkRepository {
    */
   connect(connection: Connection, at: string): Promise<void>;
   removeConnection(one: string, other: string): Promise<void>;
+
+  /** The attendee's current invite token (their share link's secret), if they have one. */
+  invite(attendeeId: string): Promise<InviteRecord | undefined>;
+  /** The current invite, storing this one first if there is none: two first reads agree. */
+  ensureInvite(attendeeId: string, token: string, at: string): Promise<InviteRecord>;
+  /** Replaces the invite; links with the old token stop connecting. */
+  replaceInvite(attendeeId: string, token: string, at: string): Promise<void>;
 
   request(id: string): Promise<ConnectionRequestRecord | undefined>;
   /** The pending request from `from` to `to`, if there is one. */

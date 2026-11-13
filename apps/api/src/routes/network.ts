@@ -2,11 +2,13 @@
 // outcome. Nothing else belongs here (ADR 0002).
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  ConnectBody,
   Connection,
   ConnectionList,
   ContactImport,
   EventScope,
   ImportContactsInput,
+  Invite,
   maxContactsCsvBytes,
   MeetingGaps,
   MeetingGapsQuery,
@@ -97,11 +99,31 @@ const connectRoute = createRoute({
   method: "post",
   path: "/api/attendees/{handle}/connect",
   operationId: "connectViaShareLink",
-  summary: "Connect at once from someone's share link (/@handle)",
-  description: "Their sharing the link is their consent and this call is mine, so no request is needed.",
+  summary: "Connect at once from someone's share link (/@handle?invite=...)",
+  description:
+    "The link's invite token is their consent and this call is mine, so no request is needed. Without their current token: 403, and a connection request is the way to ask.",
   tags,
-  request: { params: PersonScope },
+  // Not required: a call with no body has no invite, which is the 403 below, not a 400.
+  request: { params: PersonScope, body: { required: false, content: { "application/json": { schema: ConnectBody } } } },
   responses: { 200: json(Connection, "The connection, new or existing."), ...errorResponses },
+});
+
+const getInviteRoute = createRoute({
+  method: "get",
+  path: "/api/me/invite",
+  operationId: "getInvite",
+  summary: "My share link, with its invite token. Web sign-in only: 403 to an agent token",
+  tags,
+  responses: { 200: json(Invite, "My invite, made on first ask."), ...errorResponses },
+});
+
+const rotateInviteRoute = createRoute({
+  method: "post",
+  path: "/api/me/invite/rotate",
+  operationId: "rotateInvite",
+  summary: "Replace my invite token: old links stop connecting, connections stay. Web sign-in only: 403 to an agent token",
+  tags,
+  responses: { 200: json(Invite, "The new invite."), ...errorResponses },
 });
 
 const importContactsRoute = createRoute({
@@ -182,8 +204,16 @@ export function registerNetworkRoutes<B extends object>(app: ApiApp<B>) {
     respond(c, await c.var.handlers.network.withdrawRequest(c.var.actor, c.req.valid("param"))),
   );
   app.openapi(connectRoute, async (c) =>
-    respond(c, await c.var.handlers.network.connectViaShareLink(c.var.actor, c.req.valid("param"))),
+    respond(
+      c,
+      await c.var.handlers.network.connectViaShareLink(c.var.actor, {
+        ...c.req.valid("param"),
+        ...(c.req.valid("json") ?? {}),
+      }),
+    ),
   );
+  app.openapi(getInviteRoute, async (c) => respond(c, await c.var.handlers.network.getInvite(c.var.actor)));
+  app.openapi(rotateInviteRoute, async (c) => respond(c, await c.var.handlers.network.rotateInvite(c.var.actor)));
   app.openapi(importContactsRoute, async (c) => {
     // A CSV body is read as text here, then held to the contract like any other input.
     const input = ImportContactsInput.safeParse({ csv: await c.req.text() });
