@@ -3,6 +3,7 @@
 // visibility rule; what is left here is the format (PNG, iCalendar) and its
 // HTTP headers. /@handle's link preview is person-page.ts.
 import { createRoute } from "@hono/zod-openapi";
+import { anonymous } from "@hallway/application";
 import { ShareLinks } from "@hallway/contracts";
 import type { ApiApp } from "../app.ts";
 import { errorResponses, refuse, respond } from "../outcome-http.ts";
@@ -34,13 +35,15 @@ export function registerSharingRoutes<B extends DevSignInBindings>(app: ApiApp<B
     respond(c, await c.var.handlers.sharing.getShareLinks(c.var.actor, { origin: new URL(c.req.url).origin })),
   );
 
-  // The share card, as the asker may see it: LinkedIn's fetcher is
-  // anonymous, so a posted link shows the public view; the owner signed in
-  // gets their own week to download and post as a picture.
+  // The link preview's card: what anyone who opens the link sees, and only
+  // that, whoever asks and whatever cookie they send. So one URL is one
+  // picture, and a cache keyed by URL (the browser's, a CDN) can never hand
+  // the owner's own week to someone else (#70). The owner's picture has its
+  // own address, /api/me/share-image.png (routes/post.ts).
   app.get("/og/:file", async (c) => {
     const handle = imageName.exec(c.req.param("file"))?.[1];
     if (!handle) return refuse(c, { kind: "not-found", message: "Expected /og/{handle}.png." });
-    const shared = await c.var.handlers.sharing.getSharedSchedule(c.var.actor, { handle });
+    const shared = await c.var.handlers.sharing.getSharedSchedule(anonymous, { handle });
     if (!shared.ok) return refuse(c, shared.error);
     const only = c.req.query("day");
     if (only !== undefined && !(day.test(only) && eventDays(shared.value.event).includes(only))) {
@@ -52,16 +55,10 @@ export function registerSharingRoutes<B extends DevSignInBindings>(app: ApiApp<B
         pageLabel: `${new URL(c.req.url).host}/@${shared.value.attendee.handle}`,
       }),
     );
-    // Anonymous is the public view, the same for everyone, so caches may
-    // keep it: for a day when the URL names the current version (a changed
-    // schedule gets a new URL), briefly otherwise. A signed-in view may hold
-    // what only that viewer may see, so nothing keeps it.
-    const cache =
-      c.var.actor.kind === "attendee"
-        ? "private, no-store"
-        : c.req.query("v") === shared.value.version
-          ? "public, max-age=86400, immutable"
-          : "public, max-age=300";
+    // The same for everyone, so caches may keep it: for a day when the URL
+    // names the current version (a changed schedule gets a new URL), briefly
+    // otherwise.
+    const cache = c.req.query("v") === shared.value.version ? "public, max-age=86400, immutable" : "public, max-age=300";
     return c.body(png as Uint8Array<ArrayBuffer>, 200, { "content-type": "image/png", "cache-control": cache });
   });
 

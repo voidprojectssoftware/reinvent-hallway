@@ -10,17 +10,20 @@ import {
   identityHandlers,
   invitePathOf,
   networkHandlers,
+  postingHandlers,
   recordGitHubFollowing,
   scheduleHandlers,
   sharingHandlers,
   type TieBetween,
   type IdentityPorts,
+  type LinkedInPoster,
 } from "@hallway/application";
 import {
   attendeesInMemory,
   eventsInMemory,
   identityInMemory,
   networkInMemory,
+  postDraftsInMemory,
   reinvent2026,
   scheduleInMemory,
 } from "@hallway/infrastructure";
@@ -32,7 +35,12 @@ export const testSessionUrlTemplate = "https://example.test/catalog?search={code
 export const noPng = async () => new Uint8Array();
 
 export function inMemoryHandlers(
-  options: { now?: () => Date; identity?: Partial<IdentityPorts> } = {},
+  options: {
+    now?: () => Date;
+    identity?: Partial<IdentityPorts>;
+    /** Posting to LinkedIn: the poster over a fake LinkedIn, or absent (not set up). */
+    poster?: LinkedInPoster;
+  } = {},
 ) {
   const now = options.now ?? (() => new Date());
   const events = eventsInMemory([reinvent2026]);
@@ -47,6 +55,16 @@ export function inMemoryHandlers(
     now,
     ...options.identity,
   });
+  const sharing = {
+    attendees,
+    calendarFeeds: identityPorts.calendarFeeds,
+    events,
+    schedule,
+    tieBetween,
+    sessionUrlTemplate: testSessionUrlTemplate,
+    invitePath: invitePathOf(network, now),
+  };
+  const drafts = postDraftsInMemory();
   const handlers: Handlers = {
     getEvent: getEvent(events),
     identity: identityHandlers(identityPorts),
@@ -66,15 +84,8 @@ export function inMemoryHandlers(
       sessionUrlTemplate: testSessionUrlTemplate,
       now,
     }),
-    sharing: sharingHandlers({
-      attendees,
-      calendarFeeds: identityPorts.calendarFeeds,
-      events,
-      schedule,
-      tieBetween,
-      sessionUrlTemplate: testSessionUrlTemplate,
-      invitePath: invitePathOf(network, now),
-    }),
+    sharing: sharingHandlers(sharing),
+    posting: postingHandlers({ ...sharing, drafts, now, ...(options.poster && { poster: options.poster }) }),
   };
-  return { handlers, attendees, schedule, network };
+  return { handlers, attendees, schedule, network, drafts };
 }

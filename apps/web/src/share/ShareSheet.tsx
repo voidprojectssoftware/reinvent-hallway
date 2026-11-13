@@ -5,9 +5,13 @@
 // Two pictures, each labelled for what it is, because they differ (ADR
 // 0012): a posted link's preview is the card an anonymous visitor gets,
 // which for a week that is not public shows only my name, while the picture
-// to save is my own full week. The sheet fetches the first without the
-// cookie, so it shows exactly what LinkedIn will, and offers the visibility
-// switch beside it when the week is not public.
+// to save is my own full week. Each has its own address (#70): the preview's
+// is always the anonymous card, whoever asks, so it is a plain <img> showing
+// exactly what LinkedIn will; mine is only ever mine. The visibility switch
+// sits beside them when the week is not public.
+//
+// Posting goes through the composer (/share/post, ADR 0026), where the
+// person picks the week, a day or sessions and edits the text.
 //
 // Two links, said plainly, because they differ in what they let a stranger
 // do: the page link shows my week as my visibility allows and connects no
@@ -31,8 +35,6 @@ import { ProblemText, type Failed } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
 import { useModal } from "../shell/modal.ts";
 
-const linkedInShare = (pageUrl: string) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(pageUrl)}`;
-
 /** An https feed as a webcal: link, which calendar apps open as a subscription. */
 const webcal = (calendarUrl: string) => calendarUrl.replace(/^https?:/, "webcal:");
 
@@ -46,7 +48,6 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   useModal(dialog, onClose);
-  const preview = usePublicCard(links?.imageUrl);
 
   async function load() {
     try {
@@ -118,17 +119,15 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
           {links && (
             <div className="sheet-pics">
               <figure>
-                {preview ? (
-                  <img src={preview} alt="The link preview people see when you post your link" width={1200} height={627} />
-                ) : (
-                  <span className="sheet-pic-wait" aria-hidden="true" />
-                )}
+                <img src={links.imageUrl} alt="The link preview people see when you post your link" width={1200} height={627} />
                 <figcaption>When you post the link, people see</figcaption>
               </figure>
-              <figure>
-                <img src={links.imageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
-                <figcaption>Your week, to save and post as a picture</figcaption>
-              </figure>
+              {links.myImageUrl && (
+                <figure>
+                  <img src={links.myImageUrl} alt="Your whole week, the picture to save and post" width={1200} height={627} />
+                  <figcaption>Your week, to save and post as a picture</figcaption>
+                </figure>
+              )}
             </div>
           )}
           {links && visibility !== "public" && (
@@ -157,14 +156,16 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
                   Copy invite link
                 </SheetButton>
               )}
-              <a className="sheet-b" href={linkedInShare(links.pageUrl)} target="_blank" rel="noopener">
+              <Link className="sheet-b" to="/share/post" onClick={onClose}>
                 <Icon name="share" />
                 Post on LinkedIn
-              </a>
-              <a className="sheet-b" href={links.imageUrl} download="hallway-week.png">
-                <Icon name="photo" />
-                Save picture
-              </a>
+              </Link>
+              {links.myImageUrl && (
+                <a className="sheet-b" href={links.myImageUrl} download="hallway-week.png">
+                  <Icon name="photo" />
+                  Save picture
+                </a>
+              )}
               {links.calendarUrl ? (
                 <a className="sheet-b" href={webcal(links.calendarUrl)}>
                   <Icon name="cal" />
@@ -190,30 +191,6 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
     </div>,
     document.body,
   );
-}
-
-/** The anonymous card for `imageUrl`, as an object URL while the sheet is open. */
-function usePublicCard(imageUrl: string | undefined): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!imageUrl) return;
-    let made: string | null = null;
-    let live = true;
-    api.publicShareCard(imageUrl).then(
-      (blob) => {
-        if (!live) return;
-        made = URL.createObjectURL(blob);
-        setUrl(made);
-      },
-      // The preview is an aid; the sheet works without it.
-      (failure: unknown) => console.error("Hallway: the public share card did not load", failure),
-    );
-    return () => {
-      live = false;
-      if (made) URL.revokeObjectURL(made);
-    };
-  }, [imageUrl]);
-  return url;
 }
 
 interface SheetButtonProps {

@@ -44,8 +44,13 @@
   // worker-renderer.ts); a `.wasm` import is a compiled module by default.
   "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }],
 
-  // The share card's fallback fonts (CJK, Cyrillic, Greek...) are static
-  // assets, too big for the bundle: copied into the assets directory, after
-  // apps/web's build, before every `wrangler dev` and deploy (ADR 0012).
-  "build": { "command": "node scripts/copy-card-fonts.mjs" },
+  // No "build" command here. The share card's fallback fonts (ADR 0012) are
+  // copied into the assets directory by whatever starts wrangler
+  // (scripts/copy-card-fonts.mjs: apps/api/scripts/dev.mjs,
+  // scripts/aspire-api.mjs, e2e/hallway-worker.ts and `npm run build`). With a
+  // custom build, wrangler 4.160 to 4.162 never reloads the assets after a
+  // change under ../web/dist: its asset watcher refreshes only a bundle its own
+  // esbuild made, so after a web rebuild it kept the manifest from startup,
+  // served a new hashed bundle as index.html (a blank page) and the old
+  // index.html's ETag (a stale page). Issue #85.
 }

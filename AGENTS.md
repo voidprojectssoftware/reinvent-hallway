@@ -57,6 +57,16 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   Hallway (calendar feed, share image, link preview) goes through
   `shareableEntries` with the same `tieBetween`, held by
   `apps/api/src/sharing.test.ts` and `person-page.test.ts` (ADR 0012).
+- **No image URL is both the public card and the owner's picture (#70, ADR
+  0026).** _Held by:_ `/og/{handle}.png` reads as `anonymous` whatever the
+  request carries (`routes/sharing.ts`), and the owner's picture is
+  `/api/me/share-image.png`; `sharing.test.ts` ("no image URL gives the
+  owner's week to anyone else") fetches every image URL the owner is handed
+  without credentials.
+- **No LinkedIn token is stored, and only a person posts (ADR 0026).** _Held
+  by:_ the token lives in `linkedInPoster`'s closure and no repository has a
+  column for it; `apps/api/src/post.test.ts` checks no token reaches a draft
+  or a redirect, and refuses an agent token on every posting route.
 - **A session abstract reaches only a verified attendee, and only through
   session search and get (ADR 0025).** Verified is the domain's
   `canReadAbstract`: signed in, and an abstract a sync of theirs kept for one
@@ -119,6 +129,12 @@ machine's LAN address (`HALLWAY_LAN_HOST` overrides it); the dashboard link
 carries this run's sign-in token. Never on unless asked. Several agents run
 servers here: pick LAN ports nobody else uses, and never stop what you did not
 start.
+
+`npm run fake:linkedin` runs a fake LinkedIn on 127.0.0.1 and prints the
+`.dev.vars` lines (client id and secret, `LINKEDIN_POSTING=1`,
+`LINKEDIN_FAKE_URL`) that point sign-in and posting at it; restart
+`npm run dev` after adding them. Its own page shows every post with its
+picture. Nothing reaches LinkedIn (ADR 0026).
 
 `npm run seed:demo -- <url>` loads the same demo data into a running
 `npm run dev` (it needs dev sign-in, so a loopback URL).
