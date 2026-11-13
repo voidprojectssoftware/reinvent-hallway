@@ -67,7 +67,7 @@ function anAttendee(overrides: Partial<AttendeeRecord> = {}): AttendeeRecord {
     handle: `person-${counter}`,
     handlePlaceholder: false,
     displayName: `Person ${counter}`,
-    visibility: "connections",
+    visibility: "network",
     createdAt: "2026-11-13T10:00:00.000Z",
     ...overrides,
   };

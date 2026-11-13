@@ -12,6 +12,7 @@ import type {
   WebSessionRecord,
   WebSessionRepository,
 } from "@hallway/application";
+import { noTie } from "@hallway/domain";
 
 const copy = <T>(value: T | undefined): T | undefined => value && structuredClone(value);
 
@@ -137,7 +138,7 @@ export function identityInMemory(extra: Partial<IdentityPorts> = {}): IdentityPo
     agentTokens: agentTokensInMemory(),
     webSessions: webSessionsInMemory(),
     calendarFeeds: calendarFeedsInMemory(),
-    areConnected: async () => false,
+    tieBetween: async () => noTie,
     ...extra,
   };
 }

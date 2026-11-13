@@ -23,7 +23,10 @@ const contactImportResource = ({ importedAt, count }: ContactImportRecord): Cont
 
 /**
  * Reads the CSV into reduced rows (the domain drops every other column as it
- * parses), folds exact duplicates, and replaces my previous import with them.
+ * parses), folds exact duplicates, and replaces my previous import with them,
+ * then replaces my `linkedin-import` follows with the attendees they match.
+ * Two writes: if the second fails the call fails, and uploading again
+ * repairs it.
  */
 export function importContacts({ attendees, network, now }: ContactPorts): ImportContacts {
   return async (actor, { csv }) => {
@@ -44,6 +47,12 @@ export function importContacts({ attendees, network, now }: ContactPorts): Impor
       count: contacts.length,
     };
     await network.replaceContacts(record, contacts);
+    // Each attendee the two-fact rule matches becomes someone I follow (ADR
+    // 0019): my upload is my act, so it lets them see my network-only week.
+    // Connected or asked, they are still followed; only I am left out.
+    const { contacts: matched, candidates } = await network.contactMatches(me.value.id);
+    const followed = suggestions(matched, candidates, new Set([me.value.id])).map(({ attendee }) => attendee.id);
+    await network.replaceImportFollows(me.value.id, followed, record.importedAt);
     return ok(contactImportResource(record));
   };
 }

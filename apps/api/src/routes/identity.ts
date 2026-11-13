@@ -9,8 +9,10 @@ import {
   AgentTokenList,
   AttendeeCard,
   CalendarFeed,
+  DevLinkGitHubInput,
   DevSignInInput,
   GetAttendeeInput,
+  Identity,
   IdentityList,
   IssueAgentTokenInput,
   IssuedAgentToken,
@@ -124,6 +126,17 @@ const devSignInRoute = createRoute({
   tags,
   request: body(DevSignInInput),
   responses: { 200: json("Signed in; the session cookie is set.", Me), ...errorResponses },
+});
+
+const devLinkGitHubRoute = createRoute({
+  method: "post",
+  path: "/api/dev/github",
+  operationId: "devLinkGitHub",
+  summary:
+    "Dev only: link a GitHub account, with who it follows, to the person signed in, as a GitHub link round trip would. Only with DEV_SIGN_IN=1 and on a loopback host; 404 otherwise",
+  tags,
+  request: body(DevLinkGitHubInput),
+  responses: { 200: json("The GitHub identity, linked; its follows are stored.", Identity), ...errorResponses },
 });
 
 const signInOptionsRoute = createRoute({
@@ -301,6 +314,12 @@ export function registerIdentityRoutes<B extends DevSignInBindings>(app: ApiApp<
     if (!signedIn.ok) return refuse(c, signedIn.error);
     setSessionCookie(c, signedIn.value.session.secret, signedIn.value.session.expiresAt);
     return c.json(signedIn.value.me, 200);
+  });
+
+  app.openapi(devLinkGitHubRoute, async (c) => {
+    const allowed = devSignInAllowed(c.req.raw, c.env);
+    if (!allowed.ok) return refuse(c, allowed.error);
+    return respond(c, await c.var.handlers.identity.devLinkGitHub(c.var.actor, c.req.valid("json")));
   });
 
   app.openapi(signOutRoute, async (c) => {
