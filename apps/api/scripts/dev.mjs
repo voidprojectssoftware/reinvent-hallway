@@ -21,6 +21,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,8 +32,13 @@ const api = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const root = resolve(api, "../..");
 const persistTo = join(root, ".wrangler/state");
 const wrangler = join(root, "node_modules/wrangler/bin/wrangler.js");
-const vite = join(root, "node_modules/vite/bin/vite.js");
 const web = join(root, "apps/web");
+// The vite apps/web declares, found the way `npm run build -w @hallway/web`
+// finds it, never the root node_modules/vite. The root one is vitest's peer
+// and stays on whatever major vitest accepts (7 while packages/domain pins
+// vitest 4), so dev on it built with a different vite than the build (#35).
+const viteRoot = dirname(createRequire(join(web, "package.json")).resolve("vite/package.json"));
+const vite = join(viteRoot, "bin/vite.js");
 
 export function preferredPort(checkout) {
   const hash = createHash("sha256").update(checkout).digest().readUInt32BE(0);
