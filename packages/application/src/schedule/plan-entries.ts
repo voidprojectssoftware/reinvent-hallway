@@ -1,7 +1,7 @@
 // AddToPlan, RemoveFromPlan and SetEntryHidden (domain.md): what the attendee
 // does to their own schedule on Hallway, beside what their agent syncs.
 import type { PlanEntry as PlanEntryResource, SessionScope, SetEntryHiddenInput } from "@hallway/contracts";
-import type { PlanEntry } from "@hallway/domain";
+import { manualIntent, type PlanEntry } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleDependencies } from "./dependencies.ts";
@@ -31,13 +31,16 @@ export function addToPlan({ schedule, sessionUrlTemplate, now }: ScheduleDepende
       const added: PlanEntry = {
         attendeeId,
         sessionId,
-        intent: "interested",
+        intent: manualIntent,
         source: "manual",
+        invited: false,
         hidden: false,
         addedAt: now().toISOString(),
       };
       await schedule.addEntry(eventId, added);
-      entry = added;
+      // Read back: a sync landing between the read above and the add wins,
+      // and the attendee is shown the entry that is actually there.
+      entry = (await schedule.entry(attendeeId, eventId, sessionId)) ?? added;
     }
     return ok(planEntryResource(entry, session, sessionUrlTemplate));
   };

@@ -1,15 +1,22 @@
 // SyncSchedule (domain.md): the attendee's agent sends its AWS session
-// snapshots and the favorites and reserved id lists; the catalog takes the
-// snapshots and the attendee's `agent-sync` entries become exactly the lists.
+// snapshots and the favorites, reserved and invited lists; each snapshot of a
+// listed session becomes this attendee's report of it, and the attendee's
+// `agent-sync` entries become exactly the lists.
 // `PUT /api/events/{eventId}/my-schedule` and the `sync_my_schedule` tool both
 // call this.
 import type { AwsSession as AwsSessionInput, SyncResult, SyncScheduleInput } from "@hallway/contracts";
-import { mergeSnapshot, planSync, toSession, type AwsSession, type PlanEntry } from "@hallway/domain";
+import {
+  mergeSnapshot,
+  planSync,
+  syncedSessions,
+  toSession,
+  type AwsSession,
+  type SessionReport,
+} from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type { ScheduleDependencies } from "./dependencies.ts";
 import { attendeeOf, signInFirst } from "./resources.ts";
-import type { CatalogSession } from "./schedule-repository.ts";
 
 export type SyncSchedule = (actor: Actor, input: SyncScheduleInput) => Promise<Outcome<SyncResult>>;
 
@@ -21,42 +28,45 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
     if (!event) return fail("not-found", `No event ${input.eventId}.`);
     const at = now().toISOString();
 
-    // The last snapshot of a session wins when an agent sends one twice.
+    const invited = input.invitedSessions.map((aws) => aws.sessionId);
+    const listed = new Set([...input.favorites, ...input.reserved, ...invited]);
+    // Only a session on this attendee's own AWS schedule is theirs to report
+    // (ADR 0016): a snapshot of anything else is dropped unread, so no agent
+    // can rewrite a session it does not hold. The last snapshot of a session
+    // wins when an agent sends one twice.
     const snapshots = new Map(
-      input.sessions.map((aws) => [aws.sessionId, toSession(asDomainSession(aws), event)] as const),
+      [...input.sessions, ...input.invitedSessions]
+        .filter((aws) => listed.has(aws.sessionId))
+        .map((aws) => [aws.sessionId, toSession(asDomainSession(aws), event)] as const),
     );
-    const listed = [...new Set([...input.favorites, ...input.reserved])];
-    const known = new Map(
-      (await schedule.sessions(event.eventId, [...new Set([...snapshots.keys(), ...listed])])).map(
-        (session) => [session.sessionId, session] as const,
+    const known = new Set(
+      (await schedule.sessions(event.eventId, [...listed])).map((session) => session.sessionId),
+    );
+    const previous = new Map(
+      (await schedule.reports(attendeeId, event.eventId, [...snapshots.keys()])).map(
+        (report) => [report.sessionId, report] as const,
       ),
     );
-
-    const stored: CatalogSession[] = [...snapshots.values()].map((snapshot) => {
-      const old = known.get(snapshot.sessionId);
-      return { ...(old ? mergeSnapshot(old, snapshot) : snapshot), lastSeenAt: at };
+    const reports: SessionReport[] = [...snapshots.values()].map((snapshot) => {
+      const old = previous.get(snapshot.sessionId);
+      return { ...(old ? mergeSnapshot(old, snapshot) : snapshot), attendeeId, reportedAt: at };
     });
 
     // An id with no snapshot is kept when the catalog already has the session
     // (another sync, or another attendee's, sent it); otherwise it is skipped
     // and reported, so one skipped GetSession does not fail the whole sync.
     const inCatalog = (id: string) => snapshots.has(id) || known.has(id);
-    const missingSessions = listed.filter((id) => !inCatalog(id));
-    const plan = planSync(await schedule.entries(attendeeId, event.eventId), {
+    const missingSessions = [...listed].filter((id) => !inCatalog(id));
+    const synced = syncedSessions({
       favorites: input.favorites.filter(inCatalog),
       reserved: input.reserved.filter(inCatalog),
+      invited,
     });
 
-    const added: PlanEntry[] = plan.add.map(({ sessionId, intent }) => ({
-      attendeeId,
-      sessionId,
-      intent,
-      source: "agent-sync",
-      hidden: false,
-      addedAt: at,
-    }));
+    // The counts come from what was read; the write does not (ADR 0016).
+    const plan = planSync(await schedule.entries(attendeeId, event.eventId), synced);
     const counts = {
-      added: added.length,
+      added: plan.add.length,
       removed: plan.remove.length,
       changed: plan.update.length,
       unchanged: plan.unchanged.length,
@@ -64,14 +74,13 @@ export function syncSchedule({ events, schedule, now }: ScheduleDependencies): S
     await schedule.applySync({
       attendeeId,
       eventId: event.eventId,
-      sessions: stored,
-      add: added,
-      remove: plan.remove.map((entry) => entry.sessionId),
-      update: plan.update,
+      reports,
+      synced,
+      at,
       lastSync: { syncedAt: at, ...counts, missingSessions: missingSessions.length },
     });
 
-    return ok({ ...counts, sessionsStored: stored.length, missingSessions });
+    return ok({ ...counts, sessionsStored: reports.length, missingSessions });
   };
 }
 

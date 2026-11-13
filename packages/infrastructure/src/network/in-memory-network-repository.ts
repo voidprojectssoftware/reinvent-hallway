@@ -9,15 +9,17 @@ import {
   type ConnectionPlan,
   type ConnectionRequestRecord,
   type ContactImportRecord,
+  type IdentityRecord,
   type InviteRecord,
   type NetworkRepository,
   type ScheduleRepository,
 } from "@hallway/application";
 import type { Connection, ImportedContact } from "@hallway/domain";
 
-/** The attendee fake, which can also list everyone (the D1 one joins its table instead). */
+/** The attendee fake, which can also list everyone and every identity (the D1 one joins the tables instead). */
 export interface ListableAttendees extends AttendeeRepository {
   all(): Promise<AttendeeRecord[]>;
+  allIdentities(): Promise<IdentityRecord[]>;
 }
 
 export function networkInMemory({
@@ -114,7 +116,8 @@ export function networkInMemory({
     async contactMatches(attendeeId) {
       const contacts = imports.get(attendeeId)?.contacts ?? [];
       const everyone = await attendees.all();
-      const emails = new Set(everyone.flatMap((a) => (a.verifiedEmailSha256 ? [a.verifiedEmailSha256] : [])));
+      const verified = (await attendees.allIdentities()).filter((identity) => identity.verifiedEmailSha256 !== undefined);
+      const emails = new Set(verified.map((identity) => identity.verifiedEmailSha256));
       const urls = new Set(everyone.flatMap((a) => (a.linkedinProfileUrl ? [a.linkedinProfileUrl] : [])));
       const claimed = (contact: ImportedContact) =>
         contact.profileUrl === undefined ? undefined : `${claimedProfileUrlPrefix}${contact.profileUrl}`;
@@ -123,13 +126,17 @@ export function networkInMemory({
       );
       const contactEmails = new Set(matching.map((contact) => contact.emailSha256));
       const contactUrls = new Set(matching.map(claimed));
+      const matchingHashes = (attendee: AttendeeRecord) =>
+        verified
+          .filter((identity) => identity.attendeeId === attendee.id && contactEmails.has(identity.verifiedEmailSha256))
+          .map((identity) => identity.verifiedEmailSha256!);
       return {
         contacts: structuredClone(matching),
-        candidates: everyone.filter(
-          (a) =>
-            (a.verifiedEmailSha256 && contactEmails.has(a.verifiedEmailSha256)) ||
-            (a.linkedinProfileUrl && contactUrls.has(a.linkedinProfileUrl)),
-        ),
+        candidates: everyone.flatMap((attendee) => {
+          const verifiedEmailSha256s = matchingHashes(attendee);
+          const byUrl = attendee.linkedinProfileUrl !== undefined && contactUrls.has(attendee.linkedinProfileUrl);
+          return verifiedEmailSha256s.length > 0 || byUrl ? [{ attendee, verifiedEmailSha256s }] : [];
+        }),
       };
     },
 

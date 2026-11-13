@@ -22,7 +22,7 @@ export async function signInLoader({ request }: { request: Request }): Promise<S
   const returnTo = returnPathOf(new URL(request.url));
   const [me, options] = await Promise.all([
     ifSignedIn(api.me()).catch(() => null),
-    api.signInOptions().catch(() => ({ devSignIn: false, linkedIn: false })),
+    api.signInOptions().catch(() => ({ devSignIn: false, providers: [], linkedIn: false })),
   ]);
   if (me) throw redirect(returnTo ?? "/");
   return { ...options, returnTo };

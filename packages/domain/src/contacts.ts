@@ -1,16 +1,14 @@
 import { parseCsv } from "./csv";
+import { foldText } from "./sessions";
 import type { Attendee, ImportedContact } from "./types";
 
 /**
- * Case, accents and spacing only: NFKD, combining marks removed, lowercased,
- * runs of whitespace made one space. Nothing fuzzier, because a false match
+ * Case, accents and spacing only: `foldText` (NFKD, combining marks removed,
+ * lowercased), runs of whitespace made one space. Nothing fuzzier, because a false match
  * shows someone a stranger.
  */
 export function normalizeName(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
+  return foldText(name)
     .replace(/\s+/gu, " ")
     .trim();
 }
@@ -104,8 +102,8 @@ export async function parseConnectionsCsv(text: string): Promise<ConnectionsCsvR
 /** What a suggestion needs to know about an attendee, the email already hashed. */
 export interface SuggestionCandidate {
   attendee: Attendee;
-  /** `hashEmail` of the attendee's verified email, when there is one. */
-  verifiedEmailSha256?: string;
+  /** `hashEmail` of each verified email of the attendee's identities (ADR 0018: any of them matches). */
+  verifiedEmailSha256s?: readonly string[];
 }
 
 export type SuggestionReason = "profile-and-name" | "email";
@@ -119,11 +117,12 @@ export interface Suggestion {
  * Attendees my imported contacts point at (domain.md "Suggestions need two
  * matching facts"). A contact suggests an attendee when
  *   - its profile URL equals the attendee's claimed URL AND its name equals
- *     the name LinkedIn verified for the attendee, or
- *   - its email hash equals the hash of the attendee's verified email.
+ *     the name the attendee's first identity verified, or
+ *   - its email hash equals the hash of a verified email of any of the
+ *     attendee's identities.
  * The claimed URL alone never suffices: anyone can claim any URL. The email
  * suffices alone because both sides of it are facts the attendee cannot
- * choose: LinkedIn verified theirs, and my contact's comes from LinkedIn.
+ * choose: their provider verified theirs, and my contact's comes from LinkedIn.
  *
  * `exclude` holds the attendees not to suggest: me, and those I am already
  * connected to. One suggestion per attendee; an email match is reported in
@@ -142,9 +141,9 @@ export function suggestions(
   }
 
   const found: Suggestion[] = [];
-  for (const { attendee, verifiedEmailSha256 } of candidates) {
+  for (const { attendee, verifiedEmailSha256s } of candidates) {
     if (exclude.has(attendee.id)) continue;
-    if (verifiedEmailSha256 && byEmail.has(verifiedEmailSha256)) {
+    if (verifiedEmailSha256s?.some((hash) => byEmail.has(hash))) {
       found.push({ attendee, reason: "email" });
       continue;
     }

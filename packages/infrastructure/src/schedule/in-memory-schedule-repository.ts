@@ -1,10 +1,13 @@
 import type { CatalogSession, LastSync, ScheduleRepository } from "@hallway/application";
-import type { PlanEntry } from "@hallway/domain";
+import { consensus, foldSpeakers, foldText, planSync, type PlanEntry, type SessionReport } from "@hallway/domain";
 
 /** The fake: answers as the D1 repository does (schedule-repository.test.ts holds both to it). */
 export function scheduleInMemory(): ScheduleRepository {
   const catalog = new Map<string, CatalogSession>();
-  const plans = new Map<string, PlanEntry>();
+  const reportsBySession = new Map<string, Map<string, SessionReport>>();
+  /** Entries without their hidden state, which lives in `hidden`. */
+  const plans = new Map<string, Omit<PlanEntry, "hidden">>();
+  const hidden = new Set<string>();
   const sessionKey = (eventId: string, sessionId: string) => JSON.stringify([eventId, sessionId]);
   const entryKey = (attendeeId: string, eventId: string, sessionId: string) =>
     JSON.stringify([attendeeId, eventId, sessionId]);
@@ -12,15 +15,25 @@ export function scheduleInMemory(): ScheduleRepository {
   const lastSyncs = new Map<string, LastSync>();
 
   const sessionsOf = (eventId: string) => [...catalog.values()].filter((s) => s.eventId === eventId);
+  const withHidden = (eventId: string, entry: Omit<PlanEntry, "hidden">): PlanEntry => ({
+    ...structuredClone(entry),
+    hidden: hidden.has(entryKey(entry.attendeeId, eventId, entry.sessionId)),
+  });
   const entriesOf = (attendeeId: string, eventId: string) =>
     [...plans.entries()]
       .filter(([key, entry]) => entry.attendeeId === attendeeId && eventOf.get(key) === eventId)
-      .map(([, entry]) => entry);
-  const putEntry = (eventId: string, entry: PlanEntry) => {
+      .map(([, entry]) => withHidden(eventId, entry));
+  const putEntry = (eventId: string, { hidden: _hidden, ...entry }: PlanEntry) => {
     const key = entryKey(entry.attendeeId, eventId, entry.sessionId);
     plans.set(key, structuredClone(entry));
     eventOf.set(key, eventId);
   };
+  // The same fold the D1 repository stores, applied here at query time.
+  const searchText = (s: CatalogSession) => [
+    foldText(s.code ?? ""),
+    foldText(s.title ?? ""),
+    s.speakers ? foldSpeakers(s.speakers) : "",
+  ];
 
   return {
     async session(eventId, sessionId) {
@@ -36,17 +49,9 @@ export function scheduleInMemory(): ScheduleRepository {
     },
 
     async searchSessions(eventId, { q, startsFrom, startsBefore, limit }) {
-      // ASCII-only lowercasing, as SQLite's lower() does.
-      const lower = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
-      const needle = q === undefined ? undefined : lower(q);
+      const needle = q === undefined ? undefined : foldText(q);
       return sessionsOf(eventId)
-        .filter(
-          (s) =>
-            needle === undefined ||
-            [s.code ?? "", s.title ?? "", s.speakers ? JSON.stringify(s.speakers) : ""].some((field) =>
-              lower(field).includes(needle),
-            ),
-        )
+        .filter((s) => needle === undefined || searchText(s).some((field) => field.includes(needle)))
         .filter((s) => startsFrom === undefined || (s.startsAt !== undefined && s.startsAt >= startsFrom))
         .filter((s) => startsBefore === undefined || (s.startsAt !== undefined && s.startsAt < startsBefore))
         .sort(bySessionOrder)
@@ -54,19 +59,26 @@ export function scheduleInMemory(): ScheduleRepository {
         .map((s) => structuredClone(s));
     },
 
+    async reports(attendeeId, eventId, sessionIds) {
+      return [...new Set(sessionIds)].flatMap((id) => {
+        const report = reportsBySession.get(sessionKey(eventId, id))?.get(attendeeId);
+        return report ? [structuredClone(report)] : [];
+      });
+    },
+
     async entry(attendeeId, eventId, sessionId) {
       const entry = plans.get(entryKey(attendeeId, eventId, sessionId));
-      return entry && structuredClone(entry);
+      return entry && withHidden(eventId, entry);
     },
 
     async entries(attendeeId, eventId) {
-      return entriesOf(attendeeId, eventId).map((entry) => structuredClone(entry));
+      return entriesOf(attendeeId, eventId);
     },
 
     async schedule(attendeeId, eventId) {
       return entriesOf(attendeeId, eventId)
         .map((entry) => ({
-          entry: structuredClone(entry),
+          entry,
           session: structuredClone(catalog.get(sessionKey(eventId, entry.sessionId))!),
         }))
         .sort((a, b) => bySessionOrder(a.session, b.session));
@@ -77,14 +89,28 @@ export function scheduleInMemory(): ScheduleRepository {
       return lastSync && structuredClone(lastSync);
     },
 
-    async applySync({ attendeeId, eventId, sessions, add, remove, update, lastSync }) {
-      for (const session of sessions) catalog.set(sessionKey(session.eventId, session.sessionId), structuredClone(session));
-      for (const sessionId of remove) plans.delete(entryKey(attendeeId, eventId, sessionId));
-      for (const { sessionId, intent } of update) {
-        const entry = plans.get(entryKey(attendeeId, eventId, sessionId));
-        if (entry) entry.intent = intent;
+    async applySync({ attendeeId, eventId, reports, synced, at, lastSync }) {
+      for (const report of reports) {
+        const key = sessionKey(report.eventId, report.sessionId);
+        const all = reportsBySession.get(key) ?? new Map<string, SessionReport>();
+        all.set(report.attendeeId, structuredClone(report));
+        reportsBySession.set(key, all);
+        const every = [...all.values()];
+        catalog.set(key, {
+          ...consensus(every),
+          lastSeenAt: every.map((r) => r.reportedAt).reduce((a, b) => (a > b ? a : b)),
+        });
       }
-      for (const entry of add) putEntry(eventId, entry);
+      // Planned against the entries as they are now, which in memory is the
+      // same as computing it inside the write.
+      const plan = planSync(entriesOf(attendeeId, eventId), synced);
+      for (const { sessionId } of plan.remove) plans.delete(entryKey(attendeeId, eventId, sessionId));
+      for (const { sessionId, intent, invited } of plan.update) {
+        Object.assign(plans.get(entryKey(attendeeId, eventId, sessionId))!, { intent, invited });
+      }
+      for (const { sessionId, intent, invited } of plan.add) {
+        putEntry(eventId, { attendeeId, sessionId, intent, invited, source: "agent-sync", hidden: false, addedAt: at });
+      }
       lastSyncs.set(JSON.stringify([attendeeId, eventId]), structuredClone(lastSync));
     },
 
@@ -98,9 +124,10 @@ export function scheduleInMemory(): ScheduleRepository {
       eventOf.delete(key);
     },
 
-    async setHidden(attendeeId, eventId, sessionId, hidden) {
-      const entry = plans.get(entryKey(attendeeId, eventId, sessionId));
-      if (entry) entry.hidden = hidden;
+    async setHidden(attendeeId, eventId, sessionId, hide) {
+      const key = entryKey(attendeeId, eventId, sessionId);
+      if (hide) hidden.add(key);
+      else hidden.delete(key);
     },
   };
 }

@@ -64,21 +64,16 @@ export function listSuggestions({ attendees, network }: ContactPorts): ListSugge
       network.linkedTo(me.value.id),
     ]);
     const exclude = new Set([me.value.id, ...linked]);
-    const found = suggestions(
-      contacts,
-      candidates.map((attendee) => ({ attendee, ...optionalHash(attendee) })),
-      exclude,
-    ).map(({ attendee, reason }) => ({ person: toPerson(attendee as AttendeeRecord), reason }));
+    const found = suggestions(contacts, candidates, exclude).map(({ attendee, reason }) => ({
+      person: toPerson(attendee as AttendeeRecord),
+      reason,
+    }));
     return ok({
       suggestions: found.sort((a, b) => byName(a.person, b.person)),
       contactImport: contactImportResource(contactImport),
     });
   };
 }
-
-// The record holds no explicit undefined (exactOptionalPropertyTypes).
-const optionalHash = ({ verifiedEmailSha256 }: AttendeeRecord) =>
-  verifiedEmailSha256 === undefined ? {} : { verifiedEmailSha256 };
 
 function distinct(contacts: readonly ImportedContact[]): ImportedContact[] {
   const seen = new Map<string, ImportedContact>();

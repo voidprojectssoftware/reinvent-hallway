@@ -8,6 +8,8 @@ export {
   DevSignInInput,
   GetAttendeeInput,
   Handle,
+  Identity,
+  IdentityList,
   IssueAgentTokenInput,
   IssuedAgentToken,
   Me,
@@ -15,6 +17,9 @@ export {
   RevokeAgentTokenInput,
   SetVisibilityInput,
   SignInOptions,
+  SignInProvider,
+  signInProviders,
+  UnlinkIdentityInput,
   UpdateProfileInput,
   Visibility,
 } from "./identity.ts";

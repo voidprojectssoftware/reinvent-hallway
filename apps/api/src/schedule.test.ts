@@ -17,7 +17,9 @@ interface Fixture {
 const fixture = JSON.parse(
   readFileSync(new URL("./schedule-fixtures/aws-reinvent2026-schedule.json", import.meta.url), "utf8"),
 ) as Fixture;
-const syncInput = (overrides: Partial<{ sessions: unknown[]; favorites: string[]; reserved: string[] }> = {}) => ({
+const syncInput = (
+  overrides: Partial<{ sessions: unknown[]; favorites: string[]; reserved: string[]; invitedSessions: unknown[] }> = {},
+) => ({
   eventId: "reinvent2026",
   sessions: fixture.sessions,
   favorites: fixture.schedule.favorites,
@@ -154,20 +156,88 @@ describe("sync_my_schedule over MCP", () => {
     expect((await mySchedule("ben")).entries.map((e) => e.sessionId)).toEqual(["s-aim3315"]);
   });
 
-  it("merges snapshots forward: a later, thinner snapshot keeps the fields it lacks", async () => {
+  it("merges an attendee's snapshots forward: their later, thinner snapshot keeps the fields it lacks", async () => {
     await syncOverMcp("ana", syncInput());
-    await syncOverMcp("ben", {
-      eventId: "reinvent2026",
+    clock = new Date("2026-11-13T12:12:00.000Z");
+    await syncOverMcp("ana", syncInput({
       sessions: [{ sessionId: "s-aim3315", title: "Building agents that call MCP servers, at scale" }],
-      favorites: ["s-aim3315"],
-      reserved: [],
-    });
+    }));
     const session = (await (await rest("/api/events/reinvent2026/sessions/s-aim3315")).json()) as Record<string, unknown>;
     expect(session).toMatchObject({
       title: "Building agents that call MCP servers, at scale",
       room: "Room 118",
       startsAt: "2026-12-01T16:30:00.000Z",
+      lastSeenAt: "2026-11-13T12:12:00.000Z",
     });
+  });
+
+  it("ignores a snapshot of a session not on the sender's own schedule (hunt F6)", async () => {
+    await syncOverMcp("ana", syncInput());
+    const poisoned = { sessionId: "s-aim3315", title: "CANCELLED, see you at the bar", sessionTime: { date: "2026-12-04", time: "06:00", length: "5" } };
+    const result = await syncOverMcp("cy", { eventId: "reinvent2026", sessions: [poisoned], favorites: [], reserved: [] });
+    expect(result.structuredContent).toMatchObject({ sessionsStored: 0 });
+    expect((await mySchedule("ana")).entries.find((e) => e.sessionId === "s-aim3315")?.session).toMatchObject({
+      title: "Building agents that call MCP servers at scale",
+      startsAt: "2026-12-01T16:30:00.000Z",
+    });
+  });
+
+  it("shows what most reporters agree on: one newer report does not override two", async () => {
+    await syncOverMcp("ana", syncInput());
+    clock = new Date("2026-11-13T12:05:00.000Z");
+    await syncOverMcp("ben", syncInput());
+    clock = new Date("2026-11-13T12:10:00.000Z");
+    const poisoned = { sessionId: "s-aim3315", title: "CANCELLED, see you at the bar", sessionTime: { date: "2026-12-04", time: "06:00", length: "5" } };
+    await syncOverMcp("cy", { eventId: "reinvent2026", sessions: [poisoned], favorites: ["s-aim3315"], reserved: [] });
+    const session = (await (await rest("/api/events/reinvent2026/sessions/s-aim3315")).json()) as Record<string, unknown>;
+    expect(session).toMatchObject({
+      title: "Building agents that call MCP servers at scale",
+      startsAt: "2026-12-01T16:30:00.000Z",
+      lastSeenAt: "2026-11-13T12:10:00.000Z",
+    });
+  });
+
+  it("puts AWS invitedSessions on the schedule as reserved and invited (hunt F8)", async () => {
+    const keynote = { sessionId: "s-inv1", title: "Invited keynote", abbreviation: "KEY001", sessionTime: { date: "2026-12-02", time: "08:00", length: "90" } };
+    const result = await syncOverMcp("ana", syncInput({ invitedSessions: [keynote] }));
+    expect(result.structuredContent).toMatchObject({ added: 16, sessionsStored: 16 });
+    expect((await mySchedule("ana")).entries.find((e) => e.sessionId === "s-inv1")).toMatchObject({
+      intent: "reserved",
+      source: "agent-sync",
+      invited: true,
+      session: { title: "Invited keynote", startsAt: "2026-12-02T16:00:00.000Z" },
+    });
+    const again = await syncOverMcp("ana", syncInput());
+    expect(again.structuredContent).toMatchObject({ removed: 1 });
+  });
+
+  it("lowers a manual entry back to interested once AWS stops saying it is reserved (hunt F7)", async () => {
+    await syncOverMcp("ana", syncInput());
+    await rest("/api/events/reinvent2026/my-schedule/entries/s-aim3315", "cy", { method: "POST" });
+    const intent = async () => (await mySchedule("cy")).entries.find((e) => e.sessionId === "s-aim3315")?.intent;
+    const sync = (reserved: string[]) =>
+      syncOverMcp("cy", { eventId: "reinvent2026", sessions: [], favorites: [], reserved });
+    expect(await sync(["s-aim3315"]).then((r) => r.structuredContent)).toMatchObject({ changed: 1 });
+    expect(await intent()).toBe("reserved");
+    expect(await sync([]).then((r) => r.structuredContent)).toMatchObject({ changed: 1, removed: 0 });
+    expect(await intent()).toBe("interested");
+    expect((await mySchedule("cy")).entries.find((e) => e.sessionId === "s-aim3315")?.source).toBe("manual");
+  });
+
+  it("keeps a hidden session hidden when it leaves a sync and comes back (hunt F5)", async () => {
+    await syncOverMcp("ana", syncInput());
+    const hide = await rest("/api/events/reinvent2026/my-schedule/entries/s-aim3315", "ana", {
+      method: "PATCH",
+      body: JSON.stringify({ hidden: true }),
+    });
+    expect(hide.status).toBe(200);
+    await syncOverMcp("ana", syncInput({
+      reserved: fixture.schedule.reserved.filter((id) => id !== "s-aim3315"),
+      favorites: fixture.schedule.favorites.filter((id) => id !== "s-aim3315"),
+    }));
+    expect((await mySchedule("ana")).entries.map((e) => e.sessionId)).not.toContain("s-aim3315");
+    await syncOverMcp("ana", syncInput());
+    expect((await mySchedule("ana")).entries.find((e) => e.sessionId === "s-aim3315")?.hidden).toBe(true);
   });
 
   it("accepts sessions without abstracts, as ListSessions with includeAbstracts=false gives them", async () => {

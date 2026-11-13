@@ -32,8 +32,9 @@ this file in the same PR.
   to us. That is the whole import path, and it is a feature: the agent is the
   user's, the token is the user's, we hold nothing of AWS's.
 - **The catalog is behind registration**, so we cannot crawl it. Hallway's
-  session catalog is the union of the sessions attendees' agents send, each a
-  snapshot. We keep the fields needed to place and identify a session and
+  session catalog is built from the sessions attendees' agents send: each
+  snapshot is that attendee's report, and the catalog shows what the reporters
+  agree on (rule below, ADR 0016). We keep the fields needed to place and identify a session and
   **never store or show the abstract**: the abstract is AWS's content behind a
   login, and the link out is how people read it.
 - **LinkedIn will not give us anyone's connections.** Sign In with LinkedIn
@@ -51,6 +52,9 @@ front end knows these shapes and nothing else.
 erDiagram
   ATTENDEE ||--o{ PLAN_ENTRY : plans
   SESSION ||--o{ PLAN_ENTRY : "is planned in"
+  SESSION ||--o{ SESSION_REPORT : "is the consensus of"
+  ATTENDEE ||--o{ SESSION_REPORT : "reports (one per session)"
+  ATTENDEE ||--o{ HIDDEN_SESSION : hides
   EVENT ||--o{ SESSION : has
   ATTENDEE ||--o{ CONNECTION : "is in"
   ATTENDEE ||--o{ CONNECTION_REQUEST : "sends / receives"
@@ -63,10 +67,12 @@ erDiagram
 
 | Resource | What it is | Key fields |
 | --- | --- | --- |
-| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `verifiedName` (LinkedIn's name, not editable), `email` (stored only when LinkedIn says it is verified, with its SHA-256 for suggestions) |
+| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
-| **Session** | A catalog snapshot of one session | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt`. **No abstract** |
-| **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation), `source` (`agent-sync` \| `manual`), `hidden` (bool), `addedAt` |
+| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt` (the newest report). **No abstract** |
+| **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields, `attendeeId`, `reportedAt`. One per attendee and session |
+| **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation or invitation), `source` (`agent-sync` \| `manual`), `invited` (bool: from AWS `invitedSessions`), `hidden` (bool, from the hidden sessions below), `addedAt` |
+| **Hidden session** | Not served on its own: a session an attendee hid, per event | `attendeeId`, `eventId`, `sessionId`. An entry is hidden while its session is here |
 | **Connection** | Two attendees who agreed to see each other | unordered pair, `since`, `via` (`request` \| `share-link`) |
 | **Connection request** | One attendee asking another | `from`, `to`, `status` (`pending` \| `accepted` \| `declined` \| `withdrawn`), `createdAt` |
 | **Contact import** | One upload of the user's LinkedIn `Connections.csv` | `id`, `attendeeId`, `importedAt`, `count` |
@@ -99,6 +105,11 @@ We store UTC instants and the event timezone, and render in the event timezone
   - A `hidden` plan entry is never shown to anyone but its owner, and never
     counted in "who is going" or in a connection's session counts, nor lends
     its owner an intent there.
+  - **Hiding is a preference, not a property of an entry.** The attendee's
+    hidden sessions are kept per event apart from the entries; an entry is
+    hidden while its session is in that set. A session that leaves a sync and
+    comes back is still hidden; only showing it again takes it out (#53, hunt
+    F5).
   - One function decides this (`canViewSchedule(viewer, owner, areConnected)`, with `visibleEntries` for the entries), and every read path
     (REST, MCP, calendar feed, share image, link preview) goes through it.
   - What leaves Hallway (calendar feed, share image, link preview) goes
@@ -117,20 +128,43 @@ We store UTC instants and the event timezone, and render in the event timezone
   each visit until they do, and the share sheet nudges them; changing the
   handle clears the mark. A handle never changes by itself. Decided on #48.
 - **Sync replaces, never duplicates.** `SyncSchedule` for an event makes the
-  attendee's `agent-sync` entries exactly equal to the sent favorites and
-  reservations: new ones added, missing ones removed, `reserved` beats
-  `interested` when a session is in both. `manual` entries and every entry's
-  `hidden` flag survive a sync. A sync never removes or lowers a `manual`
-  entry, but raises it to `reserved` when the agent says it is reserved (I
-  added it by hand, then reserved it on AWS); it keeps `source: manual`.
+  attendee's `agent-sync` entries exactly equal to the sent favorites,
+  reservations and invited sessions: new ones added, missing ones removed,
+  `reserved` beats `interested` when a session is in both, and an invited
+  session is `reserved` and marked `invited` (`syncedSessions`). `manual`
+  entries and hidden sessions survive a sync.
+- **A manual entry keeps the attendee's own intent.** A sync never removes a
+  `manual` entry. Its intent is `reserved` while the latest sync reports the
+  session reserved (or invited), and otherwise the attendee's own intent,
+  which is `interested`, the only one `AddToPlan` gives (`manualAfterSync`). So
+  a reservation cancelled on AWS lowers it back on the next sync; it keeps
+  `source: manual`. Replaces #24's "never lowers" (#53, hunt F7).
+- **A sync is a replace even when two run at once.** The write is computed
+  from what the sync sent, never from entries read before it: delete my
+  `agent-sync` entries not sent, then upsert the sent ones. Two concurrent
+  syncs end as one of them, never as their union, and a sync racing
+  `AddToPlan` on the same session ends with one entry and no error. Only the
+  returned counts come from the earlier read (ADR 0016, hunt F4).
 - **A listed id needs a session.** An id in `favorites` or `reserved` sent
   without a snapshot is kept when the catalog already has that session, and
   otherwise skipped and returned in `missingSessions`; it never fails the sync.
-- **A sync is atomic.** The snapshots, the entry changes and the attendee's
-  last sync record land together or not at all (ADR 0009).
-- **Session snapshots merge forward.** A newer snapshot of a session replaces
-  its fields; a field absent from the snapshot keeps its old value. A snapshot
-  for an unknown event is refused.
+- **A sync is atomic.** The reports, the catalog rows they change, the entry
+  changes and the attendee's last sync record land together or not at all
+  (ADR 0009).
+- **An agent reports only its own sessions.** A sync keeps a snapshot only
+  for a session id in that sync's `favorites`, `reserved` or `invitedSessions`;
+  any other snapshot is dropped unread (hunt F6).
+- **The catalog is what reporters agree on.** Each kept snapshot is merged
+  forward into that attendee's own report of the session (a field absent from
+  the snapshot keeps the report's old value; a start brings its own end). The
+  session everyone sees is, per field, the value the most reports carry, a tie
+  going to the value whose latest report is newest (`consensus`); a report
+  without a field does not vote on it, and a start and its end are one vote.
+  So one reporter cannot override two, and a lone reporter decides only a
+  session nobody else reported. A report that disagrees is still kept, and
+  counts if others come to agree. The consensus is written to the session's
+  catalog row in the sync's own batch, so reading a session never reads
+  reports (ADR 0016). A snapshot for an unknown event is refused.
 - **A connection is mutual and needs consent.** A request becomes a connection
   only when the other side accepts. Connecting via someone's share link forms
   the connection at once: the link's current invite token is their consent
@@ -157,12 +191,12 @@ We store UTC instants and the event timezone, and render in the event timezone
 
 | Command | Who | Effect |
 | --- | --- | --- |
-| `SignIn` | anyone | LinkedIn OIDC (or dev sign-in locally); creates the attendee on first sign-in, picking a free handle |
+| `SignIn` | anyone | Google, Microsoft, LinkedIn or GitHub (or dev sign-in locally); creates the attendee and their first Identity on first sign-in, picking a free handle; refused (`account-exists`) when the verified email is another attendee's |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
-| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent), `unchanged`, `sessionsStored`, and `missingSessions`; when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
+| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[], invitedSessions: Session snapshot[] }`; keeps the snapshots of listed sessions as my reports, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent or invited mark), `unchanged`, `sessionsStored` (reports kept), and `missingSessions`; when it ran and those counts (`missingSessions` as a count) replace the attendee's last sync for the event |
 | `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
-| `SetEntryHidden` | me | hide or show one entry |
+| `SetEntryHidden` | me | hide or show the session of one entry: puts it in, or takes it out of, my hidden sessions for the event |
 | `IssueAgentToken` / `RevokeAgentToken` | me, signed in as a person (not an agent token) | |
 | `RotateCalendarFeed` | me, signed in as a person (not an agent token) | |
 | `ImportContacts` | me | parse a `Connections.csv`, keep the reduced rows (exact duplicates folded), replace my previous import, all or nothing (ADR 0011) |
@@ -183,7 +217,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
 | `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
-| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
+| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case and accents: both sides through `foldText`, NFKD with marks stripped and Unicode lowercase; the catalog stores the folded text when it writes a session), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
 | `GetSession(eventId, sessionId)` | the session, and to a signed-in caller `connectionsGoing` as in search |
 | `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read. Session search and get carry the same people, intent included |
 | `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who and their intent |
@@ -222,7 +256,7 @@ holds logic the other lacks. Both take and return the contract schemas in
 
 | Tool | Handler |
 | --- | --- |
-| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then `GetSession` per id) |
+| `sync_my_schedule` | `SyncSchedule`. Its description tells the agent how to get the input from the AWS Events MCP (`GetSchedule`, then `GetSession` per id, and `invitedSessions` passed through) |
 | `get_my_schedule` | `GetMySchedule` |
 | `list_my_connections` | `ListConnections` |
 | `get_person_schedule` | `GetAttendeeSchedule` |
@@ -231,6 +265,42 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `find_meeting_gaps` | `FindMeetingGaps` |
 | `search_sessions` | `SearchSessions` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
+
+## Identities and follows (decided 2026-11-13, being built: #60, #61, #63)
+
+The owner, 2026-11-13: sign-in with Google, Microsoft, LinkedIn or GitHub, and
+"show them the schedule of people they follow on linkedin / in their network
+and the same for github". ADRs 0018 and 0019 hold the decisions. Identities
+are built (#60); follows are not yet (#63), so the visibility rule is still the
+one above until then.
+
+```mermaid
+erDiagram
+  ATTENDEE ||--|{ IDENTITY : "signs in with"
+  ATTENDEE ||--o{ FOLLOW : follows
+  FOLLOW }o--o| ATTENDEE : "points at (or a GitHub id not yet on Hallway)"
+```
+
+| Resource | What it is | Key fields |
+| --- | --- | --- |
+| **Identity** | One provider account an attendee signs in with | `provider` (`google` \| `microsoft` \| `linkedin` \| `github`), `subject` (the provider's stable id), `email`, `emailVerified`, `username` (GitHub login), `linkedAt`. Unique per provider and subject |
+| **Follow** | One-way: I follow someone | `follower`, `followee` (an attendee, or a GitHub user id not yet on Hallway), `source` (`github` \| `linkedin-import`), `since` |
+
+Rules:
+
+- **Linking is explicit, never by email.** A new provider is added from a
+  signed-in session. A sign-in whose verified email matches another account is
+  refused with directions, never merged.
+- **Visibility "connections" becomes "My network":** the attendee, their Hallway
+  connections, and **the people they follow**. Following someone never lets you
+  see their schedule; their following you does. (Owner to confirm: #64.)
+- **GitHub follows** are fetched with the user's token during a sign-in or link
+  round trip and the token is dropped. **LinkedIn follows** are two-fact matches
+  from the user's own `Connections.csv` import.
+
+Commands: `LinkIdentity`, `UnlinkIdentity`, `RefreshGitHubFollows`,
+`ImportContacts` (now also writes follows). Queries: `ListIdentities`,
+`ListFollowing`, and `ListMyNetwork` (connections plus follows, labelled).
 
 ## Out of scope for the MVP
 

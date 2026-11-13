@@ -1,9 +1,9 @@
-// The identity tables (Drizzle models): attendees, and the three kinds of
-// secret that act for one. Session and agent token columns hold a SHA-256
+// The identity tables (Drizzle models): attendees, the provider identities
+// they sign in with (ADR 0018), and the three kinds of secret that act for one. Session and agent token columns hold a SHA-256
 // hex, never the secret, and are looked up by that hash; the calendar feed
 // token is the exception, below. Instants are ISO-8601 UTC text, which sorts
 // and compares as time does.
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const attendees = sqliteTable("attendees", {
   id: text("id").primaryKey(),
@@ -16,12 +16,35 @@ export const attendees = sqliteTable("attendees", {
   visibility: text("visibility", { enum: ["public", "connections", "private"] })
     .notNull()
     .default("connections"),
-  linkedinSub: text("linkedin_sub").notNull().unique(),
   verifiedName: text("verified_name"),
   email: text("email"),
-  verifiedEmailSha256: text("verified_email_sha256"),
   createdAt: text("created_at").notNull(),
-}, (table) => [index("attendees_verified_email_sha256").on(table.verifiedEmailSha256)]);
+});
+
+// One row per provider account. Unique on (provider, subject), so one
+// account belongs to one attendee; unique on (attendee, provider), so an
+// attendee links each provider at most once. `dev` is dev sign-in by name.
+export const identities = sqliteTable(
+  "identities",
+  {
+    provider: text("provider", { enum: ["google", "microsoft", "linkedin", "github", "dev"] }).notNull(),
+    subject: text("subject").notNull(),
+    attendeeId: text("attendee_id")
+      .notNull()
+      .references(() => attendees.id),
+    email: text("email"),
+    emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+    // hashEmail(email), only when verified: suggestions and the email-exists rule look it up.
+    verifiedEmailSha256: text("verified_email_sha256"),
+    username: text("username"),
+    linkedAt: text("linked_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.subject] }),
+    uniqueIndex("identities_attendee_provider").on(table.attendeeId, table.provider),
+    index("identities_verified_email_sha256").on(table.verifiedEmailSha256),
+  ],
+);
 
 export const agentTokens = sqliteTable(
   "agent_tokens",

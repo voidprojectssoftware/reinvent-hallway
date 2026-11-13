@@ -6,8 +6,18 @@
 # `Authorization: Bearer dev:<attendeeId>`, on a loopback host only.
 DEV_SIGN_IN=1
 
-# Sign In with LinkedIn (ADR 0004). Empty until the owner creates the LinkedIn
-# app; LinkedIn sign-in answers 404 while either is empty. Put real values in
-# .dev.vars, never here.
+# Sign in with Google, Microsoft, LinkedIn or GitHub (ADR 0018). Each is empty
+# until the owner creates that provider's OAuth app (#62); a provider answers
+# 404, and GET /api/auth/options leaves it out, while either of its pair is
+# empty. Put real values in .dev.vars, never here. Each app's redirect URI is
+# <origin>/api/auth/<provider>/callback. Microsoft's app registration must
+# also add the optional ID token claim `xms_edov`, or work accounts' emails
+# stay unverified.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
 LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=

@@ -17,11 +17,10 @@ export interface Attendee {
   /** Typed by the attendee. Unverified: anyone can claim any URL. */
   linkedinProfileUrl?: string;
   visibility: Visibility;
-  // Private fields, from Sign In with LinkedIn.
-  linkedinSub: string;
-  /** The name LinkedIn verified at sign-in. Unlike displayName, not editable. */
+  // Private fields, from the first identity the attendee signed in with (ADR 0018).
+  /** The name that provider gave. Unlike displayName, not editable. */
   verifiedName?: string;
-  /** Present only when LinkedIn reported it verified. */
+  /** Present only when that provider reported it verified. */
   email?: string;
 }
 
@@ -62,8 +61,15 @@ export type EntrySource = "agent-sync" | "manual";
 export interface PlanEntry {
   attendeeId: string;
   sessionId: string;
+  /** For a `manual` entry, `reserved` while the latest sync reports it reserved, else the attendee's own. */
   intent: Intent;
   source: EntrySource;
+  /** The latest sync had it from AWS `invitedSessions`: the event placed it on the schedule. */
+  invited: boolean;
+  /**
+   * The attendee hid the session. A preference kept apart from the entry, per
+   * attendee and event, so it outlives the entry leaving and coming back.
+   */
   hidden: boolean;
   addedAt: string;
 }

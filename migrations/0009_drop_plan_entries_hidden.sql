@@ -1,0 +1,1 @@
+ALTER TABLE `plan_entries` DROP COLUMN `hidden`;

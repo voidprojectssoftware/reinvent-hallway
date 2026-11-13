@@ -96,6 +96,86 @@ export function mergeSnapshot(existing: Session, incoming: Session): Session {
 }
 
 /**
+ * One attendee's account of a session: their agent's snapshots of it, merged
+ * forward, and when the last one came. The catalog keeps one per reporter and
+ * shows their `consensus`, so no single agent decides what a shared session is.
+ */
+export interface SessionReport extends Session {
+  attendeeId: string;
+  reportedAt: string;
+}
+
+/**
+ * The parts of a session reporters vote on, each as one value. The start and
+ * the end are one fact (as in `mergeSnapshot`): a report's time is its pair.
+ */
+const ballot: readonly (readonly (keyof Session)[])[] = [
+  ["code"],
+  ["title"],
+  ["type"],
+  ["level"],
+  ["venue"],
+  ["room"],
+  ["isAllDay"],
+  ["speakers"],
+  ["topics"],
+  ["startsAt", "endsAt"],
+];
+
+/**
+ * The session everyone sees, from every attendee's report of it (domain.md
+ * "The catalog is what reporters agree on"). Per field, the value the most
+ * reports carry wins; a tie goes to the value whose latest report is newest.
+ * A report without a field does not vote on it. So one reporter cannot
+ * override two, and a lone reporter decides only a session no one else
+ * reported. `reports` are of one session and not empty.
+ *
+ * The D1 repository computes the same thing in SQL inside the sync's batch;
+ * schedule-repository.test.ts holds the two to the same answers.
+ */
+export function consensus(reports: readonly SessionReport[]): Session {
+  const { sessionId, eventId } = reports[0]!;
+  const session: Session = { sessionId, eventId };
+  for (const fields of ballot) {
+    const tally = new Map<string, { votes: number; latest: string; values: Partial<Session> }>();
+    for (const report of reports) {
+      if (report[fields[0]!] === undefined) continue;
+      const values = Object.fromEntries(fields.map((field) => [field, report[field]]));
+      const key = JSON.stringify(fields.map((field) => report[field] ?? null));
+      const count = tally.get(key);
+      if (!count) tally.set(key, { votes: 1, latest: report.reportedAt, values });
+      else {
+        count.votes++;
+        if (report.reportedAt > count.latest) count.latest = report.reportedAt;
+      }
+    }
+    const [winner] = [...tally.entries()].sort(
+      ([keyA, a], [keyB, b]) =>
+        b.votes - a.votes || (a.latest === b.latest ? 0 : a.latest > b.latest ? -1 : 1) || (keyA < keyB ? -1 : 1),
+    );
+    if (winner) {
+      for (const [field, value] of Object.entries(winner[1].values)) {
+        if (value !== undefined) (session as unknown as Record<string, unknown>)[field] = value;
+      }
+    }
+  }
+  return session;
+}
+
+/**
+ * Text as search compares it: NFKD, combining marks removed, lowercased with
+ * Unicode's rules, so "Ångström", "ångström" and "angstrom" are one word. The
+ * catalog stores the code, title and speakers folded when it writes a
+ * session, and a query is folded the same way (domain.md `SearchSessions`).
+ */
+export function foldText(text: string): string {
+  return text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** A session's speakers as one folded text, one name a line, for search. */
+export const foldSpeakers = (speakers: readonly string[]) => foldText(speakers.join("\n"));
+
+/**
  * The link to a session on the re:Invent site: `template` with `{code}`
  * replaced. The template is configuration (SESSION_URL_TEMPLATE) because the
  * site's deep-link format is not confirmed; a template without `{code}` would

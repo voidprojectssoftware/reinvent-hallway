@@ -15,8 +15,16 @@ export {
   identityInMemory,
   webSessionsInMemory,
 } from "./identity/in-memory-identity-repositories.ts";
-export { linkedInEndpoints, linkedInOidc, type LinkedInConfig } from "./identity/linkedin-oidc.ts";
+export type { OAuthClientConfig } from "./identity/oauth-client.ts";
+export { googleEndpoints, googleOidc } from "./identity/google-oidc.ts";
+export { microsoftEndpoints, microsoftOidc, personalAccountsTenant } from "./identity/microsoft-oidc.ts";
+export { linkedInEndpoints, linkedInOidc } from "./identity/linkedin-oidc.ts";
+export { gitHubEndpoints, gitHubOAuth, maxFollowingPages } from "./identity/github-oauth.ts";
+export type { FakeProvider } from "./identity/fake-oauth-server.ts";
+export { fakeGoogle, type FakeGoogle, type FakeGoogleUser } from "./identity/fake-google.ts";
+export { fakeMicrosoft, type FakeMicrosoft, type FakeMicrosoftUser } from "./identity/fake-microsoft.ts";
 export { fakeLinkedIn, type FakeLinkedIn, type FakeLinkedInUser } from "./identity/fake-linkedin.ts";
+export { fakeGitHub, type FakeGitHub, type FakeGitHubUser } from "./identity/fake-github.ts";
 export { scheduleOnD1 } from "./schedule/d1-schedule-repository.ts";
 export { scheduleInMemory } from "./schedule/in-memory-schedule-repository.ts";
 export { networkOnD1 } from "./network/d1-network-repository.ts";
