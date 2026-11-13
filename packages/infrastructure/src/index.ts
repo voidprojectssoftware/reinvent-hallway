@@ -17,3 +17,5 @@ export {
 } from "./identity/in-memory-identity-repositories.ts";
 export { linkedInEndpoints, linkedInOidc, type LinkedInConfig } from "./identity/linkedin-oidc.ts";
 export { fakeLinkedIn, type FakeLinkedIn, type FakeLinkedInUser } from "./identity/fake-linkedin.ts";
+export { scheduleOnD1 } from "./schedule/d1-schedule-repository.ts";
+export { scheduleInMemory } from "./schedule/in-memory-schedule-repository.ts";

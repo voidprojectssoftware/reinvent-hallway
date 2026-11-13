@@ -102,7 +102,14 @@ We store UTC instants and the event timezone, and render in the event timezone
   attendee's `agent-sync` entries exactly equal to the sent favorites and
   reservations: new ones added, missing ones removed, `reserved` beats
   `interested` when a session is in both. `manual` entries and every entry's
-  `hidden` flag survive a sync.
+  `hidden` flag survive a sync. A sync never removes or lowers a `manual`
+  entry, but raises it to `reserved` when the agent says it is reserved (I
+  added it by hand, then reserved it on AWS); it keeps `source: manual`.
+- **A listed id needs a session.** An id in `favorites` or `reserved` sent
+  without a snapshot is kept when the catalog already has that session, and
+  otherwise skipped and returned in `missingSessions`; it never fails the sync.
+- **A sync is atomic.** The snapshots and the entry changes land together or
+  not at all (ADR 0009).
 - **Session snapshots merge forward.** A newer snapshot of a session replaces
   its fields; a field absent from the snapshot keeps its old value. A snapshot
   for an unknown event is refused.
@@ -123,8 +130,8 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `SignIn` | anyone | LinkedIn OIDC (or dev sign-in locally); creates the attendee on first sign-in, picking a free handle |
 | `UpdateProfile` | me | handle, display name, headline, claimed LinkedIn URL |
 | `SetVisibility` | me | `public` \| `connections` \| `private` |
-| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rule above). Returns counts added, removed, unchanged |
-| `AddToPlan` / `RemoveFromPlan` | me | a manual entry for a session already in the catalog |
+| `SyncSchedule` | me, via agent | `{ eventId, sessions: Session snapshot[], favorites: id[], reserved: id[] }`; upserts the snapshots, then replaces `agent-sync` entries (rules above). Snapshots are AWS's `Session` shape as sent; the abstract is dropped unread. Returns counts `added`, `removed`, `changed` (intent), `unchanged`, `sessionsStored`, and `missingSessions` |
+| `AddToPlan` / `RemoveFromPlan` | me | a manual entry (`interested`) for a session already in the catalog. Adding a session already on my plan returns that entry unchanged. Removing an `agent-sync` entry is refused (`conflict`): the next sync would bring it back, so hide it or drop it on AWS |
 | `SetEntryHidden` | me | hide or show one entry |
 | `IssueAgentToken` / `RevokeAgentToken` | me | |
 | `RotateCalendarFeed` | me | |
@@ -139,12 +146,12 @@ We store UTC instants and the event timezone, and render in the event timezone
 | Query | Returns |
 | --- | --- |
 | `GetMe` | my attendee, with private fields |
-| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked |
+| `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" |
 | `ListConnections` / `ListRequests` / `ListSuggestions` | |
-| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going |
-| `GetSession(sessionId)` | the session, and which of my connections are going |
+| `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. The connection counts, `from` and `to` come with the network |
+| `GetSession(eventId, sessionId)` | the session, and which of my connections are going (the connections part comes with the network) |
 | `WhoIsGoing(sessionIds[])` | per session, my connections going (respecting visibility and hidden) |
 | `NetworkAgenda(eventId, from, to)` | sessions in a window that my connections plan to attend, with who |
 | `FindMeetingGaps(handle, day)` | windows on a day, in event time, when neither I nor that connection has a visible entry. All-day sessions (the expo and the like) do not block a gap |

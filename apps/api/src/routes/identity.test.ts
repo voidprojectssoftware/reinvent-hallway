@@ -2,8 +2,15 @@
 // fake LinkedIn: a browser (cookies, redirects) and an agent (bearer token,
 // MCP with the SDK's own client) both reach the same handlers.
 import { describe, expect, it } from "vitest";
-import { getEvent, identityHandlers } from "@hallway/application";
-import { eventsInMemory, fakeLinkedIn, identityInMemory, linkedInOidc, reinvent2026 } from "@hallway/infrastructure";
+import { getEvent, identityHandlers, scheduleHandlers } from "@hallway/application";
+import {
+  eventsInMemory,
+  fakeLinkedIn,
+  identityInMemory,
+  linkedInOidc,
+  reinvent2026,
+  scheduleInMemory,
+} from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { AgentTokenList, CalendarFeed, IssuedAgentToken, Me } from "@hallway/contracts";
@@ -11,12 +18,25 @@ import { createApp } from "../app.ts";
 
 const origin = "http://127.0.0.1:8787";
 
+/** The handlers this file does not exercise, so the app has every one it needs. */
+function otherHandlers() {
+  const events = eventsInMemory([reinvent2026]);
+  return {
+    getEvent: getEvent(events),
+    ...scheduleHandlers({
+      events,
+      schedule: scheduleInMemory(),
+      sessionUrlTemplate: "https://example.test/catalog?search={code}",
+      now: () => new Date(),
+    }),
+  };
+}
+
 function world(bindings: { DEV_SIGN_IN?: string } = { DEV_SIGN_IN: "1" }) {
   const linkedIn = fakeLinkedIn();
   const identity = identityHandlers(identityInMemory({ linkedIn: linkedInOidc(linkedIn) }));
-  const app = createApp<typeof bindings>({
-    handlers: () => ({ getEvent: getEvent(eventsInMemory([reinvent2026])), identity }),
-  });
+  const others = otherHandlers();
+  const app = createApp<typeof bindings>({ handlers: () => ({ ...others, identity }) });
   const call = async (input: string | URL | Request, init?: RequestInit) =>
     app.fetch(new Request(input, init), bindings);
   return { linkedIn, call };
@@ -169,10 +189,7 @@ describe("Sign In with LinkedIn, against the fake provider", () => {
 
   it("answers 404 when LinkedIn is not configured", async () => {
     const app = createApp<object>({
-      handlers: () => ({
-        getEvent: getEvent(eventsInMemory([])),
-        identity: identityHandlers(identityInMemory()),
-      }),
+      handlers: () => ({ ...otherHandlers(), identity: identityHandlers(identityInMemory()) }),
     });
     expect((await app.fetch(new Request(`${origin}/api/auth/linkedin`), {})).status).toBe(404);
   });

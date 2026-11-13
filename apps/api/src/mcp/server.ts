@@ -14,6 +14,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ApiApp, Handlers } from "../app.ts";
 import { toolResult } from "./outcome-mcp.ts";
+import { registerScheduleTools } from "./schedule-tools.ts";
 
 export const serverInfo = { name: "hallway", version: "0.0.0" } as const;
 
@@ -31,7 +32,7 @@ export function registerMcp<B extends object>(app: ApiApp<B>) {
 // to `{ $ref, definitions }` with no top-level `type`, and MCP requires an
 // output schema's type to be "object": the SDK's own client refuses the tool
 // list otherwise. A copy of the shape has no id, so it converts inline.
-const asToolOutput = <Shape extends z.ZodRawShape>(schema: z.ZodObject<Shape>) =>
+export const asToolOutput = <Shape extends z.ZodRawShape>(schema: z.ZodObject<Shape>) =>
   z.object(schema.shape);
 
 function mcpServer(handlers: Handlers, actor: Actor): McpServer {
@@ -59,5 +60,6 @@ function mcpServer(handlers: Handlers, actor: Actor): McpServer {
     },
     async () => toolResult(await handlers.identity.getMe(actor)),
   );
+  registerScheduleTools(server, handlers, actor);
   return server;
 }

@@ -1,6 +1,6 @@
 // The Worker's composition root (ADR 0002): the one place adapters are chosen.
 // Each request gets its handlers over D1 from its own bindings.
-import { getEvent, identityHandlers } from "@hallway/application";
+import { getEvent, identityHandlers, scheduleHandlers } from "@hallway/application";
 import {
   agentTokensOnD1,
   attendeesOnD1,
@@ -8,6 +8,7 @@ import {
   eventsOnD1,
   linkedInOidc,
   openDatabase,
+  scheduleOnD1,
   webSessionsOnD1,
 } from "@hallway/infrastructure";
 import { createApp } from "./app.ts";
@@ -15,8 +16,9 @@ import { createApp } from "./app.ts";
 const app = createApp<Env>({
   handlers: (env) => {
     const db = openDatabase(env.DB);
+    const events = eventsOnD1(db);
     return {
-      getEvent: getEvent(eventsOnD1(db)),
+      getEvent: getEvent(events),
       identity: identityHandlers({
         attendees: attendeesOnD1(db),
         agentTokens: agentTokensOnD1(db),
@@ -30,6 +32,12 @@ const app = createApp<Env>({
           env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET
             ? linkedInOidc({ clientId: env.LINKEDIN_CLIENT_ID, clientSecret: env.LINKEDIN_CLIENT_SECRET })
             : undefined,
+      }),
+      ...scheduleHandlers({
+        events,
+        schedule: scheduleOnD1(db),
+        sessionUrlTemplate: env.SESSION_URL_TEMPLATE,
+        now: () => new Date(),
       }),
     };
   },
