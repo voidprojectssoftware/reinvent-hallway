@@ -2,7 +2,7 @@
 // dev sign-in both end here, so an attendee is created, and refreshed, in one
 // place whichever door was used.
 import type { DevSignInInput, Me, SignInOptions } from "@hallway/contracts";
-import { handleFromName, hashEmail, normalizeName } from "@hallway/domain";
+import { handleFromName, hashEmail, normalizeName, placeholderHandle } from "@hallway/domain";
 import { fail, ok, type Outcome } from "../outcome.ts";
 import type {
   AttendeeRecord,
@@ -119,11 +119,18 @@ export function signOut(sessions: WebSessionRepository): SignOut {
 const notConfigured = () =>
   fail("not-found", "LinkedIn sign-in is not configured here (no LINKEDIN_CLIENT_ID).");
 
-async function freeHandle(attendees: AttendeeRepository, name: string): Promise<string> {
+interface NewHandle {
+  handle: string;
+  placeholder: boolean;
+}
+
+/** A handle from the name, or a random placeholder when the name gives none, free in storage. */
+async function freeHandle(attendees: AttendeeRepository, name: string): Promise<NewHandle> {
   const taken = new Set<string>();
   for (;;) {
-    const handle = handleFromName(name, taken);
-    if (!(await attendees.byHandle(handle))) return handle;
+    const fromName = handleFromName(name, taken);
+    const handle = fromName ?? placeholderHandle(crypto.getRandomValues(new Uint8Array(4)));
+    if (!(await attendees.byHandle(handle))) return { handle, placeholder: fromName === undefined };
     taken.add(handle);
   }
 }
@@ -137,10 +144,11 @@ async function verifiedFacts(identity: VerifiedIdentity) {
   };
 }
 
-async function created(identity: VerifiedIdentity, handle: string, at: Date): Promise<AttendeeRecord> {
+async function created(identity: VerifiedIdentity, { handle, placeholder }: NewHandle, at: Date): Promise<AttendeeRecord> {
   return {
     id: crypto.randomUUID(),
     handle,
+    handlePlaceholder: placeholder,
     displayName: identity.name,
     ...(identity.picture ? { avatarUrl: identity.picture } : {}),
     visibility: "connections",

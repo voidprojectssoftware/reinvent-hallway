@@ -63,6 +63,7 @@ async function person(world: World, name: string, extra: Partial<AttendeeRecord>
   const attendee: AttendeeRecord = {
     id,
     handle: id,
+    handlePlaceholder: false,
     displayName: name,
     visibility: "connections",
     linkedinSub: `sub-${id}`,
