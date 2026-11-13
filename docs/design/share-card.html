@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1200" />
+    <title>Share card · Hallway design</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <style>
+      /* ShareImage(handle): the picture posted on LinkedIn, 1200 by 627
+         (LinkedIn's 1.91:1 link image). The Worker renders this layout to a
+         PNG later (ADR 0005); here it is HTML. Always the light scheme: a
+         posted image does not follow the reader's setting, and the feed
+         shows it on white in light mode and inside a card in dark mode.
+
+         The feed shows it at about 550 px wide, half size, so nothing here
+         is under 15 px (7.5 px on a phone in the feed is the floor). Two
+         sessions a day at most, then a count: three ran Tuesday's column
+         into the footer. */
+      html,
+      body {
+        margin: 0;
+        background: #d1d1d6;
+      }
+      .card {
+        width: 1200px;
+        height: 627px;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 22px;
+        padding: 36px 40px 28px;
+        background: var(--bg);
+        color: var(--label);
+        font-family: var(--font);
+      }
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .who .av {
+        --size: 84px;
+      }
+      .who h1 {
+        font: 700 40px/1.1 var(--font);
+        letter-spacing: -0.01em;
+      }
+      .who p {
+        margin-top: 6px;
+        font: 400 22px/1.3 var(--font);
+        color: var(--label2);
+      }
+      .week {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        min-height: 0;
+      }
+      .dayc {
+        background: var(--cell);
+        border-radius: 16px;
+        padding: 16px 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .dayc h2 {
+        font: 600 20px/1.2 var(--font);
+      }
+      .dayc h2 span {
+        color: var(--label2);
+        font-weight: 400;
+      }
+      .s {
+        display: grid;
+        gap: 2px;
+        padding-top: 12px;
+        border-top: 1px solid var(--sep);
+      }
+      .s time {
+        font: 600 16px/1.2 var(--font);
+        color: var(--tint);
+        font-variant-numeric: tabular-nums;
+      }
+      .s b {
+        font: 600 17px/1.25 var(--font);
+        display: -webkit-box;
+        /* Three lines: at two, most titles lost their subject. */
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .s small {
+        font: 400 15px/1.25 var(--font);
+        color: var(--label2);
+      }
+      .more {
+        font: 600 16px/1.2 var(--font);
+        color: var(--label2);
+      }
+      .foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font: 400 18px/1.2 var(--font);
+        color: var(--label2);
+      }
+      .foot b {
+        font: 700 22px/1 var(--font);
+        color: var(--label);
+      }
+      .foot .url {
+        color: var(--tint);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="who">
+        <span class="av" data-c="8">SO</span>
+        <div>
+          <h1>Sam Okafor at re:Invent 2026</h1>
+          <p>Platform Engineer, Adatum · 13 sessions, 30 Nov to 4 Dec</p>
+        </div>
+      </div>
+
+      <div class="week">
+        <section class="dayc">
+          <h2>Mon <span>30</span></h2>
+          <div class="s"><time>10:00 AM</time><b>What's new in Amazon EKS</b><small>Wynn</small></div>
+          <div class="s"><time>2:30 PM</time><b>Platform teams that scale</b><small>Venetian</small></div>
+        </section>
+        <section class="dayc">
+          <h2>Tue <span>1</span></h2>
+          <div class="s"><time>8:00 AM</time><b>CEO keynote with Matt Garman</b><small>Venetian</small></div>
+          <div class="s"><time>11:30 AM</time><b>Build production agents with Amazon Bedrock AgentCore</b><small>MGM Grand</small></div>
+          <p class="more">and 3 more</p>
+        </section>
+        <section class="dayc">
+          <h2>Wed <span>2</span></h2>
+          <div class="s"><time>9:00 AM</time><b>Observability for LLM applications</b><small>Venetian</small></div>
+          <div class="s"><time>1:30 PM</time><b>Cost-aware architectures on AWS</b><small>Mandalay Bay</small></div>
+          <p class="more">and 1 more</p>
+        </section>
+        <section class="dayc">
+          <h2>Thu <span>3</span></h2>
+          <div class="s"><time>9:30 AM</time><b>Infrastructure keynote</b><small>Venetian</small></div>
+          <div class="s"><time>2:00 PM</time><b>Zero-downtime database migrations</b><small>Caesars Forum</small></div>
+        </section>
+        <section class="dayc">
+          <h2>Fri <span>4</span></h2>
+          <div class="s"><time>10:00 AM</time><b>Lessons from running Kubernetes at scale</b><small>Venetian</small></div>
+        </section>
+      </div>
+
+      <div class="foot">
+        <span><b>Hallway</b> · times are Las Vegas time (PST)</span>
+        <span class="url">hallway.example/@sam</span>
+      </div>
+    </div>
+  </body>
+</html>

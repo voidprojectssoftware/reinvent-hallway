@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Share my week · Hallway design</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <script src="theme.js"></script>
+  </head>
+  <body class="app">
+    <!-- GetMySchedule(reinvent2026), one day at a time, with WhoIsGoing for
+         each session. Sample data, made up. -->
+    <header class="nav">
+      <div class="col gutter nav-row">
+        <div class="nav-side"></div>
+        <div class="nav-title">My week</div>
+        <div class="nav-side right">
+          <a class="navbtn icon" href="my-week-share.html" aria-label="Share my week">
+            <svg aria-hidden="true"><use href="icons.svg#i-share" /></svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="col gutter">
+      <div class="large">
+        <h1>My week</h1>
+        <p class="large-sub">re:Invent 2026 · times are Las Vegas time (PST)</p>
+      </div>
+
+      <div class="days" role="group" aria-label="Day">
+        <button class="day" aria-pressed="false"><small>Mon</small><b>30</b></button>
+        <button class="day" aria-pressed="true"><small>Tue</small><b>1</b></button>
+        <button class="day" aria-pressed="false"><small>Wed</small><b>2</b></button>
+        <button class="day" aria-pressed="false"><small>Thu</small><b>3</b></button>
+        <button class="day" aria-pressed="false"><small>Fri</small><b>4</b></button>
+      </div>
+
+      <section class="section">
+        <h2 class="ghead big">Tuesday 1 December <small>6 sessions</small></h2>
+        <ul class="group">
+          <li>
+            <a class="cell lead-time" href="session.html">
+              <div class="when"><b>8:00 AM</b><span>10:30 AM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">CEO keynote with Matt Garman</span>
+                <span class="cellsub"><span class="code">KEY002</span> · Venetian, Venetian Arena</span>
+                <div class="meta"><span class="badge reserved"><svg aria-hidden="true"><use href="icons.svg#i-check" /></svg>Reserved</span></div>
+                <div class="going">
+                  <span class="stack" aria-hidden="true"><span class="av sm" data-c="1">PR</span><span class="av sm" data-c="3">MW</span><span class="av sm" data-c="5">DK</span></span>
+                  <span><b>Priya, Marcus, Dana</b> and 9 more</span>
+                </div>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-time" href="session.html">
+              <div class="when"><b>11:30 AM</b><span>12:30 PM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">Build production agents with Amazon Bedrock AgentCore</span>
+                <span class="cellsub"><span class="code">AIM3315</span> · MGM Grand, Grand 122</span>
+                <div class="meta">
+                  <span class="badge reserved"><svg aria-hidden="true"><use href="icons.svg#i-check" /></svg>Reserved</span>
+                  <span class="clash">Same time as SVS401</span>
+                </div>
+                <div class="going">
+                  <span class="stack" aria-hidden="true"><span class="av sm" data-c="1">PR</span><span class="av sm" data-c="3">MW</span></span>
+                  <span><b>Priya Raman</b> and <b>Marcus Webb</b></span>
+                </div>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-time" href="session.html">
+              <div class="when"><b>11:30 AM</b><span>12:30 PM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">Durable functions in AWS Lambda, in depth</span>
+                <span class="cellsub"><span class="code">SVS401</span> · Venetian, Murano 3205</span>
+                <div class="meta">
+                  <span class="badge">Interested</span>
+                  <span class="clash">Same time as AIM3315</span>
+                </div>
+                <div class="going"><span>No one you know yet</span></div>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-time" href="session.html">
+              <div class="when"><b>1:00 PM</b><span>2:00 PM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">Amazon Aurora DSQL under the hood</span>
+                <span class="cellsub"><span class="code">DAT327</span> · Caesars Forum, Summit 232</span>
+                <div class="meta"><span class="badge">Interested</span></div>
+                <div class="going">
+                  <span class="stack" aria-hidden="true"><span class="av sm" data-c="5">DK</span><span class="av sm" data-c="7">LO</span><span class="av sm" data-c="2">HL</span></span>
+                  <span><b>Dana, Luis, Hannah</b> and 2 more</span>
+                </div>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-time" href="session.html">
+              <div class="when"><b>3:00 PM</b><span>5:00 PM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">Workshop: Resilient multi-Region architectures</span>
+                <span class="cellsub"><span class="code">ARC306</span> · Mandalay Bay, Islander F</span>
+                <div class="meta"><span class="badge reserved"><svg aria-hidden="true"><use href="icons.svg#i-check" /></svg>Reserved</span></div>
+                <div class="going">
+                  <span class="stack" aria-hidden="true"><span class="av sm" data-c="4">TB</span></span>
+                  <span><b>Tom Becker</b></span>
+                </div>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+          <li>
+            <a class="cell lead-time hidden-entry" href="session.html">
+              <div class="when"><b>5:30 PM</b><span>6:30 PM</span></div>
+              <div class="cellmain">
+                <span class="celltitle">FinOps for generative AI workloads</span>
+                <span class="cellsub"><span class="code">COP212</span> · Wynn, Lafite 4</span>
+                <div class="meta"><span class="badge">Interested</span></div>
+                <span class="hiddennote"><svg aria-hidden="true"><use href="icons.svg#i-eye-off" /></svg>Hidden from others</span>
+              </div>
+              <svg class="chev" aria-hidden="true"><use href="icons.svg#i-chev" /></svg>
+            </a>
+          </li>
+        </ul>
+        <p class="gfoot">Synced from your agent 12 minutes ago. Reserving happens on re:Invent; Hallway shows what you reserved there.</p>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Hallway">
+      <span class="brand">Hallway</span>
+      <a href="my-week.html" aria-current="page"><svg aria-hidden="true"><use href="icons.svg#i-week" /></svg><span>My week</span></a>
+      <a href="network.html"><svg aria-hidden="true"><use href="icons.svg#i-people" /></svg><span>Network</span><span class="badge-n" aria-label="2 requests">2</span></a>
+      <a href="connect-agent.html"><svg aria-hidden="true"><use href="icons.svg#i-agent" /></svg><span>Agent</span></a>
+      <a href="settings.html"><svg aria-hidden="true"><use href="icons.svg#i-gear" /></svg><span>Settings</span></a>
+    </nav>
+    <!-- The share sheet, open over My week. Static: the page under it is
+         My week as drawn in my-week.html. -->
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="share-t">
+      <div class="sheet-in">
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-g">
+          <div class="sheet-t"><b id="share-t">Share my week</b>hallway.example/@sam. People who open it and sign in can connect with you in one tap.</div>
+          <button class="sheet-b"><svg aria-hidden="true"><use href="icons.svg#i-link" /></svg>Copy link</button>
+          <button class="sheet-b"><svg aria-hidden="true"><use href="icons.svg#i-share" /></svg>Post on LinkedIn</button>
+          <button class="sheet-b"><svg aria-hidden="true"><use href="icons.svg#i-photo" /></svg>Save picture</button>
+          <button class="sheet-b"><svg aria-hidden="true"><use href="icons.svg#i-cal" /></svg>Subscribe in Calendar</button>
+        </div>
+        <button class="sheet-cancel">Cancel</button>
+      </div>
+    </div>
+  </body>
+</html>
