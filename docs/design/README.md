@@ -33,15 +33,48 @@ the host, which is not decided.
 
 ## Decisions
 
-**Accent: indigo.** `#5856d6` (Apple's systemIndigo) in light, `#9896ff` in
-dark. iOS blue was the obvious choice and was rejected on two counts: `#007aff`
-is 4.0:1 on white, under AA for link text, and every darkened blue reads as
+**Accent: Void Projects' violet (issue #106, ADR 0027).** Hallway is a Void
+Projects piece, so its tint is the brand violet of voidprojects.ai
+(`--color-primary`, `oklch(0.6534 0.1876 301.62)`, in that site's
+`src/routes/layout.css`), kept at the brand's hue and chroma and moved in
+lightness until every use passes AA: `#8147c4` (`oklch(0.53 …)`) in light,
+`#bb83ff` (`oklch(0.72 …)`) in dark. The brand value itself is 3.45:1 on white,
+and its `--color-primary-strong` (L 0.58) 4.17:1 on the grouped background.
+It replaced the indigo of #10 (`#5856d6` / `#9896ff`). Measured on the
+tokens (light / dark):
+
+| Use | Pairing | Light | Dark |
+| --- | --- | --- | --- |
+| Links, tinted text | tint on a cell | 5.78 | 6.32 |
+| Tinted text on the page | tint on `--bg` | 5.18 | 7.80 |
+| Tinted text in a grouped cell's second level | tint on `--cell2` | 5.18 | 5.18 |
+| Gray buttons, `.minibtn` | tint on `--fill` over a cell | 5.03 | 4.74 |
+| Gray button on the page | tint on `--fill` over `--bg` | 4.52 | 6.32 |
+| Selected tab label | tint on `--bar` over `--bg` | 5.45 | 6.96 |
+| Calendar "+N more" | tint on `--tint-bg` over a cell | 4.88 | 4.91 |
+| Solid buttons, selected day, sidebar row | `--on-tint` on tint | 5.78 | 6.32 |
+| Selected day's weekday (0.85 opacity) | `--on-tint` at 0.85 on tint | 4.65 | 4.98 |
+
+The light tint passes on gray over the page too (indigo was 4.42:1 there),
+but the rule below that a gray button sits on a cell still stands. Why not
+iOS blue: `#007aff` is 4.0:1 on white, and every darkened blue reads as
 LinkedIn's, which sits next to Hallway in every post. AWS's orange and squid
-ink belong to AWS, and Hallway must not look like an AWS product. Halloween's
-pumpkin belongs to Halloween. Indigo is still a system color, so the app looks
-native. Apple's dark indigo (`#5e5ce6`) is 3.4:1 on a dark cell, so the dark
-tint is lighter, and text on it is the cell color (Halloween did the same with
-its dark orange).
+ink belong to AWS, and Hallway must not look like an AWS product. The
+iOS look is otherwise unchanged: system font, system grays, Apple's green,
+orange and red. `--av-1` (the first avatar hue, and the icon tiles) is the
+light tint in both schemes, as it was indigo before.
+
+**The credit: "Made by Void Projects", once per screen size.** The orbit
+mark and the words, linking to `https://voidprojects.ai/websites` in a new
+tab, as every Void-built site carries it (voidprojects-site,
+`docs/websites/how-to/add-the-footer-badge.md`). On a wide screen it is the
+foot of the sidebar; on a phone, the end of Settings; on the sign-in screen,
+under the buttons. A footnote in the secondary label, never a banner or a
+pill. The share card's footer says "Hallway · by Void Projects". The mark
+is a fixed copy (`apps/web/src/brand/void-mark.svg`, seed 3 of
+voidprojects.ai's `/api/mark.svg`), never fetched from that site, and it is
+the favicon. Page titles stay "<Screen> · Hallway"; `og:site_name` is
+"Hallway by Void Projects".
 
 **Type: the system font, nothing loaded.** The same stack Halloween used, at
 Apple's text style sizes (`--t-large` 34 bold through `--t-caption` 12), with
@@ -123,7 +156,8 @@ from, not a second source.
 
 ## Open points for the owner
 
-- Indigo is a call made without you; say if you want another accent.
+- The share card and composer picture carry the credit in words only; the
+  mark is not drawn on them.
 - The share card is light only. A dark variant is easy if you want it.
 - On a wide screen the share sheet sits at the bottom, as on a phone. A
   popover from the Share button would be more iPad-like; the builders can

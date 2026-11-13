@@ -8,7 +8,8 @@
    Three things differ from Apple's values, each for contrast (WCAG AA, 4.5:1
    for text), and each is noted where it is set:
    - the secondary label is darker in light mode,
-   - the tint is indigo, lightened in dark mode,
+   - the tint is Void Projects' violet, darkened in light mode and
+     lightened in dark,
    - green text is darker in light mode.
 
    The scheme follows the system, and data-theme="light" or "dark" on <html>
@@ -36,18 +37,20 @@
   --fill2: rgba(118, 118, 128, 0.2);
   --seg-on: #ffffff;
 
-  /* The accent. Indigo (Apple's systemIndigo, #5856d6): 5.65:1 on white,
-     5.06:1 on the grouped background, and white text on it is 5.65:1.
-     On --fill over the grouped background it is 4.42:1, so a gray
-     (.btn.gray, .minibtn) button sits on a cell, never on the page.
-     Why indigo and not iOS blue: blue (#007aff) is 4.0:1 on white and fails
-     AA as link text; a darker blue reads as LinkedIn's, and Hallway's links
-     sit next to LinkedIn's in every post. AWS's orange and squid ink are
-     AWS's brand, which Hallway must not look like. Halloween's pumpkin is
-     Halloween's. Indigo is a system color, so it still looks native. */
-  --tint: #5856d6;
+  /* The accent: Void Projects' brand violet (issue #106, ADR 0027), the
+     hue and chroma of voidprojects.ai's --color-primary,
+     oklch(0.6534 0.1876 301.62), darkened to oklch(0.53 0.1876 301.62).
+     The brand's own value is 3.45:1 on white and its --color-primary-strong
+     (L 0.58) 4.17:1 on the grouped background, both short of AA for text.
+     This one is 5.78:1 on white, 5.18:1 on the grouped background, 5.03:1
+     on --fill over a cell, 4.52:1 on --fill over the page, 4.88:1 on
+     --tint-bg over a cell, and white text on it is 5.78:1.
+     Why not iOS blue: blue (#007aff) is 4.0:1 on white and fails AA as link
+     text, and a darker blue reads as LinkedIn's, next to which Hallway's
+     links sit in every post. AWS's orange and squid ink are AWS's. */
+  --tint: #8147c4;
   --on-tint: #ffffff;
-  --tint-bg: rgba(88, 86, 214, 0.12);
+  --tint-bg: rgba(129, 71, 196, 0.12);
 
   /* Status. Green marks a reserved seat. Apple's #248a3d is 3.9:1 on its
      own tinted background; #1e7a35 is 4.78:1 on it over a cell. */
@@ -65,7 +68,7 @@
   /* Avatars without a picture: initials in white on one of eight hues,
      picked by the attendee id. Each is at least 5.4:1 with white, in both
      schemes, so they are not redefined for dark. */
-  --av-1: #5856d6;
+  --av-1: #8147c4; /* the light tint: the icon tiles use it */
   --av-2: #1e7a35;
   --av-3: #b8336a;
   --av-4: #8a5a00;
@@ -130,13 +133,15 @@
     --fill: rgba(118, 118, 128, 0.24);
     --fill2: rgba(118, 118, 128, 0.36);
     --seg-on: #636366;
-    /* Apple's dark indigo (#5e5ce6) is 3.4:1 on a dark cell. This lighter
-       indigo is 6.6:1 on --cell, 5.4:1 on --cell2 and 4.98:1 on --fill over
-       a cell (the small buttons; #8e8cff was 4.49:1 there). Text on it is
-       the cell color, as Halloween did with its dark orange. */
-    --tint: #9896ff;
+    /* The brand violet lightened to oklch(0.72 0.1876 301.62). The brand's
+       own value (#a66eee) is 4.93:1 on --cell but 4.04:1 on --cell2 and
+       3.70:1 on --fill over a cell (the small buttons). This one is 6.32:1
+       on --cell, 5.18:1 on --cell2, 4.74:1 on --fill over a cell and 4.91:1
+       on --tint-bg over a cell. Text on it is the cell color, 6.32:1, as
+       Halloween did with its dark orange. */
+    --tint: #bb83ff;
     --on-tint: #1c1c1e;
-    --tint-bg: rgba(152, 150, 255, 0.16);
+    --tint-bg: rgba(187, 131, 255, 0.16);
     --green: #30d158;
     --green-bg: rgba(48, 209, 88, 0.18);
     --orange: #ff9f0a;
@@ -159,9 +164,9 @@
   --fill: rgba(118, 118, 128, 0.24);
   --fill2: rgba(118, 118, 128, 0.36);
   --seg-on: #636366;
-  --tint: #9896ff;
+  --tint: #bb83ff;
   --on-tint: #1c1c1e;
-  --tint-bg: rgba(152, 150, 255, 0.16);
+  --tint-bg: rgba(187, 131, 255, 0.16);
   --green: #30d158;
   --green-bg: rgba(48, 209, 88, 0.18);
   --orange: #ff9f0a;

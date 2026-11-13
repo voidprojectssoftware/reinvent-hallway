@@ -47,7 +47,7 @@ export function previewTags(shared: SharedSchedule, origin: string): { title: st
     meta("name", "description", description),
     // Only a public schedule is offered to search engines.
     ...(shared.scheduleVisible ? [] : [meta("name", "robots", "noindex")]),
-    meta("property", "og:site_name", "Hallway"),
+    meta("property", "og:site_name", "Hallway by Void Projects"),
     meta("property", "og:type", "profile"),
     meta("property", "og:title", title),
     meta("property", "og:description", description),

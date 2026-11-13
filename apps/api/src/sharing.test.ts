@@ -255,6 +255,7 @@ describe("the share card", () => {
     expect(drawn).toEqual(expect.arrayContaining(["Sam Okafor at re:Invent 2026", "10:00 AM", "8:00 AM", "11:30 AM", "and 1 more"]));
     expect(drawn).toContain("Platform Engineer · 4 sessions, 30 Nov to 4 Dec");
     expect(drawn).toContain("· times are Las Vegas time (PST)");
+    expect(drawn).toContain("· by Void Projects");
     expect(drawn).not.toContain("Tuesday three");
   });
 

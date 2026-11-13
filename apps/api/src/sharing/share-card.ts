@@ -19,8 +19,8 @@ const color = {
   label: "#000000",
   label2: "rgba(60, 60, 67, 0.78)",
   sep: "rgba(60, 60, 67, 0.18)",
-  tint: "#5856d6",
-  avatars: ["#5856d6", "#1e7a35", "#b8336a", "#8a5a00", "#0b6e99", "#6b4fbb", "#a04100", "#636366"],
+  tint: "#8147c4",
+  avatars: ["#8147c4", "#1e7a35", "#b8336a", "#8a5a00", "#0b6e99", "#6b4fbb", "#a04100", "#636366"],
 };
 const font = "Inter";
 
@@ -281,6 +281,9 @@ export function shareCard(shared: SharedSchedule, { day, pageLabel }: CardOption
         "div",
         { alignItems: "baseline", gap: 8 },
         el("span", { fontSize: 22, fontWeight: 700, color: color.label }, "Hallway"),
+        // Who made it (issue #106): every Void-built thing carries the credit.
+        // A span of its own: Satori runs adjacent strings together, gap and all.
+        el("span", {}, "· by Void Projects"),
         // Said once, here, as the design does, and only when there are times.
         // The zone's name comes from the week itself: re:Invent is PST,
         // whatever AWS's own label says.

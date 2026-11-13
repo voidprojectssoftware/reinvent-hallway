@@ -13,6 +13,7 @@ import { WhoCanSee } from "../settings/WhoCanSee.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
+import { MadeBy } from "../shell/MadeBy.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
 import { formatAgo } from "../time.ts";
@@ -84,6 +85,7 @@ export function Settings() {
         </ul>
       </section>
       <SignOut />
+      <MadeBy className="on-phone" />
     </Screen>
   );
 }
