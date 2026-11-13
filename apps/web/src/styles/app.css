@@ -337,7 +337,7 @@ body.loading main {
 /* List or Calendar on a week (#91): the design's segmented control, at the
    top of the week, as wide as the day chips under it. */
 .seg.week-view {
-  margin-block: var(--sp-1) var(--sp-2);
+  margin-block: var(--sp-2);
 }
 /* "On from 9:30 to 10 AM": the list a calendar's "+N more" opened. */
 .slot-note {
