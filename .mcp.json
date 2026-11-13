@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentation": {
+      "command": "node",
+      "args": ["scripts/notes-mcp.mjs"]
+    }
+  }
+}
