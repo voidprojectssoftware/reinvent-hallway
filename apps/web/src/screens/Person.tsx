@@ -20,6 +20,7 @@ import { inSlot, parseSlot, slotMinutes } from "../schedule/calendar.ts";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { firstName as firstWord } from "../schedule/going.ts";
 import { WeekCalendar } from "../schedule/WeekCalendar.tsx";
+import { WeekMap } from "../schedule/WeekMap.tsx";
 import { useWeekView, WeekViewToggle } from "../schedule/WeekView.tsx";
 import { useMe } from "../shell/AppLayout.tsx";
 import { Avatar } from "../shell/Avatar.tsx";
@@ -328,21 +329,26 @@ function Week({ card, entries, mine, own, me }: WeekProps) {
   const toggle = <WeekViewToggle view={view} onChange={setView} />;
 
   if (view === "calendar") {
-    // Their days, first to last: the page has no event to read the week's dates from.
-    const dated = entries.flatMap((entry) => (entry.session.startsAt ? [eventDate(entry.session.startsAt)] : [])).sort();
-    const [firstDay] = dated;
-    const lastDay = dated.at(-1);
-    const dates = firstDay && lastDay ? eventDates(firstDay, lastDay) : [];
+    const dates = theirDates(entries);
     return (
       <>
         {note}
-        {toggle}
         <WeekCalendar
           entries={entries}
           dates={dates}
           going={(entry) => (you.length > 0 && mine.has(entry.sessionId) ? { short: "You", spoken: "you're going too" } : undefined)}
           cell={cell}
+          toggle={toggle}
         />
+      </>
+    );
+  }
+
+  if (view === "map") {
+    return (
+      <>
+        {note}
+        <WeekMap entries={entries} dates={theirDates(entries)} toggle={toggle} cell={cell} />
       </>
     );
   }
@@ -358,8 +364,10 @@ function Week({ card, entries, mine, own, me }: WeekProps) {
   }
   return (
     <>
-      {note}
-      {toggle}
+      <div className="day-head">
+        {note}
+        {toggle}
+      </div>
       {slot !== null && slotDay && (
         <p className="gfoot slot-note">
           On {formatDate(slotDay)} from {formatMinute(slot)} to {formatMinute(slot + slotMinutes)}.{" "}
@@ -376,6 +384,14 @@ function Week({ card, entries, mine, own, me }: WeekProps) {
       ))}
     </>
   );
+}
+
+/** Their days, first to last: the page has no event to read the week's dates from. */
+function theirDates(entries: readonly PersonEntry[]): string[] {
+  const dated = entries.flatMap((entry) => (entry.session.startsAt ? [eventDate(entry.session.startsAt)] : [])).sort();
+  const [firstDay] = dated;
+  const lastDay = dated.at(-1);
+  return firstDay && lastDay ? eventDates(firstDay, lastDay) : [];
 }
 
 function YouToo({ you }: { you: PersonFace[] }) {

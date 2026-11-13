@@ -71,6 +71,25 @@ describe("MCP get_event", () => {
   });
 });
 
+describe("GET /api/events/{eventId}/venues and MCP get_venues (#93)", () => {
+  it("gives the venues and walks to anyone, the same over both interfaces", async () => {
+    const response = await call(`${origin}/api/events/reinvent2026/venues`);
+    expect(response.status).toBe(200);
+    const rest = (await response.json()) as { venues: { venueId: string }[]; walks: unknown[]; attribution: string };
+    expect(rest.venues.map((v) => v.venueId)).toEqual(expect.arrayContaining(["venetian", "caesars-forum", "mgm-grand", "mandalay-bay", "wynn"]));
+    expect(rest.attribution).toContain("OpenStreetMap");
+    const client = await mcpClient();
+    const result = await client.callTool({ name: "get_venues", arguments: { eventId: "reinvent2026" } });
+    expect(result.structuredContent).toEqual(rest);
+    await client.close();
+  });
+
+  it("answers 404 for an unknown event", async () => {
+    const response = await call(`${origin}/api/events/summit-nowhere/venues`);
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("GET /api/openapi.json", () => {
   it("names the route and its schemas", async () => {
     const document = (await (await call(`${origin}/api/openapi.json`)).json()) as {

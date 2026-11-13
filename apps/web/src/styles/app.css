@@ -342,10 +342,72 @@ body.loading main {
   color: #1f2328;
 }
 
-/* List or Calendar on a week (#91): the design's segmented control, at the
-   top of the week, as wide as the day chips under it. */
-.seg.week-view {
-  margin-block: var(--sp-2);
+/* List, Calendar or Map on a week (#91, #93): three icon buttons joined like
+   a segmented control, the chosen one filled with the tint, at the right of
+   the day's header row (the owner asked for it there, 2026-11-13). Each is
+   40 by 32 px, so a long day name still fits beside them at 390, and its
+   tap target is stretched to 44 by 44 by ::after. */
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: 6px;
+}
+.day-head .ghead.big {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  column-gap: var(--sp-2);
+  row-gap: 0;
+  margin: 0;
+}
+/* The day keeps its line; the count goes under it when the two do not fit. */
+.day-head .day-name {
+  white-space: nowrap;
+}
+/* At phone widths a Title 3 "Wednesday 2 December" and the switch do not fit
+   on one line, so the day drops to Headline size there. */
+@media (max-width: 429px) {
+  .day-head .ghead.big {
+    font: var(--t-headline);
+  }
+}
+.week-view {
+  flex: none;
+  display: inline-flex;
+  background: var(--fill);
+  border-radius: var(--r-seg);
+  padding: 2px;
+  gap: 2px;
+}
+.week-view button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 32px;
+  border-radius: 7px;
+  color: var(--label);
+}
+.week-view button::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}
+.week-view button svg {
+  width: 20px;
+  height: 20px;
+}
+.week-view button[aria-pressed='true'] {
+  background: var(--tint);
+  color: var(--on-tint);
+  box-shadow: var(--shadow-sm);
+}
+/* The person page's week line, with the switch at its right. */
+.day-head .week-note {
+  margin: 0;
 }
 /* "On from 9:30 to 10 AM": the list a calendar's "+N more" opened. */
 .slot-note {
@@ -707,4 +769,176 @@ body:has(.cal.week) .nav-row {
 /* The composer's day chips sit under a footnote, not a title. */
 .post-days {
   margin-top: var(--sp-5);
+}
+
+/* The Map view of a week (#93). The map sits in a grouped cell, 360 px tall
+   on a phone and 440 from 768; the day in order is a list of stops with the
+   walk between each two on its own line, inset to the text like a separator. */
+.campus {
+  position: relative;
+  isolation: isolate; /* keeps Leaflet's z-indexes under the tab bar and sheets */
+}
+.campus-map,
+.campus-wait,
+.campus-map.leaflet-container {
+  height: 360px;
+  background: var(--map-land);
+}
+@media (min-width: 768px) {
+  .campus-map,
+  .campus-wait {
+    height: 440px;
+  }
+}
+.campus-wait {
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  font: var(--t-subhead);
+  color: var(--label2);
+  text-align: center;
+}
+.campus-map.leaflet-container .leaflet-control-attribution {
+  background: var(--cell);
+  color: var(--label2);
+  font: var(--t-caption);
+  font-weight: 400;
+}
+.campus-map.leaflet-container .leaflet-control-attribution a {
+  color: var(--tint);
+}
+.campus-map.leaflet-container .leaflet-bar a {
+  background: var(--cell);
+  color: var(--label);
+  border-color: var(--sep);
+}
+/* A venue's pin: its sessions' numbers in the day's order on a tint pill,
+   centered on the venue, with the count of sessions there in a small badge
+   when several share it. The venue's name under it shows on the tapped pin
+   and from zoom 16 (.named), where names no longer cover each other. */
+.venue-pin {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: max-content !important; /* Leaflet sets a fixed size on a divIcon */
+  height: auto !important;
+  translate: -50% -16px;
+  cursor: pointer;
+}
+.venue-pin .pin-order {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 16px;
+  background: var(--tint);
+  color: var(--on-tint);
+  font: 700 15px/1 var(--font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--cell), var(--shadow-sm);
+}
+.venue-pin .pin-order::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.venue-pin .pin-count {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--cell);
+  color: var(--label);
+  font: 700 12px/1 var(--font);
+  box-shadow: 0 0 0 1.5px var(--tint);
+}
+.venue-pin .pin-name {
+  display: none;
+  padding: 2px 6px;
+  border-radius: var(--r-badge);
+  background: var(--cell);
+  color: var(--label);
+  font: 600 12px/1.2 var(--font);
+  white-space: nowrap;
+  box-shadow: 0 0 0 1px var(--sep), var(--shadow-sm);
+}
+.campus-map.named .venue-pin .pin-name,
+.venue-pin.selected .pin-name {
+  display: block;
+}
+.venue-pin.selected {
+  z-index: 2000 !important;
+}
+.venue-pin.selected .pin-order {
+  box-shadow: 0 0 0 3px var(--cell), 0 0 0 5px var(--tint);
+}
+.venue-pin:focus-visible {
+  outline: none;
+}
+.venue-pin:focus-visible .pin-order {
+  outline: 3px solid var(--tint);
+  outline-offset: 4px;
+}
+/* A walk's minutes on the path, at its middle. */
+.walk-chip {
+  width: max-content !important;
+  height: auto !important;
+  translate: -50% -50%;
+  padding: 2px 6px;
+  border-radius: var(--r-badge);
+  background: var(--cell);
+  color: var(--label);
+  font: 600 12px/1.2 var(--font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 0 0 1px var(--sep), var(--shadow-sm);
+}
+.walk-chip.tight {
+  color: var(--orange);
+  box-shadow: 0 0 0 1.5px var(--orange);
+}
+.day-order .stop {
+  --inset: 56px;
+  align-items: flex-start;
+}
+.stop-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tint);
+  color: var(--on-tint);
+  font: 700 14px/1 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.stop-n.allday {
+  background: var(--fill);
+  color: var(--label2);
+}
+.stop-when {
+  font: var(--t-footnote);
+  font-variant-numeric: tabular-nums;
+  color: var(--label2);
+}
+/* The walk between two stops: a line of its own, inset like a separator. */
+.leg {
+  position: relative;
+  margin: 0;
+  padding: 8px 14px 8px 56px;
+  font: var(--t-footnote);
+  color: var(--label2);
+  background: var(--cell2);
+}
+.leg.tight {
+  color: var(--orange);
 }

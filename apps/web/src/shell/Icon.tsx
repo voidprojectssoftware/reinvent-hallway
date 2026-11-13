@@ -4,7 +4,7 @@
 export type IconName =
   | "back" | "chev" | "week" | "people" | "agent" | "gear" | "share" | "out" | "lock" | "check"
   | "clock" | "pin" | "mic" | "tag" | "copy" | "plus" | "search" | "link" | "cal" | "photo"
-  | "eye-off" | "doc" | "key" | "sun";
+  | "eye-off" | "doc" | "key" | "sun" | "list" | "map";
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (

@@ -173,3 +173,43 @@
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+
+/* The campus map's base layer (issue #93): the Halloween map's land, water
+   and road colors (its app.css --map-*), which this file left out until a
+   map came back. Only the drawn tiles use them; text on the map sits on a
+   --cell label, never on these. */
+:root {
+  --map-land: #ece9e4;
+  --map-urban: #e3dfd8;
+  --map-park: #d6e0c6;
+  --map-water: #afc9db;
+  --map-building: #d9d3c9;
+  --map-road: #ffffff;
+  --map-road-edge: #c9c0b2;
+  --map-label: #4a433a;
+  --map-halo: #f5f2ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --map-land: #17151c;
+    --map-urban: #1f1d25;
+    --map-park: #1c2420;
+    --map-water: #1e3346;
+    --map-building: #2a2731;
+    --map-road: #4a4352;
+    --map-road-edge: #2b2731;
+    --map-label: #cfc6d8;
+    --map-halo: #17151c;
+  }
+}
+:root[data-theme='dark'] {
+  --map-land: #17151c;
+  --map-urban: #1f1d25;
+  --map-park: #1c2420;
+  --map-water: #1e3346;
+  --map-building: #2a2731;
+  --map-road: #4a4352;
+  --map-road-edge: #2b2731;
+  --map-label: #cfc6d8;
+  --map-halo: #17151c;
+}

@@ -89,6 +89,7 @@ export {
   WhoIsGoingQuery,
 } from "./network.ts";
 export { ShareLinks } from "./sharing.ts";
+export { Venue, VenueId, Venues, Walk } from "./venues.ts";
 export { isReturnPath, ReturnPath } from "./return-path.ts";
 export {
   BeginLinkedInPostInput,

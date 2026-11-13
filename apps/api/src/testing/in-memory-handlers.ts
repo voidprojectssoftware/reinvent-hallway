@@ -7,6 +7,7 @@
 import {
   connectionsGoing,
   getEvent,
+  getVenues,
   identityHandlers,
   invitePathOf,
   networkHandlers,
@@ -67,6 +68,7 @@ export function inMemoryHandlers(
   const drafts = postDraftsInMemory();
   const handlers: Handlers = {
     getEvent: getEvent(events),
+    getVenues: getVenues(events),
     identity: identityHandlers(identityPorts),
     ...scheduleHandlers({
       events,

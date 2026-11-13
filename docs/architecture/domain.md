@@ -73,7 +73,8 @@ erDiagram
 | --- | --- | --- |
 | **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`; reserved words such as `api`, `settings`, `dev` are refused, `isReservedHandle`), `handlePlaceholder` (private, in `Me` only: the handle is a made-up `attendee-` one, rule below), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `network` \| `private`, default `network`; `network` was `connections` before #63). Private: `verifiedName` (the first identity's name, not editable), `email` (the first identity's, stored only when that provider says it is verified). Signs in through one or more Identities (below) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
-| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, and only to a reader `canReadAbstract` allows (rule below). Never `seatAvailability` or `isReservable` |
+| **Venue** | A building re:Invent sessions are held in, with the walks between venues (issue #93, ADR 0029). Facts measured once and committed, not stored in D1 | `venueId` (`venetian`, `caesars-forum`, ...), `name`, `osm` (the OpenStreetMap element), `center` and `outline` ([lat, lon]), and per ordered pair a `Walk`: `meters`, `minutes` (rounded up). Hand-written list in `packages/domain/src/venue-list.ts`; measurements in `venue-data.ts`, derived from `docs/discovery/venues/` (`docs/discovery/venues.md`) |
+| **Session** | One session as the catalog shows it: per field, what most of its reporters agree on | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `venueId` (derived: the Venue `venue` names, by `venueOf`; absent when Hallway cannot place it), `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), the lists `tracks[]`, `topics[]`, `industries[]`, `areasOfInterest[]`, `roles[]`, `services[]`, `segments[]`, `features[]`, `customerPersonas[]`, `experiences[]`, `additionalActivities[]`, `focusAreas[]`, `url` (derived, see below), `lastSeenAt` (the newest report). `abstract` (AWS's plain text) only on search and get, and only to a reader `canReadAbstract` allows (rule below). Never `seatAvailability` or `isReservable` |
 | **Session report** | Not served: one attendee's account of one session, their agent's snapshots of it merged forward | the session's fields and its abstract, `attendeeId`, `reportedAt`, and (stored only) `abstractKey`, the SHA-256 of the abstract's normalized text, which corroboration compares. One per attendee and session |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation or invitation), `source` (`agent-sync` \| `manual`), `invited` (bool: from AWS `invitedSessions`), `hidden` (bool, from the hidden sessions below), `addedAt` |
 | **Hidden session** | Not served on its own: a session an attendee hid, per event | `attendeeId`, `eventId`, `sessionId`. An entry is hidden while its session is here |
@@ -241,6 +242,17 @@ We store UTC instants and the event timezone, and render in the event timezone
   or revoke agent tokens, nor rotate or read the calendar feed or the invite (`forbidden`),
   so a stolen token cannot outlive its own revocation (ADR 0008).
 
+- **Where a session is (issue #93).** `venueOf(venue)` maps AWS's venue text
+  to a venue: the text before the first `|` or `,`, folded to lowercase
+  words without a leading "the", matched against each venue's aliases as a
+  whole-word prefix, longest alias first ("MGM Grand Conference Center" and
+  "MGM Grand" are `mgm-grand`; "Caesars" alone is nothing, since two venues
+  start with it). Unknown text has no venue, so no pin and no walk. A walk
+  between two sessions in a row is tight when its minutes exceed the gap
+  between them; the web works that out from my own entries (as it does
+  clashes), and the agent can from `get_venues`. Rooms are text: OpenStreetMap
+  has no named rooms in these buildings (`docs/discovery/venues.md`).
+
 ## Commands
 
 | Command | Who | Effect |
@@ -287,6 +299,7 @@ what they are told (hunt F10).
 | `GetMyShareImage(selection)` | my own picture of my week, a day or chosen sessions, hidden ones left out; to me signed in as a person, never cached (`GET /api/me/share-image.png`) |
 | `ComposePost(selection)` | the composer's draft: the sessions I may share, the selected ones, the suggested text, my picture's URL, whether the link preview shows my week, and whether Hallway can post for me (`GET /api/me/share/post`) |
 | `LinkPreview(handle)` | `/@handle`'s Open Graph and Twitter tags, always as an anonymous visitor sees it; `og:image` is the share image with a version that changes when what it shows changes |
+| `GetVenues(eventId)` | the venues Hallway can place a session in and the measured walk between every two, with the OpenStreetMap credit; open to any caller (`GET /api/events/{eventId}/venues`). The web's Map view puts my own day on them (issue #93) |
 | `GetShareLinks` | my page, the link preview's card and, to me signed in as a person, my own picture, my calendar feed and my invite link (`GET /api/me/share`) |
 
 ## Who calls what
@@ -329,6 +342,8 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `get_session` | `GetSession` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
 | `set_entry_hidden` | `SetEntryHidden` |
+| `get_event` | `GetEvent` |
+| `get_venues` | `GetVenues` |
 
 Every tool error is the Error resource, and names a next step the agent can
 take with its own tools (#54): a refused removal points at `set_entry_hidden`,

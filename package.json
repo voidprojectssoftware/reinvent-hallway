@@ -22,13 +22,15 @@
     "seed:demo": "node scripts/seed-demo.mjs",
     "fake:linkedin": "node scripts/fake-linkedin.mjs",
     "db:generate": "node scripts/generate-migration.mjs",
-    "test:e2e": "vitest run --config e2e/vitest.config.ts"
+    "test:e2e": "vitest run --config e2e/vitest.config.ts",
+    "tiles": "node scripts/venues/cut-tiles.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "22.20.5",
     "dependency-cruiser": "18.7.0",
     "esbuild": "0.28.2",
+    "pmtiles": "4.5.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.1.0",

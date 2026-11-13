@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { Person } from "./identity.ts";
+import { VenueId } from "./venues.ts";
 
 export const SessionId = z
   .string()
@@ -126,6 +127,9 @@ export const Session = z
     level: z.string().optional(),
     venue: z.string().optional(),
     room: z.string().optional(),
+    venueId: VenueId.optional().meta({
+      description: "The venue `venue` names, from the event's Venues, so the session can go on a map. Absent when Hallway cannot place the venue.",
+    }),
     startsAt: instant.optional(),
     endsAt: instant.optional(),
     isAllDay: z.boolean().optional(),

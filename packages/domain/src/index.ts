@@ -58,3 +58,4 @@ export {
   type RequestDecision,
   type RequestOutcome,
 } from "./connections";
+export { venueOf, venues, walks, venuesMeasuredOn, type Venue, type VenueId, type Walk } from "./venues";
