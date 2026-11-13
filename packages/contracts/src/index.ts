@@ -25,6 +25,7 @@ export {
   EntrySource,
   EventScope,
   Intent,
+  LastSync,
   MySchedule,
   PlanEntry,
   SearchSessionsInput,
