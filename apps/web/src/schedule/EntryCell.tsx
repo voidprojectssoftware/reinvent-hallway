@@ -48,8 +48,10 @@ export function EntryCell({ session, intent, hidden = false, clash, going }: Ent
 }
 
 function When({ session }: { session: Session }) {
-  if (session.isAllDay) return <div className="when"><b>All day</b></div>;
-  if (!session.startsAt) return <div className="when"><b>Time to come</b></div>;
+  // Words, not times, may wrap in the 78 px column: "Time to come" is wider
+  // than it and would otherwise run into the title (#100).
+  if (session.isAllDay) return <div className="when words"><b>All day</b></div>;
+  if (!session.startsAt) return <div className="when words"><b>Time to come</b></div>;
   return (
     <div className="when">
       <b>{formatTime(session.startsAt)}</b>
