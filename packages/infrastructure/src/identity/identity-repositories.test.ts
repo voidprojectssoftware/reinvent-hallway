@@ -149,6 +149,17 @@ describe.each(implementations)("identity repositories %s", (_, open) => {
     expect(await feeds.get(owner.id)).toEqual({ token: `${owner.id}-new`, rotatedAt: "2026-11-13T11:00:00.000Z" });
   });
 
+  it("finds a feed's owner by its current token only, so a rotated URL opens nothing", async () => {
+    const { attendees, feeds } = open();
+    const owner = anAttendee();
+    await attendees.create(owner);
+    await feeds.replace(owner.id, `${owner.id}-old`, "2026-11-13T10:00:00.000Z");
+    expect(await feeds.ownerOf(`${owner.id}-old`)).toBe(owner.id);
+    await feeds.replace(owner.id, `${owner.id}-new`, "2026-11-13T11:00:00.000Z");
+    expect(await feeds.ownerOf(`${owner.id}-old`)).toBeUndefined();
+    expect(await feeds.ownerOf(`${owner.id}-new`)).toBe(owner.id);
+  });
+
   it("refuses a feed token another attendee already holds", async () => {
     const { attendees, feeds } = open();
     const [one, two] = [anAttendee(), anAttendee()];

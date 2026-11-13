@@ -36,3 +36,4 @@ export {
   SyncScheduleBody,
   SyncScheduleInput,
 } from "./schedule.ts";
+export { ShareLinks } from "./sharing.ts";

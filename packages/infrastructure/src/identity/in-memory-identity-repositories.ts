@@ -104,5 +104,6 @@ export function calendarFeedsInMemory(): CalendarFeedRepository {
       feeds.set(attendeeId, { token, rotatedAt });
     },
     get: async (attendeeId) => copy(feeds.get(attendeeId)),
+    ownerOf: async (token) => [...feeds].find(([, feed]) => feed.token === token)?.[0],
   };
 }
