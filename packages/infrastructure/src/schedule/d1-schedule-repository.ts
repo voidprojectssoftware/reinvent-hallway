@@ -15,6 +15,7 @@ import {
   foldSpeakers,
   foldText,
   manualIntent,
+  sessionTags,
   type PlanEntry,
   type SessionReport,
   type SyncedSession,
@@ -36,8 +37,8 @@ export const D1_MAX_PARAMETERS = 100;
 
 /**
  * How much row JSON one statement binds: a quarter of D1's 2 MB limit on one
- * string, as for contacts (ADR 0011). A 1,000-session sync without abstracts
- * is well under one chunk.
+ * string, as for contacts (ADR 0011). A 250-session sync with abstracts and
+ * every list is about two chunks (ADR 0025).
  */
 export const syncBytesPerStatement = 500_000;
 
@@ -82,8 +83,16 @@ type SessionRow = typeof sessions.$inferSelect;
 type ReportRow = typeof sessionReports.$inferSelect;
 type EntryRow = typeof planEntries.$inferSelect;
 
-/** The session fields of a catalog row or a report, absent where the column is null. */
-function sessionFrom(row: SessionRow | ReportRow) {
+/**
+ * Every column of the catalog row but the abstract: what every read of a
+ * session selects, so the abstract is neither carried nor fetched by a
+ * schedule, a search or a feed (ADR 0025). Only `abstracts` reads it.
+ */
+export const catalogColumns = (({ abstract: _abstract, ...columns }) => columns)(getTableColumns(sessions));
+type CatalogRow = Omit<SessionRow, "abstract">;
+
+/** The session fields of a catalog row or a report, absent where the column is null. Never the abstract. */
+function sessionFrom(row: CatalogRow | ReportRow) {
   const session: Omit<CatalogSession, "lastSeenAt"> = { sessionId: row.sessionId, eventId: row.eventId };
   if (row.code !== null) session.code = row.code;
   if (row.title !== null) session.title = row.title;
@@ -95,14 +104,27 @@ function sessionFrom(row: SessionRow | ReportRow) {
   if (row.endsAt !== null) session.endsAt = row.endsAt;
   if (row.isAllDay !== null) session.isAllDay = row.isAllDay;
   if (row.speakers !== null) session.speakers = row.speakers;
-  if (row.topics !== null) session.topics = row.topics;
+  for (const tag of sessionTags) {
+    const values = row[tag];
+    if (values !== null) session[tag] = values;
+  }
   return session;
 }
 
-export const fromSessionRow = (row: SessionRow): CatalogSession => ({ ...sessionFrom(row), lastSeenAt: row.lastSeenAt });
+export const fromSessionRow = (row: CatalogRow): CatalogSession => ({ ...sessionFrom(row), lastSeenAt: row.lastSeenAt });
 
-/** A report as a JSON row for `selectFromJson(sessionReports)`, its search text folded on the way. */
-const reportJson = (report: SessionReport): Record<string, unknown> => ({
+/** A report's column name for each descriptive list (`areasOfInterest` is `areas_of_interest`). */
+const tagColumn = (tag: (typeof sessionTags)[number]) => getTableColumns(sessionReports)[tag].name;
+
+/**
+ * A report as a JSON row for `selectFromJson(sessionReports)`, its search text
+ * folded on the way. An absent field is left out rather than written as null
+ * (`json_extract` reads a missing key as NULL either way), which keeps a
+ * large sync's chunks small.
+ */
+const reportJson = (report: SessionReport): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(reportColumns(report)).filter(([, value]) => value !== null));
+const reportColumns = (report: SessionReport): Record<string, unknown> => ({
   event_id: report.eventId,
   session_id: report.sessionId,
   attendee_id: report.attendeeId,
@@ -117,7 +139,8 @@ const reportJson = (report: SessionReport): Record<string, unknown> => ({
   ends_at: report.endsAt ?? null,
   is_all_day: report.isAllDay ?? null,
   speakers: report.speakers ?? null,
-  topics: report.topics ?? null,
+  abstract: report.abstract ?? null,
+  ...Object.fromEntries(sessionTags.map((tag) => [tagColumn(tag), report[tag] ?? null])),
   code_folded: report.code === undefined ? null : foldText(report.code),
   title_folded: report.title === undefined ? null : foldText(report.title),
   speakers_folded: report.speakers === undefined ? null : foldSpeakers(report.speakers),
@@ -198,7 +221,8 @@ const consensusColumns: Partial<Record<keyof SessionRow, SQL>> = {
   isAllDay: voted("is_all_day", ["is_all_day"]),
   speakers: voted("speakers", ["speakers"]),
   speakersFolded: voted("speakers_folded", ["speakers"], true),
-  topics: voted("topics", ["topics"]),
+  abstract: voted("abstract", ["abstract"]),
+  ...Object.fromEntries(sessionTags.map((tag) => [tag, voted(tagColumn(tag), [tagColumn(tag)])])),
   startsAt: voted("starts_at", ["starts_at", "ends_at"]),
   endsAt: voted("ends_at", ["starts_at", "ends_at"]),
   lastSeenAt: sql.raw(
@@ -226,7 +250,7 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
   return {
     async session(eventId, sessionId) {
       const [row] = await db
-        .select()
+        .select(catalogColumns)
         .from(sessions)
         .where(and(eq(sessions.eventId, eventId), eq(sessions.sessionId, sessionId)))
         .limit(1);
@@ -235,7 +259,7 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
 
     async sessions(eventId, sessionIds) {
       const rows = await db
-        .select()
+        .select(catalogColumns)
         .from(sessions)
         .where(and(eq(sessions.eventId, eventId), sql`${sessions.sessionId} in ${jsonList(sessionIds)}`));
       return rows.map(fromSessionRow);
@@ -256,8 +280,17 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
       }
       if (filter.startsFrom !== undefined) conditions.push(gte(sessions.startsAt, filter.startsFrom));
       if (filter.startsBefore !== undefined) conditions.push(lt(sessions.startsAt, filter.startsBefore));
+      if (filter.type !== undefined) conditions.push(eq(sessions.type, filter.type));
+      if (filter.level !== undefined) conditions.push(eq(sessions.level, filter.level));
+      for (const [list, value] of [
+        [sessions.topics, filter.topic],
+        [sessions.tracks, filter.track],
+        [sessions.services, filter.service],
+      ] as const) {
+        if (value !== undefined) conditions.push(sql`exists (select 1 from json_each(${list}) where value = ${value})`);
+      }
       const rows = await db
-        .select()
+        .select(catalogColumns)
         .from(sessions)
         .where(and(...conditions))
         .orderBy(...sessionOrder)
@@ -277,7 +310,35 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
             sql`${sessionReports.sessionId} in ${jsonList(sessionIds)}`,
           ),
         );
-      return rows.map((row) => ({ ...sessionFrom(row), attendeeId: row.attendeeId, reportedAt: row.reportedAt }));
+      return rows.map((row) => {
+        const report: SessionReport = { ...sessionFrom(row), attendeeId: row.attendeeId, reportedAt: row.reportedAt };
+        if (row.abstract !== null) report.abstract = row.abstract;
+        return report;
+      });
+    },
+
+    async hasReported(attendeeId, eventId) {
+      const [row] = await db
+        .select({ one: sql`1` })
+        .from(sessionReports)
+        .where(and(eq(sessionReports.attendeeId, attendeeId), eq(sessionReports.eventId, eventId)))
+        .limit(1);
+      return row !== undefined;
+    },
+
+    async abstracts(eventId, sessionIds) {
+      if (sessionIds.length === 0) return new Map();
+      const rows = await db
+        .select({ sessionId: sessions.sessionId, abstract: sessions.abstract })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.eventId, eventId),
+            sql`${sessions.sessionId} in ${jsonList(sessionIds)}`,
+            sql`${sessions.abstract} is not null`,
+          ),
+        );
+      return new Map(rows.map((row) => [row.sessionId, row.abstract!]));
     },
 
     async entry(attendeeId, eventId, sessionId) {
@@ -294,7 +355,7 @@ export function scheduleOnD1(db: Database): ScheduleRepository {
 
     async schedule(attendeeId, eventId) {
       const rows = await db
-        .select({ entry: planEntries, session: sessions, hidden: isHidden })
+        .select({ entry: planEntries, session: catalogColumns, hidden: isHidden })
         .from(planEntries)
         .innerJoin(
           sessions,

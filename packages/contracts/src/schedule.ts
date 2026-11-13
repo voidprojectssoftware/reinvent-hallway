@@ -3,10 +3,11 @@
 //
 // The sync input accepts AWS's own `Session` shape (the AWS Events API spec,
 // docs/discovery/aws-events-api/openapi-2026-11-13.json) so an agent can pass
-// `GetSession` output straight through. `abstract` and the taxonomies other
-// than `topics` are accepted so that pass-through validates, and are never
-// read: packages/domain's `toSession` copies only the fields Hallway keeps
-// (ADR 0003), and no resource below has an abstract to carry.
+// `GetSession` output straight through. Hallway keeps all of it but AWS's
+// live state (`isReservable`, `seatAvailability`), which is accepted so the
+// pass-through validates and never read (ADR 0025). The abstract leaves
+// Hallway only on search and get, and only to a reader the domain's
+// `canReadAbstract` allows.
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { Person } from "./identity.ts";
@@ -19,6 +20,12 @@ export const SessionId = z
 
 const taxonomy = z.array(z.string()).max(100).optional();
 
+/**
+ * Far above any abstract AWS writes (about a thousand characters), so a real
+ * one always passes and a sync cannot be used to store a book.
+ */
+const abstractMaxLength = 20_000;
+
 /** AWS's `Session`, as `GetSession` returns it or `ListSessions` lists it. */
 export const AwsSession = z
   .object({
@@ -27,8 +34,12 @@ export const AwsSession = z
     abbreviation: z.string().optional().meta({ description: "The public session code, e.g. `AIM3315`." }),
     abstract: z
       .string()
+      .max(abstractMaxLength)
       .optional()
-      .meta({ description: "Accepted so AWS's shape passes through, then discarded. Leave it out to keep the call small." }),
+      .meta({
+        description:
+          "AWS's description of the session, as `GetSession` gives it. Kept, and shown only to attendees whose own agent has synced sessions.",
+      }),
     type: z.string().optional(),
     level: z.string().optional(),
     venue: z.string().optional(),
@@ -94,6 +105,7 @@ export const ConnectionsGoing = z
 export type ConnectionsGoing = z.infer<typeof ConnectionsGoing>;
 
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
+const tagList = (description: string) => z.array(z.string()).optional().meta({ description });
 
 export const Session = z
   .object({
@@ -109,7 +121,22 @@ export const Session = z
     endsAt: instant.optional(),
     isAllDay: z.boolean().optional(),
     speakers: z.array(z.string()).optional(),
-    topics: z.array(z.string()).optional(),
+    abstract: z.string().optional().meta({
+      description:
+        "AWS's plain-text description, from what attendees' agents sent. Only on search and get, and only to an attendee whose own agent has synced sessions for this event: AWS shows it only to registered attendees. Render it as text.",
+    }),
+    tracks: tagList("Programming tracks, e.g. `Developer Productivity`."),
+    topics: tagList("Technology domains, e.g. `Artificial Intelligence`."),
+    industries: tagList("Industries it is aimed at."),
+    areasOfInterest: tagList("Broader interest areas, e.g. `Generative AI`."),
+    roles: tagList("Job roles it is aimed at, e.g. `Developer / Engineer`."),
+    services: tagList("AWS services it covers, e.g. `Amazon Bedrock`."),
+    segments: tagList("Audience segments, e.g. `Enterprise`."),
+    features: tagList("Format labels, e.g. `Interactive`."),
+    customerPersonas: tagList("Customer personas it is aimed at."),
+    experiences: tagList("Programs it belongs to; attendance may be limited to that program's participants."),
+    additionalActivities: tagList("Activities that go with it."),
+    focusAreas: tagList("Focus areas it is tagged with."),
     url: z
       .url()
       .optional()
@@ -122,7 +149,7 @@ export const Session = z
   .meta({
     id: "Session",
     description:
-      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. No abstract: follow `url` to read it.",
+      "One session as the catalog shows it: per field, what most attendees' agents report of it. Times are UTC; show them in the event's timezone. `abstract` only to attendees whose own agent has synced; otherwise follow `url` to read it on re:Invent.",
   });
 export type Session = z.infer<typeof Session>;
 
@@ -231,6 +258,8 @@ export type SetEntryHiddenBody = z.infer<typeof SetEntryHiddenBody>;
 export const SetEntryHiddenInput = SessionScope.extend(SetEntryHiddenBody.shape);
 export type SetEntryHiddenInput = z.infer<typeof SetEntryHiddenInput>;
 
+const tagFilter = (description: string) => z.string().trim().min(1).max(200).optional().meta({ description });
+
 export const SearchSessionsQuery = z.object({
   q: z
     .string()
@@ -244,6 +273,11 @@ export const SearchSessionsQuery = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .meta({ description: "A day in the event's timezone; matches sessions starting on it.", example: "2026-12-01" }),
+  type: tagFilter("The session type, exactly as sessions carry it, e.g. `Breakout session`."),
+  level: tagFilter("The level, exactly as sessions carry it, e.g. `300 - Advanced`."),
+  topic: tagFilter("One of the session's `topics`, exactly, e.g. `Artificial Intelligence`."),
+  track: tagFilter("One of the session's `tracks`, exactly."),
+  service: tagFilter("One of the session's `services`, exactly, e.g. `Amazon Bedrock`."),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 

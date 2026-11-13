@@ -6,6 +6,7 @@ import {
   MySchedule,
   PlanEntry,
   SearchSessionsInput,
+  Session,
   SessionList,
   SessionScope,
   SyncResult,
@@ -23,9 +24,9 @@ import { asToolOutput } from "./server.ts";
 export const syncMyScheduleDescription = [
   "Put the user's AWS re:Invent 2026 schedule on Hallway, so the people they know can see where they will be. Hallway cannot read AWS itself; you read it from the AWS Events MCP server and send it here.",
   "1. Call the AWS Events MCP tool `GetSchedule` with eventId `reinvent2026`. It returns `favorites` and `reserved`, two lists of session ids, and `invitedSessions`, whole sessions the event placed on the user's schedule.",
-  "2. Call AWS `GetSession` for each id in `favorites` and `reserved` (or, for many ids, page through AWS `ListSessions` with `includeAbstracts=false` and keep the ones you need).",
+  "2. Call AWS `GetSession` for each id in `favorites` and `reserved`, and keep each full `session` object. For a large schedule you may instead page through AWS `ListSessions` (it includes abstracts by default) and keep the sessions whose ids are in the two lists.",
   "3. Call this tool once, with eventId `reinvent2026`, every session object in `sessions` exactly as AWS returned it, the two id lists exactly as `GetSchedule` gave them, and `invitedSessions` exactly as `GetSchedule` gave it.",
-  "Leave `abstract` out of each session if you can: Hallway never stores or shows it, and dropping it keeps a large schedule within your tool-input limits. Sessions shaped like `ListSessions` with `includeAbstracts=false` are exactly right.",
+  "Send whole session objects, `abstract`, speakers and every list (`topics`, `tracks`, `services`, `roles` and the rest) included: Hallway keeps them so people can see what a session is. The abstract is shown only to attendees whose own agent has synced, never publicly. If one call would be too large for your tool input, send both id lists in full every time and split the session objects across calls: Hallway keeps the sessions it already has, so the last call leaves the whole schedule.",
   "Each call replaces what your last sync put on Hallway: un-favorited sessions are removed, reservations and invitations show as reserved (invitations marked `invited`), and sessions the user added or hid on Hallway are kept. The same input twice changes nothing. An id sent without a session object that Hallway has never seen is skipped and listed in `missingSessions`; call `GetSession` for those and sync again.",
   "Send only the user's own sessions, copied from AWS. A session object for an id in none of the lists is ignored. The session details everyone sees are what most attendees' agents report, so one agent's copying mistake does not change a session for others.",
   "Hallway never reserves, cancels or favorites anything on AWS, and writes nothing back to AWS. To reserve a seat, use AWS `ReserveSessions` or follow the session's `url`.",
@@ -62,12 +63,25 @@ export function registerScheduleTools(server: McpServer, handlers: Handlers, act
     {
       title: "Search sessions",
       description:
-        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker, ignoring case and accents) and by `day` in Las Vegas time (`2026-12-01`). Times are UTC instants. Each session's `url` opens it on the re:Invent site.",
+        "Search Hallway's re:Invent session catalog (the sessions attendees' agents have synced, not all of AWS's) by text (`q`: code, title or speaker, ignoring case and accents), by `day` in Las Vegas time (`2026-12-01`), and by exact `type`, `level`, `topic`, `track` or `service` as sessions carry them. Times are UTC instants. Each session's `url` opens it on the re:Invent site. Sessions carry their `abstract` only once the user's own agent has synced their schedule (`sync_my_schedule`).",
       inputSchema: SearchSessionsInput,
       outputSchema: asToolOutput(SessionList),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (input) => toolResult(await handlers.searchSessions(actor, input)),
+  );
+
+  server.registerTool(
+    "get_session",
+    {
+      title: "Get one session",
+      description:
+        "One session from Hallway's catalog by its AWS `sessionId`: when and where (UTC instants; show them in Las Vegas time), speakers, type, level, topics, tracks, services and the rest, with the user's connections going. Its `abstract` is there only once the user's own agent has synced their schedule (`sync_my_schedule`). Its `url` opens it on the re:Invent site.",
+      inputSchema: SessionScope,
+      outputSchema: asToolOutput(Session),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async (input) => toolResult(await handlers.getSession(actor, input)),
   );
 
   server.registerTool(

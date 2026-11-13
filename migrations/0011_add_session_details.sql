@@ -1,0 +1,24 @@
+ALTER TABLE `session_reports` ADD `abstract` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `tracks` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `industries` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `areas_of_interest` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `roles` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `services` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `segments` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `features` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `customer_personas` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `experiences` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `additional_activities` text;--> statement-breakpoint
+ALTER TABLE `session_reports` ADD `focus_areas` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `abstract` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `tracks` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `industries` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `areas_of_interest` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `roles` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `services` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `segments` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `features` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `customer_personas` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `experiences` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `additional_activities` text;--> statement-breakpoint
+ALTER TABLE `sessions` ADD `focus_areas` text;

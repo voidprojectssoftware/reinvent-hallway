@@ -13,11 +13,15 @@ export {
   toSession,
   mergeSnapshot,
   consensus,
+  canReadAbstract,
+  withoutAbstract,
+  sessionTags,
   foldText,
   foldSpeakers,
   sessionUrl,
   type AwsSession,
   type SessionReport,
+  type AbstractReader,
 } from "./sessions";
 export { toLocal, dayBounds, localWindow } from "./time";
 export {
