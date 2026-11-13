@@ -62,7 +62,7 @@ erDiagram
 
 | Resource | What it is | Key fields |
 | --- | --- | --- |
-| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `email` |
+| **Attendee** | A person on Hallway | `id`, `handle` (share URL `/@handle`), `displayName`, `headline`, `avatarUrl`, `linkedinProfileUrl` (claimed, unverified), `visibility` (`public` \| `connections` \| `private`, default `connections`). Private: `linkedinSub`, `verifiedName` (LinkedIn's name, not editable), `email` (stored only when LinkedIn says it is verified) |
 | **Event** | re:Invent 2026, as AWS describes it | `eventId` (`reinvent2026`), `name`, `timezone` (`America/Los_Angeles`), `startDate`, `endDate`. Seeded, not user-created |
 | **Session** | A catalog snapshot of one session | `sessionId` (AWS's), `eventId`, `code` (AWS `abbreviation`, e.g. `AIM3315`), `title`, `type`, `level`, `venue`, `room`, `startsAt`/`endsAt` (UTC instants, derived from AWS's local date, time, length and the event timezone), `isAllDay`, `speakers[]` (names), `topics[]`, `url` (derived, see below), `lastSeenAt`. **No abstract** |
 | **Plan entry** | One session on one attendee's schedule | `attendeeId`, `sessionId`, `intent` (`interested` = AWS favorite, `reserved` = AWS reservation), `source` (`agent-sync` \| `manual`), `hidden` (bool), `addedAt` |
@@ -76,7 +76,7 @@ erDiagram
 
 ### Session link
 
-`url` is derived from `code` by one configured template,
+`url` is not stored: the contract resource derives it from `code` with `sessionUrl(code, template)` and one configured template,
 `SESSION_URL_TEMPLATE`. The default is the re:Invent catalog searched for the
 code. **Assumption** (no public deep-link format was found): the template is one
 config value precisely so that it can change without a migration. See issue
@@ -96,7 +96,7 @@ We store UTC instants and the event timezone, and render in the event timezone
   - `private`: the attendee only.
   - A `hidden` plan entry is never shown to anyone but its owner, and never
     counted in "who is going".
-  - One function decides this (`canView(viewer, owner)`), and every read path
+  - One function decides this (`canViewSchedule(viewer, owner, areConnected)`, with `visibleEntries` for the entries), and every read path
     (REST, MCP, calendar feed, share image, link preview) goes through it.
 - **Sync replaces, never duplicates.** `SyncSchedule` for an event makes the
   attendee's `agent-sync` entries exactly equal to the sent favorites and
@@ -110,8 +110,8 @@ We store UTC instants and the event timezone, and render in the event timezone
   only when the other side accepts. Accepting via someone's share link counts as
   their consent (they shared it) and yours (you clicked Connect).
 - **Suggestions need two matching facts.** A contact suggests an attendee when
-  the profile URL matches **and** the name matches the attendee's LinkedIn
-  verified name, or the email hash matches the attendee's verified email. A
+  the profile URL matches **and** the contact's name matches the attendee's
+  `verifiedName` (accents, case and spacing ignored, nothing fuzzier), or the email hash matches the attendee's verified email. A
   claimed URL alone suggests no one: anyone can claim any URL.
 - **Agent tokens act as their attendee**, for that attendee's data and that
   attendee's view of others. Never more.
@@ -147,7 +147,7 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetSession(sessionId)` | the session, and which of my connections are going |
 | `WhoIsGoing(sessionIds[])` | per session, my connections going (respecting visibility and hidden) |
 | `NetworkAgenda(eventId, from, to)` | sessions in a window that my connections plan to attend, with who |
-| `FindMeetingGaps(handle, day)` | windows on a day when neither I nor that connection has a visible entry |
+| `FindMeetingGaps(handle, day)` | windows on a day, in event time, when neither I nor that connection has a visible entry. All-day sessions (the expo and the like) do not block a gap |
 | `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule |
 | `ShareImage(handle, day?)` | a PNG of the visible schedule, for posting |
 
