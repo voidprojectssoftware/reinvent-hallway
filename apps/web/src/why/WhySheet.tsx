@@ -69,18 +69,13 @@ function WhySheet({ section, sessionUrl, onClose }: WhyProps & { onClose: () => 
   }, [section]);
 
   // Into body, as the share sheet: a fixed sheet inside the blurred nav bar
-  // or a group would be pinned to it.
+  // or a group would be pinned to it. Unlike the share sheet, the dialog
+  // that takes focus is the panel that scrolls, not the dimmed page around
+  // it: this sheet is mostly text, longer than a phone's screen, and the
+  // arrow keys and Page Down scroll only what has focus or holds it.
   return createPortal(
-    <div
-      className="sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="why-t"
-      tabIndex={-1}
-      ref={dialog}
-      onClick={(event) => event.target === event.currentTarget && onClose()}
-    >
-      <div className="sheet-in">
+    <div className="sheet" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="sheet-in" role="dialog" aria-modal="true" aria-labelledby="why-t" tabIndex={-1} ref={dialog}>
         <div className="sheet-grab" aria-hidden="true" />
         <div className="sheet-g">
           <div className="sheet-t">
