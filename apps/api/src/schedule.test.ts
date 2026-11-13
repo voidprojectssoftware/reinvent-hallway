@@ -422,6 +422,10 @@ describe("the abstract reaches only an attendee whose synced abstract another at
     return bodies;
   }
 
+  /** What my schedule says about my reading abstracts, for the Session screen's reason (issue #88). */
+  const readsAbstracts = async (reader: string) =>
+    ((await (await rest("/api/events/reinvent2026/my-schedule", reader)).json()) as MySchedule).readsAbstracts;
+
   const expectNone = async (who: string, reader: string | undefined) => {
     for (const body of await carryingReads(reader)) {
       expect(body, who).toContain("AIM3315");
@@ -441,6 +445,7 @@ describe("the abstract reaches only an attendee whose synced abstract another at
     // yet corroborates her abstracts, so she cannot read them (issue #83).
     await syncOverMcp(ana.id, syncInput());
     await expectNone("first reporter", ana.id);
+    expect(await readsAbstracts(ana.id)).toBe(false);
 
     // Cy's agent synced, but its one snapshot was of a session not on Cy's
     // schedule: nothing was kept, so nothing proves AWS let Cy read the catalog.
@@ -466,6 +471,8 @@ describe("the abstract reaches only an attendee whose synced abstract another at
     for (const body of await carryingReads(bo.id)) expect(body).toContain(abstract);
     for (const body of await carryingReads(ana.id)) expect(body).toContain(abstract);
     await expectNone("forger, after honest reporters agree", dee.id);
+    const readers = [ana, bo, cy, dee].map((who) => who.id);
+    expect(await Promise.all(readers.map(readsAbstracts))).toEqual([true, true, false, false]);
   });
 
   it("no other read path carries it, even to a verified reader", async () => {
