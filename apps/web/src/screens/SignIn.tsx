@@ -1,46 +1,53 @@
-// Sign in: LinkedIn, and on a developer's machine a dev sign-in by name.
-// Each shows only when the API says it is on (GET /api/auth/options), so a
-// build served anywhere else never offers dev sign-in, and a server without
-// LinkedIn credentials never offers a button that answers 404. A failed or
-// missing answer counts as both off.
+// Sign in: one button per provider the server has set up (Google, Microsoft,
+// LinkedIn, GitHub, in that order: GET /api/auth/options), and on a
+// developer's machine a dev sign-in by name. Each shows only when the API
+// says it is on, so a build served anywhere else never offers dev sign-in,
+// and a provider without credentials never offers a button that answers 404.
+// A failed or missing answer counts as all off.
 //
 // A page that sends someone here to sign in names itself in `?returnTo=`
-// (a person's page, a session): both ways of signing in land back there, and
-// someone already signed in goes straight there (`returnPathOf`).
+// (a person's page, a session): every way of signing in lands back there,
+// and someone already signed in goes straight there (`returnPathOf`).
 //
-// The provider buttons are a list drawn from the options, so a provider the
-// server adds is one more row in `providers`, not another branch here.
+// A provider that refused comes back here with `?error=<kind>&provider=<p>`
+// (ADR 0018), said under the buttons; `account-exists` has its own page.
 import { useState, type FormEvent } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router";
-import { api, linkedInSignInHref, type SignInOptions } from "../api/client.ts";
+import { api, type SignInOptions } from "../api/client.ts";
+import { ProviderButtons } from "../signin/ProviderButtons.tsx";
+import { refusalOf, signInRefusalText, type Refusal } from "../signin/providers.ts";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, type Failed } from "../shell/Foot.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, returnPathOf } from "../shell/signed-in.ts";
 
-export async function signInLoader({ request }: { request: Request }): Promise<SignInOptions & { returnTo: string | null }> {
-  const returnTo = returnPathOf(new URL(request.url));
-  const [me, options] = await Promise.all([
-    ifSignedIn(api.me()).catch(() => null),
-    api.signInOptions().catch(() => ({ devSignIn: false, providers: [], linkedIn: false })),
-  ]);
+const noOptions: SignInOptions = { devSignIn: false, providers: [], linkedIn: false };
+
+/** What both sign-in screens need: the options, where to go back to, and who is signed in already. */
+export async function signInOptionsFor(url: URL): Promise<SignInOptions & { returnTo: string | null }> {
+  const returnTo = returnPathOf(url);
+  const [me, options] = await Promise.all([ifSignedIn(api.me()).catch(() => null), api.signInOptions().catch(() => noOptions)]);
   if (me) throw redirect(returnTo ?? "/");
   return { ...options, returnTo };
 }
 
-/** Each way to sign in that leaves for a provider, when the server says it is on. */
-const providers: { on: (options: SignInOptions) => boolean; label: string; href: (returnTo: string | null) => string; note: string }[] = [
-  {
-    on: (options) => options.linkedIn,
-    label: "Sign in with LinkedIn",
-    href: linkedInSignInHref,
-    note: "Hallway gets your name, picture and email from LinkedIn. Never your connections or your posts.",
-  },
-];
+export async function signInLoader({ request }: { request: Request }): Promise<
+  SignInOptions & { returnTo: string | null; refusal: Refusal | null }
+> {
+  const url = new URL(request.url);
+  const refusal = refusalOf(url);
+  if (refusal?.kind === "account-exists") {
+    const next = new URLSearchParams();
+    if (refusal.provider) next.set("provider", refusal.provider);
+    const returnTo = returnPathOf(url);
+    if (returnTo) next.set("returnTo", returnTo);
+    throw redirect(`/sign-in/account-exists${next.size > 0 ? `?${next}` : ""}`);
+  }
+  return { ...(await signInOptionsFor(url)), refusal };
+}
 
 export function SignIn() {
-  const { returnTo, ...options } = useLoaderData<typeof signInLoader>();
-  const offered = providers.filter((provider) => provider.on(options));
+  const { returnTo, refusal, providers, devSignIn } = useLoaderData<typeof signInLoader>();
   return (
     <Screen
       title="Hallway"
@@ -50,18 +57,19 @@ export function SignIn() {
           : "See where the people you know will be at re:Invent 2026, and let your agent plan around them."
       }
     >
-      {offered.map((provider) => (
-        <section className="section" key={provider.label}>
-          <a className="btn block" href={provider.href(returnTo)}>
-            {provider.label}
-          </a>
-          <p className="gfoot">{provider.note}</p>
+      {providers.length > 0 && (
+        <section className="section">
+          <ProviderButtons providers={providers} returnTo={returnTo} />
+          <Foot failed={refusal && { failure: signInRefusalText(refusal) }}>
+            Hallway gets your name, picture and email from the account you choose
+            {providers.includes("github") && ", and from GitHub who you follow there"}. Never your posts or your contacts.
+          </Foot>
         </section>
-      ))}
+      )}
 
-      {options.devSignIn && <DevSignIn returnTo={returnTo} />}
+      {devSignIn && <DevSignIn returnTo={returnTo} />}
 
-      {offered.length === 0 && !options.devSignIn && (
+      {providers.length === 0 && !devSignIn && (
         <Empty icon="lock" title="Signing in is not open yet">
           This Hallway has no way to sign in set up. Try again later.
         </Empty>
