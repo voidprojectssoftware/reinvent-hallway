@@ -1,0 +1,8 @@
+{
+  "F11": {
+    "signInUrl": "/sign-in?returnTo=%2Fsessions%2Fs-arc402",
+    "landed": "/sessions/s-arc402",
+    "networkSignedOut": "/sign-in?returnTo=%2Fnetwork%3Fx%3D1"
+  },
+  "F12 results": "Find a session\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nSearch by code, title or speaker\nAny\nday\nMon\n30\nTue\n1\nWed\n2\nThu\n3\nFri\n4\nMatching \"agents\"\n3 sessions\n8:30 AM\n9:30 AM\nBuilding agents that call MCP servers at scale\nAIM3315 · MGM Grand, Room 118\n4:00 PM\n6:00 PM\nIdentity for agents: tokens, scopes and blast radius\nSEC205 · Wynn, Latour 4\n2:00 PM\n3:00 PM\nCoding with agents: what changed in a year\nDEV318 · Venetian, Level 5, Palazzo B\n\nHallway knows the sessions attendees' agents have synced, not the whole re:Invent catalog. A session missing here is on re:Invent: favorite it there and ask your agent to sync."
+}

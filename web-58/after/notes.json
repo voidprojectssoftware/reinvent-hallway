@@ -1,0 +1,91 @@
+{
+  "F1 alt texts": [
+    "The link preview people see when you post your link",
+    "Your whole week, the picture to save and post"
+  ],
+  "F2a text": [
+    "Hallway could not be reached. Check your connection and try again. Try again"
+  ],
+  "F2b text": "Network\nThis screen did not load\n\nHallway had a problem. Try again in a moment.\n\nTry again",
+  "F2b after Try again": "Network",
+  "F4 keyboard walk 390": [
+    "open -> in sheet: div \"Share my week127.0.0.1:28588/@alice-owne\"",
+    "Tab 1 -> in sheet: button \"Anyone\"",
+    "Tab 2 -> in sheet: button \"Connections\"",
+    "Tab 3 -> in sheet: button \"Only me\"",
+    "Tab 4 -> in sheet: button \"Copy link\"",
+    "Tab 5 -> in sheet: button \"Copy invite link\"",
+    "Tab 6 -> in sheet: a \"Post on LinkedIn\"",
+    "Tab 7 -> in sheet: a \"Save picture\"",
+    "Tab 8 -> in sheet: button \"Make a calendar link\"",
+    "Tab 9 -> in sheet: button \"Reset invite link\"",
+    "Tab 10 -> in sheet: button \"Cancel\"",
+    "Tab 11 -> in sheet: button \"Anyone\"",
+    "Tab 12 -> in sheet: button \"Connections\"",
+    "Tab 13 -> in sheet: button \"Only me\"",
+    "Tab 14 -> in sheet: button \"Copy link\"",
+    "Escape -> OUTSIDE: button \"Share my week\""
+  ],
+  "F4 keyboard walk 1280": [
+    "open -> in sheet: div \"Share my week127.0.0.1:28588/@alice-owne\"",
+    "Tab 1 -> in sheet: button \"Anyone\"",
+    "Tab 2 -> in sheet: button \"Connections\"",
+    "Tab 3 -> in sheet: button \"Only me\"",
+    "Tab 4 -> in sheet: button \"Copy link\"",
+    "Tab 5 -> in sheet: button \"Copy invite link\"",
+    "Tab 6 -> in sheet: a \"Post on LinkedIn\"",
+    "Tab 7 -> in sheet: a \"Save picture\"",
+    "Tab 8 -> in sheet: button \"Make a calendar link\"",
+    "Tab 9 -> in sheet: button \"Reset invite link\"",
+    "Tab 10 -> in sheet: button \"Cancel\"",
+    "Tab 11 -> in sheet: button \"Anyone\"",
+    "Tab 12 -> in sheet: button \"Connections\"",
+    "Tab 13 -> in sheet: button \"Only me\"",
+    "Tab 14 -> in sheet: button \"Copy link\"",
+    "Escape -> OUTSIDE: button \"Share my week\""
+  ],
+  "F5 titles 390": [
+    "/@ben-okafor: Ben Okafor · Hallway",
+    "Network: Network · Hallway",
+    "/: My week · Hallway",
+    "/connect: Connect your agent · Hallway",
+    "/settings: Settings · Hallway",
+    "/settings/profile: Profile · Hallway",
+    "/sessions/s-aim3315: Building agents that call MCP servers at scale · Hallway"
+  ],
+  "F5 titles 1280": [
+    "/@ben-okafor: Ben Okafor · Hallway",
+    "Network: Network · Hallway",
+    "/: My week · Hallway",
+    "/connect: Connect your agent · Hallway",
+    "/settings: Settings · Hallway",
+    "/settings/profile: Profile · Hallway",
+    "/sessions/s-aim3315: Building agents that call MCP servers at scale · Hallway"
+  ],
+  "F6 lengths in the fields": [
+    100,
+    200
+  ],
+  "F6 message": [
+    "A name is at most 100 characters."
+  ],
+  "F7 last sync": "Last sync\n2 sessions, just now\n2 added, 0 removed, 0 unchanged\nSee my week",
+  "F7 token still shown": 1,
+  "F8 Eve Empty": "My week\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nYour agent found nothing to add\n\nYour agent synced 19 minutes ago and found no favorites or reservations on re:Invent. Favorite or reserve sessions there and ask your agent again, or find a session here and add it.\n\nFind a session",
+  "F8 Finn Fresh": "My week\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nNothing on your week yet\n\nAsk your agent to put your re:Invent favorites and reservations here, or find a session and add it.\n\nConnect your agent\nFind a session",
+  "F9 Hallway command": "claude mcp add --transport http \\\n  --scope user hallway http://127.0.0.1:28588/mcp \\\n  --header \"Authorization: Bearer hw_…\"",
+  "F10a back label": "Ben Okafor",
+  "F10a back goes to": "/@ben-okafor",
+  "F10b/c": [
+    "person from session: \"AIM3315\"",
+    "session from person: \"Ben Okafor\"",
+    "back goes to /@ben-okafor",
+    "back again goes to /sessions/s-aim3315"
+  ],
+  "F11": {
+    "signInUrl": "/sign-in?returnTo=%2Fsessions%2Fs-arc402",
+    "landed": "/sessions/s-arc402",
+    "networkSignedOut": "/sign-in?returnTo=%2Fnetwork%3Fx%3D1"
+  },
+  "F12 results": "Find a session\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nSearch by code, title or speaker\nAny\nday\nMon\n30\nTue\n1\nWed\n2\nThu\n3\nFri\n4\nMatching \"security\"\n0 sessions\nNo session found\n\nTry a session code such as AIM3315, a word from the title, or a speaker's name.\n\nHallway knows the sessions attendees' agents have synced, not the whole re:Invent catalog. A session missing here is on re:Invent: favorite it there and ask your agent to sync."
+}

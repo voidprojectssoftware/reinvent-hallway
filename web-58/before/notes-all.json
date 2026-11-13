@@ -1,0 +1,84 @@
+{
+  "F1 alt texts": [
+    "The picture of your week that goes with the link"
+  ],
+  "F2a text": [
+    "Could not reach Hallway: TypeError: Failed to fetch"
+  ],
+  "F2b text": "Hallway\nCould not load this screen\n\nGET /api/me/connections?eventId=reinvent2026 answered 500.",
+  "F2b after Try again": "no Try again button",
+  "F4 keyboard walk 390": [
+    "open -> in sheet: button \"Cancel\"",
+    "Tab 1 -> OUTSIDE: body \"My weekMy weekre:Invent 2026 · times are\"",
+    "Tab 2 -> OUTSIDE: button \"Share my week\"",
+    "Tab 3 -> OUTSIDE: button \"Monday 30 November\"",
+    "Tab 4 -> OUTSIDE: button \"Tuesday 1 December\"",
+    "Tab 5 -> OUTSIDE: button \"Wednesday 2 December\"",
+    "Tab 6 -> OUTSIDE: button \"Thursday 3 December\"",
+    "Tab 7 -> OUTSIDE: button \"Friday 4 December\"",
+    "Tab 8 -> OUTSIDE: a \"7:30 PM9:00 PMMonday Night LiveKEY001 · \"",
+    "Tab 9 -> OUTSIDE: a \"My week\"",
+    "Tab 10 -> OUTSIDE: a \"Network\"",
+    "Tab 11 -> OUTSIDE: a \"Agent\"",
+    "Tab 12 -> OUTSIDE: a \"Settings\"",
+    "Tab 13 -> in sheet: button \"Copy link\"",
+    "Tab 14 -> in sheet: button \"Copy invite link\"",
+    "Escape -> OUTSIDE: body \"My weekMy weekre:Invent 2026 · times are\""
+  ],
+  "F4 keyboard walk 1280": [
+    "open -> in sheet: button \"Cancel\"",
+    "Tab 1 -> OUTSIDE: body \"My weekMy weekre:Invent 2026 · times are\"",
+    "Tab 2 -> OUTSIDE: button \"Share my week\"",
+    "Tab 3 -> OUTSIDE: button \"Monday 30 November\"",
+    "Tab 4 -> OUTSIDE: button \"Tuesday 1 December\"",
+    "Tab 5 -> OUTSIDE: button \"Wednesday 2 December\"",
+    "Tab 6 -> OUTSIDE: button \"Thursday 3 December\"",
+    "Tab 7 -> OUTSIDE: button \"Friday 4 December\"",
+    "Tab 8 -> OUTSIDE: a \"7:30 PM9:00 PMMonday Night LiveKEY001 · \"",
+    "Tab 9 -> OUTSIDE: a \"My week\"",
+    "Tab 10 -> OUTSIDE: a \"Network\"",
+    "Tab 11 -> OUTSIDE: a \"Agent\"",
+    "Tab 12 -> OUTSIDE: a \"Settings\"",
+    "Tab 13 -> in sheet: button \"Copy link\"",
+    "Tab 14 -> in sheet: button \"Copy invite link\"",
+    "Escape -> OUTSIDE: body \"My weekMy weekre:Invent 2026 · times are\""
+  ],
+  "F5 titles 390": [
+    "/@ben-okafor: Ben Okafor at re:Invent 2026 · Hallway",
+    "Network: Ben Okafor at re:Invent 2026 · Hallway",
+    "/: Hallway",
+    "/connect: Hallway",
+    "/settings: Hallway",
+    "/settings/profile: Hallway",
+    "/sessions/s-aim3315: Hallway"
+  ],
+  "F5 titles 1280": [
+    "/@ben-okafor: Ben Okafor at re:Invent 2026 · Hallway",
+    "Network: Ben Okafor at re:Invent 2026 · Hallway",
+    "/: Hallway",
+    "/connect: Hallway",
+    "/settings: Hallway",
+    "/settings/profile: Hallway",
+    "/sessions/s-aim3315: Hallway"
+  ],
+  "F6 lengths in the fields": [
+    130,
+    260
+  ],
+  "F6 message": [
+    "[ { \"origin\": \"string\", \"code\": \"too_big\", \"maximum\": 100, \"inclusive\": true, \"path\": [ \"displayName\" ], \"message\": \"Too big: expected string to have <=100 characters\" }, { \"origin\": \"string\", \"code\": \"too_big\", \"maximum\": 200, \"inclusive\": true, \"path\": [ \"headline\" ], \"message\": \"Too big: expected string to have <=200 characters\" } ]"
+  ],
+  "F7 last sync": "Last sync\n2 sessions, 4 minutes ago\n2 added, 0 removed, 0 unchanged\nSee my week",
+  "F7 token still shown": 1,
+  "F8 Eve Empty": "My week\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nNothing on your week yet\n\nAsk your agent to put your re:Invent favorites and reservations here, or add a session from its page.\n\nConnect your agent",
+  "F8 Finn Fresh": "My week\n\nre:Invent 2026 · times are Las Vegas time (PST)\n\nNothing on your week yet\n\nAsk your agent to put your re:Invent favorites and reservations here, or add a session from its page.\n\nConnect your agent",
+  "F9 Hallway command": "claude mcp add --transport http \\\n  hallway http://127.0.0.1:28588/mcp \\\n  --header \"Authorization: Bearer hw_…\"",
+  "F10a back label": "My week",
+  "F10a back goes to": "/sign-in",
+  "F11": {
+    "signInUrl": "/sign-in?returnTo=%2Fsessions%2Fs-arc402",
+    "landed": "/sessions/s-arc402",
+    "networkSignedOut": "/sign-in"
+  },
+  "F12": "no way to search from My week"
+}

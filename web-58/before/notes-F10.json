@@ -1,0 +1,10 @@
+{
+  "F10a back label": "My week",
+  "F10a back goes to": "/sign-in",
+  "F10b/c": [
+    "person from session: \"Network\"",
+    "session from person: \"My week\"",
+    "back goes to /",
+    "back again goes to /"
+  ]
+}
