@@ -14,7 +14,7 @@ import { clashLabel } from "../clash.ts";
 import { Icon } from "../shell/Icon.tsx";
 import { dayChip, eventDate, formatDate, formatMinute, formatTime, formatTimeRange, minuteOfDay } from "../time.ts";
 import { hoursShown, layoutDay, slotMinutes, slotParam, spanOf, type Span } from "./calendar.ts";
-import { DayChips, pickDate } from "./DayChips.tsx";
+import { DayChips, DayCount, pickDate } from "./DayChips.tsx";
 import { sessionName, sessionPath } from "./EntryCell.tsx";
 
 export interface CalendarEntry {
@@ -64,7 +64,11 @@ export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing
   const busy = (date: string) => timed.some(({ span }) => span.date === date) || allDay.some((entry) => onDate(entry.session, date));
   const chosen = pickDate(search.get("day"), dates, busy);
   const shown = sideBySide ? dates : [chosen];
-  const hours = hoursShown(timed.map(({ span }) => span));
+  const timedShown = sideBySide ? timed : timed.filter(({ span }) => span.date === chosen);
+  // One day on a phone runs over its own hours, not the week's (#114): an
+  // 11:30 PM session on Wednesday no longer gives Tuesday five empty hours to
+  // scroll past. Side by side, the days share one axis.
+  const hours = hoursShown(timedShown.map(({ span }) => span));
   const maxLanes = Math.floor(dayWidth / narrowestBlock);
   const allDayShown = allDay.filter((entry) => shown.some((date) => onDate(entry.session, date)));
   const today = eventDate(now);
@@ -80,9 +84,7 @@ export function WeekCalendar<E extends CalendarEntry>({ entries, dates, clashing
               <span className="day-name">The week</span> <small>{count(timed.length + allDayShown.length)}</small>
             </h2>
           ) : (
-            <h2 className="ghead big">
-              <span className="day-name">{formatDate(chosen)}</span> <small>{count(timed.filter(({ span }) => span.date === chosen).length + allDayShown.length)}</small>
-            </h2>
+            <DayCount date={chosen} count={timedShown.length + allDayShown.length} />
           )}
           {toggle}
         </div>
@@ -211,7 +213,7 @@ function Block({ entry, name, going, clash, crossesMidnight = false }: BlockProp
           <span className="cal-b-flag clash narrow-only">Clash</span>
         </>
       )}
-      {entry.hidden && <span className="cal-b-flag">Hidden from others</span>}
+      {entry.hidden && <span className="cal-b-flag hidden-flag">Hidden from others</span>}
       {crossesMidnight && <span className="cal-b-flag">Runs past midnight</span>}
     </Link>
   );

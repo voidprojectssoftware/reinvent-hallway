@@ -374,6 +374,37 @@ body.loading main {
     font: var(--t-headline);
   }
 }
+/* One day's header is its count only, in the group header's footnote style:
+   the pressed chip just above says the day (#114). */
+.day-head .day-count {
+  margin: 0 0 0 var(--sp-4);
+}
+
+/* The day chips stay under the nav bar while a day scrolls (#114), on My
+   week, a person's calendar and map, and Sessions: on a twelve-session day
+   another day is otherwise seven screens back up. They reach the gutters so
+   nothing shows beside them, and once the page has scrolled they take the
+   bar's blur and the hairline the bar gives up. */
+.days {
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 10;
+  margin-inline: calc(-1 * var(--gutter));
+  padding-inline: var(--gutter);
+  background: var(--bg);
+}
+body:has(.nav.scrolled) .days {
+  background: var(--bar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 0.5px 0 var(--sep);
+}
+body:has(main .days) .nav.scrolled {
+  border-bottom-color: transparent;
+}
+.days + .section {
+  margin-top: var(--sp-3);
+}
 .week-view {
   flex: none;
   display: inline-flex;
@@ -622,7 +653,10 @@ body.loading main {
   .cal-b-title {
     -webkit-line-clamp: 2;
   }
-  .cal-b-place {
+  /* A short hidden block has no line for the words; its eye glyph and
+     dashed edge still say it (#114). */
+  .cal-b-place,
+  .cal-b-flag.hidden-flag {
     display: none;
   }
 }
