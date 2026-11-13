@@ -27,13 +27,14 @@
 
   // apps/web's build (ADR 0005). Assets answer first, except on the paths
   // below, which are the Worker's; any other path that is not a file gets
-  // index.html, the SPA's client-side route. Until apps/web exists,
-  // scripts/dev.mjs points this at an empty folder (wrangler refuses a
-  // missing one) and the Worker answers 404 for non-API paths.
+  // index.html, the SPA's client-side route. scripts/dev.mjs builds apps/web
+  // here before wrangler starts (it refuses a missing directory) and keeps
+  // rebuilding it on change.
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/mcp", "/mcp/*", "/cal/*"],
+    // /@* is the web app's, but served by the Worker: src/person-page.ts.
+    "run_worker_first": ["/api/*", "/mcp", "/mcp/*", "/cal/*", "/@*"],
   },
 }

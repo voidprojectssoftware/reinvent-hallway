@@ -78,6 +78,9 @@ free one if taken; `HALLWAY_PORT` overrides) and keeps D1 under this checkout's
 it prints; never assume 8787. Stop it by its own process (Ctrl-C, or the pid
 you started), never with a pattern that matches other worktrees' servers.
 
+- The web app is at `/` on the same origin. `npm run dev` builds `apps/web`
+  first and rebuilds it on every change (no hot reload: reload the page;
+  ADR 0010). `/sign-in` is the sign-in screen.
 - `GET /api/events/reinvent2026`, `GET /api/openapi.json`, MCP at `/mcp`
   (streamable HTTP, stateless).
 - Dev sign-in, a stand-in until real sign-in lands: send
