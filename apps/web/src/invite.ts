@@ -8,7 +8,8 @@
 // tab's sessionStorage instead: not in the URL, where it would sit in history
 // and be copied with the address; not in a loader's data or a log. It must be
 // kept somewhere that outlives a page load, because signing in with LinkedIn
-// leaves the app and comes back to `/` (the callback takes no return path).
+// leaves the app and comes back to `/` (the callback takes no return path:
+// #46 asks for one).
 //
 // sessionStorage can be missing or refuse (a private window, blocked site
 // data); then the invite is simply not held, and the page offers a plain

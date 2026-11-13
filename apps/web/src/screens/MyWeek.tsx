@@ -16,7 +16,7 @@ import { Empty } from "../shell/Empty.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { requireSignIn } from "../shell/signed-in.ts";
-import { dayChip, eventDate, eventDates, formatDate, zoneAbbreviation } from "../time.ts";
+import { dayChip, eventDate, eventDates, formatAgo, formatDate, zoneAbbreviation } from "../time.ts";
 
 type GoingBySession = Map<string, Person[]>;
 
@@ -108,9 +108,10 @@ export function MyWeek() {
             </div>
           </div>
         )}
-        {/* TODO(#37): "Synced from your agent 12 minutes ago", from
-            lastSync on GET /api/events/{eventId}/my-schedule once #37 lands. */}
-        <p className="gfoot">Reserving happens on re:Invent; Hallway shows what you reserved there.</p>
+        <p className="gfoot">
+          {schedule.lastSync && `Synced from your agent ${formatAgo(schedule.lastSync.syncedAt)}. `}
+          Reserving happens on re:Invent; Hallway shows what you reserved there.
+        </p>
       </section>
 
       {untimed.length > 0 && (

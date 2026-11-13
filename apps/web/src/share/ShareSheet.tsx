@@ -8,6 +8,7 @@
 // comes with a way to reset it.
 import type { ShareLinks } from "@hallway/contracts";
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api/client.ts";
 import { copyText } from "../copy.ts";
 import { failureText } from "../shell/Foot.tsx";
@@ -67,7 +68,10 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
   }
 
   const page = links && new URL(links.pageUrl);
-  return (
+  // Into body, not where the Share button sits: the nav bar's backdrop-filter
+  // makes it the containing block of anything fixed inside it, which pinned
+  // the sheet to the bar's 44 px.
+  return createPortal(
     <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="share-t" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="sheet-in">
         <div className="sheet-grab" aria-hidden="true" />
@@ -123,7 +127,8 @@ export function ShareSheet({ onClose }: { onClose: () => void }) {
           Cancel
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

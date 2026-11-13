@@ -2,12 +2,14 @@
 // to re:Invent, and its place on my week. Never an abstract (ADR 0003): the
 // description is read on re:Invent, behind the one button. Anyone may open a
 // session; the "On your week" part is for someone signed in.
-import type { PlanEntry, Session as SessionResource } from "@hallway/contracts";
+import { goingFacesShown, type Person, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useParams, useRevalidator } from "react-router";
 import { api, ApiFailure } from "../api/client.ts";
 import { EVENT_ID } from "../event.ts";
 import { IntentBadge, sessionName } from "../schedule/EntryCell.tsx";
+import { whoIsGoing } from "../schedule/going.ts";
+import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, failureText } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
@@ -17,7 +19,7 @@ import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
 
 type Loaded =
   | { found: false }
-  | { found: true; session: SessionResource; signedIn: boolean; entry: PlanEntry | null };
+  | { found: true; session: SessionResource; signedIn: boolean; entry: PlanEntry | null; going: Person[] };
 
 export async function sessionLoader({ params }: { params: { sessionId?: string } }): Promise<Loaded> {
   const sessionId = params.sessionId ?? "";
@@ -29,11 +31,19 @@ export async function sessionLoader({ params }: { params: { sessionId?: string }
     ifSignedIn(api.mySchedule(EVENT_ID)),
   ]);
   if (!session) return { found: false };
+  // The session carries the first few of my connections going; when there
+  // are more, who-is-going names them all.
+  const shown = session.connectionsGoing;
+  const going =
+    shown && shown.count > goingFacesShown
+      ? ((await whoIsGoing(api, EVENT_ID, [sessionId])).get(sessionId) ?? shown.people)
+      : (shown?.people ?? []);
   return {
     found: true,
     session,
     signedIn: schedule !== null,
     entry: schedule?.entries.find((e) => e.sessionId === sessionId) ?? null,
+    going,
   };
 }
 
@@ -51,7 +61,7 @@ export function Session() {
       </Screen>
     );
   }
-  const { session, signedIn, entry } = loaded;
+  const { session, signedIn, entry, going } = loaded;
   const sub = [session.code, session.type, session.level].filter(Boolean);
 
   return (
@@ -99,8 +109,7 @@ export function Session() {
         </section>
       )}
 
-      {/* TODO(#33): "Your connections going" (ghead with the count, then a
-          cell per person with their intent badge), from #15's GetSession. */}
+      {signedIn && <ConnectionsGoing people={going} />}
     </Screen>
   );
 }
@@ -226,6 +235,41 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
         A hidden session stays on your week and calendar, and no one else sees it or counts it.
         {synced && " Your agent put it here: to remove it, drop it on re:Invent and sync again."}
       </Foot>
+    </section>
+  );
+}
+
+/** "Your connections going": a cell per person, linking to their week. */
+function ConnectionsGoing({ people }: { people: Person[] }) {
+  return (
+    <section className="section">
+      <h2 className="ghead">
+        Your connections going <span>{people.length}</span>
+      </h2>
+      <ul className="group">
+        {people.length === 0 ? (
+          <li>
+            <div className="cell">
+              <span className="cellmain cellsub">None of your connections has this on their week yet.</span>
+            </div>
+          </li>
+        ) : (
+          people.map((person) => (
+            <li key={person.id}>
+              <Link className="cell lead-av" to={`/@${person.handle}`}>
+                <Avatar person={person} />
+                <div className="cellmain">
+                  <span className="celltitle">{person.displayName}</span>
+                  {person.headline && <span className="cellsub">{person.headline}</span>}
+                </div>
+                {/* TODO(#46): the design's Reserved or Interested badge per person needs their intent,
+                    which who-is-going does not carry. */}
+                <Icon name="chev" className="chev" />
+              </Link>
+            </li>
+          ))
+        )}
+      </ul>
     </section>
   );
 }
