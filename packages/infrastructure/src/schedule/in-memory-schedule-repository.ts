@@ -3,6 +3,7 @@ import {
   consensus,
   foldSpeakers,
   foldText,
+  isCorroborated,
   planSync,
   withoutAbstract,
   type PlanEntry,
@@ -78,8 +79,11 @@ export function scheduleInMemory(): ScheduleRepository {
       });
     },
 
-    async hasReported(attendeeId, eventId) {
-      return [...reportsBySession.values()].some((byAttendee) => byAttendee.get(attendeeId)?.eventId === eventId);
+    async hasCorroboratedAbstract(attendeeId, eventId) {
+      return [...reportsBySession.values()].some((byAttendee) => {
+        const reports = [...byAttendee.values()];
+        return reports[0]?.eventId === eventId && isCorroborated(attendeeId, reports);
+      });
     },
 
     async abstracts(eventId, sessionIds) {

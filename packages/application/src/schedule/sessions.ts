@@ -80,5 +80,8 @@ async function abstractReader(
   eventId: string,
 ): Promise<AbstractReader | null> {
   if (actor.kind !== "attendee") return null;
-  return { attendeeId: actor.attendeeId, hasReportedSessions: await schedule.hasReported(actor.attendeeId, eventId) };
+  return {
+    attendeeId: actor.attendeeId,
+    abstractCorroborated: await schedule.hasCorroboratedAbstract(actor.attendeeId, eventId),
+  };
 }
