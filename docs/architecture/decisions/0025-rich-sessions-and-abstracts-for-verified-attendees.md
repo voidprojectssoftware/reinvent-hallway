@@ -1,7 +1,8 @@
 # 0025. Keep what attendees' agents send of a session; abstracts only for verified attendees
 
 Date: 2026-11-13. Status: accepted. Issue #74; amends ADR 0003 ("we keep no
-abstracts").
+abstracts"). Decisions 3 and 4's gate, and the note on corroboration, are
+superseded by the correction at the end (issue #103): descriptions are public.
 
 The owner, 2026-11-13: "can we make it where we get as much information about
 a session as we can from the attendee submitting it to us so we can render
@@ -152,3 +153,68 @@ earlier reporter of the session on each sync, and a stored verdict would need
 revoking when an abstract changes, for no saving over one indexed read);
 fuzzy matching (it narrows the gap a forger has to close); keeping the gate as
 it was.
+
+## Correction, 2026-11-13: descriptions are public (issue #103)
+
+**The premise was wrong.** "The catalog is gated by design" holds for the
+Events **API**, not for AWS's website. Measured 2026-11-13 by the
+orchestrator in a real browser, signed out: AWS's public catalog page
+(`https://registration.awsevents.com/flow/awsevents/reinvent2026/eventcatalog/page/eventcatalog`)
+lists 2,588 sessions, each with its title, code, type, level, features and
+**full description**. Opening it with `?search=<code>` puts that session
+first (tried `ANT319-R1` and `SEC205`). Only the API needs a signed-in,
+registered attendee. The owner, the same day: "This is available without
+signing in so why can't we have the descriptions / information shown in the
+public event catalog?"
+
+**Decision, superseding decision 3, the gate in decision 4, and the note on
+corroboration (#83):**
+
+1. **A session's description is shown to everyone who can see the session**,
+   signed in or not, like every other field. `canReadAbstract`,
+   `isCorroborated`, `readsAbstracts` and the Session screen's reader states
+   (#88, #96) are gone.
+2. **Which text is shown is still the reporters' consensus (ADR 0016, and
+   decision 5 above)**, so one forger cannot rewrite a description that two
+   honest reporters agree on.
+3. **Descriptions still come only from attendees' agents.** Hallway never
+   fetches or scrapes the public catalog page or the service behind it: the
+   Site Terms quoted above prohibit "data mining, robots, or similar data
+   gathering and extraction tools". Every session keeps its link to AWS's
+   page, which is how someone reads a session nobody has synced yet. The
+   `sync_my_schedule` description tells agents Hallway accepts only the
+   sessions on the user's own schedule, never a catalog dump; the sync
+   already drops a snapshot for a session in none of its lists (#67).
+4. **Only search and get carry it**, as before, now for size rather than
+   secrecy: the largest field stays off schedules, agendas and sync results.
+   Link previews, share images and the calendar feed stay title, time and
+   venue, by design rather than as a secret. Held by the same construction
+   (`catalogColumns`, the one `abstracts` read) and the same tests, which now
+   assert that everyone reads the consensus description, that a lone forger
+   cannot change one two honest reporters agree on, and that no description
+   reaches OG tags, share images or the calendar feed.
+5. **Credit.** Wherever a description shows, one plain line: "Session details
+   from the AWS re:Invent catalog", linking to the session's AWS page. The
+   Session screen shows it; search and get's tool and field descriptions ask
+   agents to do the same.
+6. **Off switch.** `SHOW_SESSION_DESCRIPTIONS` (a Worker var, `"1"` in
+   `wrangler.jsonc`; `"0"` turns it off) hides descriptions from search and
+   get, the only reads that carry them, so from REST, MCP and the web at once,
+   if AWS ever asks. Stored descriptions are kept, so turning it back on needs
+   no resync. `schedule.test.ts` proves off removes them for every reader.
+7. **Session link.** `SESSION_URL_TEMPLATE` defaults to the measured search
+   link above (closing #19); the old default's path
+   (`event-catalog/page/eventCatalog`) was wrong.
+
+**Migration 0013's abstract keys are dropped** (migration 0015, column and
+index). Consensus never used them: it votes on the abstract's text, as on
+every other field, in SQL and in the domain alike. Their one reader was
+corroboration, which is gone, so keeping them would have been a write per
+report and an index nobody reads. Hallway is not deployed, so this touches
+only local databases.
+
+**Rejected:** fetching descriptions from the public page ourselves (the Site
+Terms); dropping consensus for the description now that it is public (a lone
+agent could then rewrite what everyone reads); adding descriptions to the
+link preview, share image or feed (they are about where someone will be, and
+a description makes a post or calendar entry long without helping it).

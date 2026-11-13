@@ -3,7 +3,6 @@ import {
   consensus,
   foldSpeakers,
   foldText,
-  isCorroborated,
   planSync,
   withoutAbstract,
   type PlanEntry,
@@ -13,7 +12,7 @@ import {
 /** The fake: answers as the D1 repository does (schedule-repository.test.ts holds both to it). */
 export function scheduleInMemory(): ScheduleRepository {
   const catalog = new Map<string, CatalogSession>();
-  /** Kept beside the catalog, as only `abstracts` reads it (ADR 0025). */
+  /** Kept beside the catalog, as only `abstracts` reads it (ADR 0025, issue #103). */
   const abstractOf = new Map<string, string>();
   const reportsBySession = new Map<string, Map<string, SessionReport>>();
   /** Entries without their hidden state, which lives in `hidden`. */
@@ -76,13 +75,6 @@ export function scheduleInMemory(): ScheduleRepository {
       return [...new Set(sessionIds)].flatMap((id) => {
         const report = reportsBySession.get(sessionKey(eventId, id))?.get(attendeeId);
         return report ? [structuredClone(report)] : [];
-      });
-    },
-
-    async hasCorroboratedAbstract(attendeeId, eventId) {
-      return [...reportsBySession.values()].some((byAttendee) => {
-        const reports = [...byAttendee.values()];
-        return reports[0]?.eventId === eventId && isCorroborated(attendeeId, reports);
       });
     },
 

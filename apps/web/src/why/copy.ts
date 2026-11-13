@@ -1,7 +1,8 @@
 // The words of the "Why?" sheet (issue #87), in one place so every screen
 // that opens it says the same thing. Each sentence states one of the facts
-// listed on the issue, which come from docs/discovery/aws-events-api.md and
-// ADRs 0003 and 0025; a new sentence needs a fact there first. Plain terms
+// listed on the issues (#87, #103), which come from
+// docs/discovery/aws-events-api.md and ADRs 0003 and 0025; a new sentence
+// needs a fact there first. Plain terms
 // ("your AWS sign-in"), and no blame on AWS.
 
 /** The part of the sheet a "Why?" link opens on. */
@@ -13,9 +14,8 @@ export const whySections: Record<WhySection, { heading: string; paragraphs: stri
   description: {
     heading: "The full description",
     paragraphs: [
-      "re:Invent's session catalog is not public. AWS shows it only to registered attendees who are signed in. Hallway only knows what attendees' own agents send.",
-      "To respect that, Hallway shows the full description once your synced schedule confirms you can read the catalog. That happens when another attendee's agent sends the same description for one of your sessions. Hallway never shows it on public pages or link previews.",
-      "Until then, open it on re:Invent. Everyone can open the session there.",
+      "Hallway shows the descriptions attendees' own agents send when they sync their schedules. Hallway never copies them from the re:Invent site itself.",
+      "For a session nobody has synced yet, open it on re:Invent. Everyone can open the session there.",
     ],
   },
   schedule: {
@@ -32,19 +32,11 @@ export const whySections: Record<WhySection, { heading: string; paragraphs: stri
 /** The closing next step: the session on re:Invent when there is one, else a fresh sync. */
 export const whyNext = { open: "Open on re:Invent", sync: "Sync again with your agent" } as const;
 
-/**
- * Where the reader stands with descriptions (issue #88), for the Session
- * screen's line under "Open on re:Invent" when it shows none.
- */
-export type DescriptionReader = "signed-out" | "never-synced" | "unconfirmed" | "confirmed";
+/** The Session screen's line under "Open on re:Invent" when it shows no description (issue #103). */
+export const noDescription = "Hallway has no description of this session yet. Open it on re:Invent.";
 
-/** Why this reader sees no description of this session. */
-export const whyNoDescription: Record<DescriptionReader, string> = {
-  "signed-out": "Hallway shows descriptions only to signed-in attendees whose synced schedule confirms they can read the catalog.",
-  "never-synced": "Descriptions show here once your agent syncs your schedule and another attendee's agent sends the same description for one of your sessions.",
-  unconfirmed: "Descriptions show here once another attendee's agent sends the same description for one of your sessions.",
-  confirmed: "Hallway has no description of this session yet.",
-};
+/** The credit under a description, linking to the session's page on re:Invent (issue #103). */
+export const descriptionCredit = "Session details from the AWS re:Invent catalog";
 
 /** Connect your agent's one line on why an agent is the way in. */
 export const whyAgentLine = "AWS's Events API only works for a program on your own computer, such as your agent.";

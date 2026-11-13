@@ -362,24 +362,31 @@ describe("the share card's fonts", () => {
   });
 });
 
-describe("what leaves Hallway never carries an abstract (ADR 0025)", () => {
-  it("not the link preview nor the share card of a verified owner, whoever asks", async () => {
-    // Sam's agent synced the fixture, abstracts included, and so did Ola's,
-    // which corroborates Sam's: Sam may read them on Hallway.
+describe("what leaves Hallway never carries an abstract (ADR 0025, issue #103)", () => {
+  it("not the link preview, the public card nor the owner's picture, though anyone may read it on Hallway", async () => {
+    // Sam's agent synced the fixture, abstracts included. The description is
+    // public on Hallway (AWS publishes it), yet what leaves Hallway stays
+    // title, time and venue, by design.
     const me = await attendee("Sam Okafor", "public");
-    await attendee("Ola Bello", "private");
-    const session = await call("/api/events/reinvent2026/sessions/s-aim3315", { as: me.id });
+    const session = await call("/api/events/reinvent2026/sessions/s-aim3315");
     expect(await session.text()).toContain("ABSTRACT-TEXT-AIM3315");
 
-    for (const as of [undefined, me.id]) {
-      const card = await call(`/og/${me.handle}.png`, as ? { as } : {});
-      expect(card.status).toBe(200);
+    const cards: [string, string | undefined][] = [
+      [`/og/${me.handle}.png`, undefined],
+      [`/og/${me.handle}.png`, me.id],
+      ["/api/me/share-image.png", me.id],
+      ["/api/me/share-image.png?session=s-aim3315", me.id],
+    ];
+    for (const [path, as] of cards) {
+      const card = await call(path, as ? { as } : {});
+      expect(card.status, path).toBe(200);
     }
-    expect(drawn).toHaveLength(2);
+    expect(drawn).toHaveLength(cards.length);
     for (const card of drawn) {
       const texts = cardTexts(card).join("\n");
-      expect(texts).toContain("Monday Night Live");
+      expect(texts).toContain("Sam Okafor at re:Invent 2026");
       expect(texts).not.toContain("ABSTRACT-TEXT");
+      expect(texts).not.toContain("public catalog");
     }
 
     const shell = "<!doctype html><html><head><title>Hallway</title></head><body></body></html>";

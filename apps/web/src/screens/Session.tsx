@@ -1,10 +1,10 @@
 // One session (docs/design/session.html): when, where, who speaks, what it
 // is about and who it is for, the link to re:Invent, and its place on my
-// week. The abstract comes only to an attendee one of whose synced
-// descriptions another attendee's agent has matched (ADR 0025), and is AWS's
-// plain text, so it is rendered as text, never as HTML. Without one, the line
-// under "Open on re:Invent" says why for where the reader stands (issue #88). Anyone may open a session; the "On your week" part is for someone
-// signed in.
+// week. The abstract is shown to everyone, as attendees' agents sent it, with
+// a credit linking to the session on re:Invent (ADR 0025, issue #103). It is
+// AWS's plain text, so it is rendered as text, never as HTML. Without one,
+// the line under "Open on re:Invent" says so. Anyone may open a session; the
+// "On your week" part is for someone signed in.
 import { goingFacesShown, type GoingPerson, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useParams, useRevalidator } from "react-router";
@@ -20,8 +20,7 @@ import { Icon, type IconName } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
 import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
-import { whyNoDescription, type DescriptionReader } from "../why/copy.ts";
-import { descriptionReader } from "../why/reader.ts";
+import { descriptionCredit, noDescription } from "../why/copy.ts";
 import { WhyLink } from "../why/WhySheet.tsx";
 
 type Loaded =
@@ -30,8 +29,6 @@ type Loaded =
       found: true;
       session: SessionResource;
       signedIn: boolean;
-      /** Why I might see no description: signed out, never synced, or not yet corroborated. */
-      reader: DescriptionReader;
       entry: PlanEntry | null;
       going: GoingPerson[];
     };
@@ -57,7 +54,6 @@ export async function sessionLoader({ params }: { params: { sessionId?: string }
     found: true,
     session,
     signedIn: schedule !== null,
-    reader: descriptionReader(schedule),
     entry: schedule?.entries.find((e) => e.sessionId === sessionId) ?? null,
     going,
   };
@@ -78,7 +74,7 @@ export function Session() {
       </Screen>
     );
   }
-  const { session, signedIn, reader, entry, going } = loaded;
+  const { session, signedIn, entry, going } = loaded;
   const sub = [session.code, session.type, session.level].filter(Boolean);
 
   return (
@@ -105,6 +101,15 @@ export function Session() {
           <div className="group">
             <p className="cell abstract">{session.abstract}</p>
           </div>
+          <p className="gfoot">
+            {session.url ? (
+              <a href={session.url} target="_blank" rel="noopener">
+                {descriptionCredit}
+              </a>
+            ) : (
+              descriptionCredit
+            )}
+          </p>
         </section>
       )}
 
@@ -121,15 +126,8 @@ export function Session() {
             ? "This session has no code yet, so there is no re:Invent link for it."
             : session.abstract
               ? "Seats and reservations are on the re:Invent site."
-              : "The description, seats and reservations are on the re:Invent site."}
-          {!session.abstract && ` ${whyNoDescription[reader]}`}{" "}
+              : `${noDescription} Seats and reservations are there too.`}{" "}
           <WhyLink section={session.abstract ? "schedule" : "description"} sessionUrl={session.url} />
-          {!session.abstract && reader === "never-synced" && (
-            <>
-              {" "}
-              <Link to="/connect">Connect your agent</Link>
-            </>
-          )}
         </p>
       </section>
 

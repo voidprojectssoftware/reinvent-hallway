@@ -2,10 +2,11 @@
 // built. Sessions are facts about the event, not about anyone, so any actor
 // may read them; a signed-in asker also sees how many of their connections
 // are going, with a few faces, from one read for the whole list. These two
-// are the only read paths that may carry an abstract, and only to a reader
-// the domain's `canReadAbstract` allows (ADR 0025).
+// are the only read paths that carry a session's abstract, to anyone who can
+// see the session (AWS publishes it: ADR 0025, corrected by issue #103), and
+// only while SHOW_SESSION_DESCRIPTIONS is on.
 import { goingFacesShown, type SearchSessionsInput, type Session, type SessionList, type SessionScope } from "@hallway/contracts";
-import { canReadAbstract, dayBounds, type AbstractReader } from "@hallway/domain";
+import { dayBounds } from "@hallway/domain";
 import type { Actor } from "../actor.ts";
 import { noEvent } from "../events/get-event.ts";
 import { fail, ok, type Outcome } from "../outcome.ts";
@@ -50,9 +51,9 @@ export function getSession(dependencies: ScheduleDependencies): GetSession {
   };
 }
 
-/** Sessions as the asker sees them: with their connections going, and the abstract if the rule allows. */
+/** Sessions as the asker sees them: with their connections going, and the abstract while descriptions are shown. */
 async function asResources(
-  { schedule, sessionUrlTemplate, connectionsGoing }: ScheduleDependencies,
+  { schedule, sessionUrlTemplate, connectionsGoing, showSessionDescriptions }: ScheduleDependencies,
   actor: Actor,
   eventId: string,
   sessions: readonly CatalogSession[],
@@ -60,9 +61,7 @@ async function asResources(
   const ids = sessions.map((session) => session.sessionId);
   const [going, abstracts] = await Promise.all([
     connectionsGoing(actor, eventId, ids),
-    abstractReader(schedule, actor, eventId).then((reader) =>
-      canReadAbstract(reader) ? schedule.abstracts(eventId, ids) : undefined,
-    ),
+    showSessionDescriptions ? schedule.abstracts(eventId, ids) : undefined,
   ]);
   return sessions.map((session) => {
     const resource: Session = sessionResource(session, sessionUrlTemplate);
@@ -74,14 +73,3 @@ async function asResources(
   });
 }
 
-async function abstractReader(
-  schedule: ScheduleDependencies["schedule"],
-  actor: Actor,
-  eventId: string,
-): Promise<AbstractReader | null> {
-  if (actor.kind !== "attendee") return null;
-  return {
-    attendeeId: actor.attendeeId,
-    abstractCorroborated: await schedule.hasCorroboratedAbstract(actor.attendeeId, eventId),
-  };
-}
