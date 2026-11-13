@@ -3,7 +3,7 @@
 // and editing over REST, and the two agreeing.
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getEvent, identityHandlers, scheduleHandlers } from "@hallway/application";
+import { getEvent, identityHandlers, scheduleHandlers, sharingHandlers } from "@hallway/application";
 import type { MySchedule, SyncResult } from "@hallway/contracts";
 import { eventsInMemory, identityInMemory, reinvent2026, scheduleInMemory } from "@hallway/infrastructure";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -44,7 +44,14 @@ beforeEach(() => {
         sessionUrlTemplate: "https://example.test/catalog?search={code}",
         now: () => new Date("2026-11-13T12:00:00.000Z"),
       }),
+      sharing: sharingHandlers({
+        ...identityInMemory(),
+        events,
+        schedule,
+        sessionUrlTemplate: "https://example.test/catalog?search={code}",
+      }),
     }),
+    renderPng: async () => new Uint8Array(),
   });
   // Handlers are built per request; the fake store under them lives for the test.
   call = async (input, init) => app.fetch(new Request(input, init), bindings);
