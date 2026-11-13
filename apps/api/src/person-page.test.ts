@@ -84,6 +84,15 @@ describe("/@handle", () => {
     expect(html).toContain("<title>Jane &quot;JD&quot; &lt;Doe&gt; at re:Invent 2026 · Hallway</title>");
   });
 
+  it("gives the same tags with or without an invite token, and never repeats the token", async () => {
+    const page = async (path: string) =>
+      (await personPage(new URL(`https://hallway.example${path}`), assets(), answering(shared()))).text();
+    const bare = await page("/@jane.doe");
+    const invited = await page("/@jane.doe?invite=SECRET-INVITE-TOKEN");
+    expect(invited).toBe(bare);
+    expect(invited).not.toContain("SECRET-INVITE-TOKEN");
+  });
+
   it("previews a schedule the public may not see as the name alone, and keeps it out of search", async () => {
     const response = await personPage(
       new URL("https://hallway.example/@jane.doe"),

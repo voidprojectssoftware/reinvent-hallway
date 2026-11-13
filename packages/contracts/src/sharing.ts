@@ -18,6 +18,9 @@ export const ShareLinks = z
           "My secret iCalendar feed. Absent until a feed is made (`POST /api/me/calendar-feed/rotate`), and never given to an agent token.",
         example: "https://hallway.example/cal/AbC.ics",
       }),
+    // TODO(#33): the secret invite link (`/@handle?invite=<token>`, owner only)
+    // goes here as an optional `inviteUrl` once the network slice's invite
+    // (#38) is on mvp. `pageUrl` stays the bare link, which connects no one.
   })
   .meta({ id: "ShareLinks", description: "What the share sheet offers: my page, its picture, my calendar feed." });
 export type ShareLinks = z.infer<typeof ShareLinks>;
