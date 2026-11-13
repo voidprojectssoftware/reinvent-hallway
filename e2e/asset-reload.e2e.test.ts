@@ -119,10 +119,16 @@ it("serves a rebuild of the web app within seconds, without a restart", async ()
   const started = Date.now();
   build("index-bbbb2222.js", "second build");
 
+  // Poll until both the bundle and index.html's ETag have changed (#98). One
+  // poll is two requests, and wrangler's reload can fall between them: the
+  // page comes from the old runtime (fresh body, old ETag) and the bundle,
+  // held while the proxy pauses, from the new one. The next poll has both.
+  // Measured over 45 runs: always the same reload, 45 to 52 ms apart in 2 runs
+  // under load, never an ETag left stale.
   let now = before;
   while (Date.now() - started < withinMs) {
     now = await served("/sign-in");
-    if (now.body.includes("second build")) break;
+    if (now.body.includes("second build") && now.etag !== before.etag) break;
     await new Promise((done) => setTimeout(done, 100));
   }
   expect(now.bundle, `served after ${Date.now() - started} ms\n${output}`).toBe("/assets/index-bbbb2222.js");
