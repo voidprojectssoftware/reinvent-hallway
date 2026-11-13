@@ -6,7 +6,8 @@ import {
   claimedProfileUrlPrefix,
   type AttendeeRecord,
   type AttendeeRepository,
-  type ConnectionPlan,
+  type NetworkMemberRecord,
+  type NetworkPlan,
   type ConnectionRequestRecord,
   type ContactImportRecord,
   type IdentityRecord,
@@ -14,7 +15,7 @@ import {
   type NetworkRepository,
   type ScheduleRepository,
 } from "@hallway/application";
-import type { Connection, ImportedContact } from "@hallway/domain";
+import type { Connection, FollowSource, ImportedContact, Tie } from "@hallway/domain";
 
 /** The attendee fake, which can also list everyone and every identity (the D1 one joins the tables instead). */
 export interface ListableAttendees extends AttendeeRepository {
@@ -41,6 +42,47 @@ export function networkInMemory({
       if (other !== attendeeId && invite.token === token) throw new Error("UNIQUE constraint failed: invite_tokens.token");
     }
     invites.set(attendeeId, { token, rotatedAt });
+  };
+
+  // A follow names a GitHub account or an attendee, as the follows table does;
+  // a GitHub one reaches whoever has linked that account at the time of asking.
+  interface FollowRow {
+    follower: string;
+    source: FollowSource;
+    target: string;
+    since: string;
+  }
+  let followRows: FollowRow[] = [];
+  const followee = async ({ source, target }: FollowRow) =>
+    source === "linkedin-import" ? target : (await attendees.identity("github", target))?.attendeeId;
+  const replaceFollows = (follower: string, source: FollowSource, targets: readonly string[], at: string) => {
+    const kept = new Set(targets);
+    followRows = followRows.filter((row) => row.follower !== follower || row.source !== source || kept.has(row.target));
+    for (const target of kept) {
+      if (!followRows.some((row) => row.follower === follower && row.source === source && row.target === target)) {
+        followRows.push({ follower, source, target, since: at });
+      }
+    }
+  };
+  const tieOf = async (viewer: string, owner: string): Promise<Tie> => {
+    let followedByOwner = false;
+    for (const row of followRows) {
+      if (row.follower === owner && (await followee(row)) === viewer) followedByOwner = true;
+    }
+    return { connected: pairs.has(key(viewer, owner)), followedByOwner };
+  };
+  /** My connections, and everyone I follow who is on Hallway, never me. */
+  const networkIds = async (me: string) => {
+    const ids = new Set<string>();
+    for (const connection of pairs.values()) {
+      if (connection.a === me || connection.b === me) ids.add(otherEnd(connection, me));
+    }
+    for (const row of followRows) {
+      if (row.follower !== me) continue;
+      const id = await followee(row);
+      if (id !== undefined && id !== me) ids.add(id);
+    }
+    return ids;
   };
 
   return {
@@ -152,13 +194,53 @@ export function networkInMemory({
       return linked;
     },
 
-    async connectionPlans(viewerId, eventId, scope) {
-      const plans: ConnectionPlan[] = [];
+    async tie(viewer, owner) {
+      return tieOf(viewer, owner);
+    },
+
+    async replaceGitHubFollows(attendeeId, gitHubIds, at) {
+      replaceFollows(attendeeId, "github", gitHubIds, at);
+    },
+
+    async replaceImportFollows(attendeeId, followeeIds, at) {
+      replaceFollows(attendeeId, "linkedin-import", followeeIds, at);
+    },
+
+    async networkOf(attendeeId) {
+      const members: NetworkMemberRecord[] = [];
+      for (const id of await networkIds(attendeeId)) {
+        const other = await attendees.byId(id);
+        if (!other) continue;
+        const connection = pairs.get(key(attendeeId, id));
+        const mine = [];
+        for (const follow of followRows.filter((row) => row.follower === attendeeId)) {
+          if ((await followee(follow)) === id) mine.push({ source: follow.source, since: follow.since });
+        }
+        members.push({
+          other,
+          ...(connection && { connection: structuredClone(connection) }),
+          follows: mine.sort((a, b) => a.source.localeCompare(b.source)),
+          tie: await tieOf(id, attendeeId),
+        });
+      }
+      return members;
+    },
+
+    async gitHubFollowsNotOnHallway(attendeeId) {
+      let count = 0;
+      for (const follow of followRows) {
+        if (follow.follower === attendeeId && follow.source === "github" && (await followee(follow)) === undefined) count += 1;
+      }
+      return count;
+    },
+
+    async networkPlans(viewerId, eventId, scope) {
+      const plans: NetworkPlan[] = [];
       const wanted = "sessionIds" in scope ? new Set(scope.sessionIds) : undefined;
-      for (const connection of pairs.values()) {
-        if (connection.a !== viewerId && connection.b !== viewerId) continue;
-        const owner = await attendees.byId(otherEnd(connection, viewerId));
+      for (const id of await networkIds(viewerId)) {
+        const owner = await attendees.byId(id);
         if (!owner) continue;
+        const tie = await tieOf(viewerId, owner.id);
         for (const { entry, session } of await schedule.schedule(owner.id, eventId)) {
           const inScope = wanted
             ? wanted.has(entry.sessionId)
@@ -166,7 +248,7 @@ export function networkInMemory({
               (session.startsAt !== undefined &&
                 session.startsAt >= scope.startsFrom &&
                 session.startsAt < scope.startsBefore);
-          if (inScope) plans.push({ owner, entry, session });
+          if (inScope) plans.push({ owner, tie, entry, session });
         }
       }
       return plans;

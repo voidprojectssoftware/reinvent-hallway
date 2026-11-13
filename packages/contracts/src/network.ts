@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { AttendeeCard, Handle, Person } from "./identity.ts";
+import { ReturnPath } from "./return-path.ts";
 import { EventScope, GoingPerson, Intent, Session, SessionId } from "./schedule.ts";
 
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
@@ -41,6 +42,80 @@ export const ConnectionList = z
   .object({ connections: z.array(Connection) })
   .meta({ id: "ConnectionList", description: "My connections, by display name." });
 export type ConnectionList = z.infer<typeof ConnectionList>;
+
+// ---- My network: connections and follows (ADR 0019) ----
+
+export const FollowSource = z.enum(["github", "linkedin-import"]).meta({
+  id: "FollowSource",
+  description:
+    "`github`: I follow them on GitHub. `linkedin-import`: they matched a contact in my LinkedIn Connections.csv (verified email, or claimed profile URL plus verified name).",
+});
+export type FollowSource = z.infer<typeof FollowSource>;
+
+const scheduleVisible = z.boolean().meta({
+  description:
+    "Whether I may see their schedule: it is public, or we are connected, or they follow me. Following them is not enough.",
+});
+const sessionsSeen = z.int().min(0).optional().meta({
+  description: "With `eventId` asked: how many sessions of theirs I may see there. Hidden entries never count.",
+});
+
+export const NetworkMember = z
+  .object({
+    person: Person,
+    how: z
+      .array(z.enum(["connection", "github", "linkedin-import"]))
+      .min(1)
+      .meta({ description: "Every way they are in my network: a Hallway connection, and the sources I follow them from." }),
+    connectedSince: instant.optional().meta({ description: "When we connected, if we are." }),
+    scheduleVisible,
+    sessions: sessionsSeen,
+    sharedWithMe: z.int().min(0).optional().meta({
+      description: "With `eventId` asked: how many of those sessions are also on my schedule.",
+    }),
+  })
+  .meta({ id: "NetworkMember", description: "Someone in my network, labelled with how." });
+export type NetworkMember = z.infer<typeof NetworkMember>;
+
+export const NetworkList = z
+  .object({ people: z.array(NetworkMember) })
+  .meta({ id: "NetworkList", description: "My connections and the people I follow, by display name, each once." });
+export type NetworkList = z.infer<typeof NetworkList>;
+
+export const FollowedPerson = z
+  .object({ person: Person, since: instant, scheduleVisible, sessions: sessionsSeen })
+  .meta({ id: "FollowedPerson", description: "Someone I follow, from one source." });
+export type FollowedPerson = z.infer<typeof FollowedPerson>;
+
+export const Following = z
+  .object({
+    github: z.object({
+      linked: z.boolean().meta({ description: "Whether I sign in with GitHub. Without it there is nothing to refresh from." }),
+      people: z.array(FollowedPerson).meta({ description: "People I follow on GitHub who are on Hallway, by name." }),
+      notOnHallway: z.int().min(0).meta({
+        description: "People I follow on GitHub who have not linked GitHub on Hallway yet. They join this list when they do.",
+      }),
+    }),
+    linkedinImport: z.object({
+      people: z.array(FollowedPerson).meta({ description: "Attendees my last Connections.csv matched, by name." }),
+    }),
+  })
+  .meta({ id: "Following", description: "The people I follow, grouped by where the follow came from." });
+export type Following = z.infer<typeof Following>;
+
+export const RefreshGitHubFollowsInput = z
+  .object({
+    returnTo: ReturnPath.optional().meta({ description: "Where to land after GitHub, a path on this site. Default `/network`." }),
+  })
+  .meta({ id: "RefreshGitHubFollows" });
+export type RefreshGitHubFollowsInput = z.infer<typeof RefreshGitHubFollowsInput>;
+
+export const GitHubRoundTrip = z
+  .object({
+    authorizationUrl: z.string().meta({ description: "Send the browser here. GitHub comes back to Hallway, which reads who I follow and drops the token." }),
+  })
+  .meta({ id: "GitHubRoundTrip" });
+export type GitHubRoundTrip = z.infer<typeof GitHubRoundTrip>;
 
 export const ConnectionRequest = z
   .object({

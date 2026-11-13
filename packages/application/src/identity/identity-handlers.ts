@@ -18,11 +18,11 @@ import {
 } from "./calendar-feed.ts";
 import type {
   AgentTokenRepository,
-  AreConnected,
   AttendeeRepository,
   CalendarFeedRepository,
   IdentityProviders,
   RecordGitHubFollowing,
+  TieBetween,
   WebSessionRepository,
 } from "./ports.ts";
 import { listIdentities, unlinkIdentity, type ListIdentities, type UnlinkIdentity } from "./identities.ts";
@@ -42,6 +42,7 @@ import {
   signOut,
   type BeginSignIn,
   type CompleteSignIn,
+  type DevLinkGitHub,
   type DevSignIn,
   type GetSignInOptions,
   type SignOut,
@@ -52,10 +53,11 @@ export interface IdentityPorts {
   agentTokens: AgentTokenRepository;
   webSessions: WebSessionRepository;
   calendarFeeds: CalendarFeedRepository;
-  areConnected: AreConnected;
+  /** How a viewer stands to a schedule's owner, for the visibility rule (the network slice answers it). */
+  tieBetween: TieBetween;
   /** The sign-in providers configured here; one without a client id is absent. */
   providers?: IdentityProviders;
-  /** Where GitHub's following list goes at sign-in and link time. #63 fills it; a no-op until then. */
+  /** Where GitHub's following list goes at sign-in and link time, and an empty one on unlinking GitHub (ADR 0019). */
   recordGitHubFollowing?: RecordGitHubFollowing;
   now?: () => Date;
 }
@@ -63,6 +65,7 @@ export interface IdentityPorts {
 export interface IdentityHandlers {
   authenticate: Authenticate;
   devSignIn: DevSignIn;
+  devLinkGitHub: DevLinkGitHub;
   beginSignIn: BeginSignIn;
   completeSignIn: CompleteSignIn;
   listIdentities: ListIdentities;
@@ -83,23 +86,24 @@ export interface IdentityHandlers {
 export function identityHandlers(ports: IdentityPorts): IdentityHandlers {
   const now = ports.now ?? (() => new Date());
   const providers = ports.providers ?? {};
+  const recordGitHubFollowing = ports.recordGitHubFollowing ?? (async () => {});
   const signIn = signInHandlers(providers, {
     attendees: ports.attendees,
     sessions: ports.webSessions,
-    recordGitHubFollowing: ports.recordGitHubFollowing ?? (async () => {}),
+    recordGitHubFollowing,
     now,
   });
   return {
     authenticate: authenticate(ports.webSessions, ports.agentTokens, now),
     ...signIn,
     listIdentities: listIdentities(ports.attendees),
-    unlinkIdentity: unlinkIdentity(ports.attendees),
+    unlinkIdentity: unlinkIdentity(ports.attendees, recordGitHubFollowing),
     signOut: signOut(ports.webSessions),
     getSignInOptions: getSignInOptions(providers),
     getMe: getMe(ports.attendees),
     updateProfile: updateProfile(ports.attendees),
     setVisibility: setVisibility(ports.attendees),
-    getAttendee: getAttendee(ports.attendees, ports.areConnected),
+    getAttendee: getAttendee(ports.attendees, ports.tieBetween),
     issueAgentToken: issueAgentToken(ports.agentTokens, now),
     listAgentTokens: listAgentTokens(ports.agentTokens),
     revokeAgentToken: revokeAgentToken(ports.agentTokens, now),

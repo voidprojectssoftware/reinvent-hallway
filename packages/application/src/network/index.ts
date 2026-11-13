@@ -1,7 +1,7 @@
 // Every network handler, built over one set of ports. apps/api keeps them as
 // one entry (`handlers.network`), as it does identity's.
 import type { EventRepository } from "../events/event-repository.ts";
-import type { AttendeeRepository } from "../identity/ports.ts";
+import type { AttendeeRepository, TieBetween } from "../identity/ports.ts";
 import type { ScheduleRepository } from "../schedule/schedule-repository.ts";
 import {
   connectViaShareLink,
@@ -18,6 +18,7 @@ import {
   type RequestConnection,
 } from "./connections.ts";
 import { importContacts, listSuggestions, type ImportContacts, type ListSuggestions } from "./contacts.ts";
+import { listFollowing, listMyNetwork, type ListFollowing, type ListMyNetwork } from "./following.ts";
 import { getInvite, rotateInvite, type GetInvite, type RotateInvite } from "./invites.ts";
 import type { NetworkRepository } from "./ports.ts";
 import {
@@ -32,14 +33,16 @@ import {
 } from "./schedules.ts";
 
 export type {
-  ConnectionPlan,
   ConnectionRequestRecord,
   ContactImportRecord,
   InviteRecord,
+  NetworkMemberRecord,
+  NetworkPlan,
   NetworkRepository,
   PlanScope,
 } from "./ports.ts";
 export { connectionsGoing } from "./schedules.ts";
+export { recordGitHubFollowing } from "./following.ts";
 export { invitePathOf } from "./invites.ts";
 
 export interface NetworkPorts {
@@ -47,6 +50,8 @@ export interface NetworkPorts {
   network: NetworkRepository;
   events: EventRepository;
   schedule: ScheduleRepository;
+  /** The one lookup every read path hands the visibility rule (apps/api's composition root). */
+  tieBetween: TieBetween;
   sessionUrlTemplate: string;
   now?: () => Date;
 }
@@ -64,6 +69,8 @@ export interface NetworkHandlers {
   listRequests: ListRequests;
   importContacts: ImportContacts;
   listSuggestions: ListSuggestions;
+  listMyNetwork: ListMyNetwork;
+  listFollowing: ListFollowing;
   getAttendeeSchedule: GetAttendeeSchedule;
   whoIsGoing: WhoIsGoingQuery;
   networkAgenda: GetNetworkAgenda;
@@ -73,7 +80,7 @@ export interface NetworkHandlers {
 export function networkHandlers(ports: NetworkPorts): NetworkHandlers {
   const now = ports.now ?? (() => new Date());
   const writes = { attendees: ports.attendees, network: ports.network, now };
-  const reads = { ...ports, areConnected: (a: string, b: string) => ports.network.areConnected(a, b) };
+  const network = { attendees: ports.attendees, network: ports.network, events: ports.events, schedule: ports.schedule };
   return {
     requestConnection: requestConnection(writes),
     withdrawRequest: decideOn(writes, "withdraw"),
@@ -87,9 +94,11 @@ export function networkHandlers(ports: NetworkPorts): NetworkHandlers {
     listRequests: listRequests(writes),
     importContacts: importContacts(writes),
     listSuggestions: listSuggestions(writes),
-    getAttendeeSchedule: getAttendeeSchedule(reads),
-    whoIsGoing: whoIsGoing(reads),
-    networkAgenda: networkAgenda(reads),
-    findMeetingGaps: findMeetingGaps(reads),
+    listMyNetwork: listMyNetwork(network),
+    listFollowing: listFollowing(network),
+    getAttendeeSchedule: getAttendeeSchedule(ports),
+    whoIsGoing: whoIsGoing(ports),
+    networkAgenda: networkAgenda(ports),
+    findMeetingGaps: findMeetingGaps(ports),
   };
 }

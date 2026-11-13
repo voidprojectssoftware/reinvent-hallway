@@ -77,7 +77,7 @@ function setup(options: { providers?: SignInProvider[] } = {}) {
       get: async (id) => feeds.get(id),
       ownerOf: async (token) => [...feeds].find(([, feed]) => feed.token === token)?.[0],
     },
-    areConnected: async (a, b) => connected.some(([x, y]) => (x === a && y === b) || (x === b && y === a)),
+    tieBetween: async (a, b) => ({ connected: connected.some(([x, y]) => (x === a && y === b) || (x === b && y === a)), followedByOwner: false }),
     providers: Object.fromEntries(configured.map((provider) => [provider, stub])),
     recordGitHubFollowing: async (input) => void followed.push(input),
     now: () => clock,
@@ -144,7 +144,7 @@ describe("SignIn", () => {
       verifiedName: "Jane Doe",
       email: "Jane@Example.com",
       avatarUrl: jane.picture,
-      visibility: "connections",
+      visibility: "network",
     });
     expect(world.identities).toEqual([
       {

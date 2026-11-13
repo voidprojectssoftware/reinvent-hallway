@@ -17,8 +17,8 @@ import {
   type ContactImportRecord,
   type NetworkRepository,
 } from "@hallway/application";
-import type { Connection, ImportedContact } from "@hallway/domain";
-import { and, desc, eq, gte, lt, or, sql, type SQL } from "drizzle-orm";
+import { noTie, type Connection, type ImportedContact, type Tie } from "@hallway/domain";
+import { and, desc, eq, gte, lt, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { compact } from "../identity/d1-identity-repositories.ts";
 import type { Database } from "../persistence/d1/database.ts";
@@ -26,6 +26,7 @@ import { attendees, identities } from "../persistence/d1/entities/identity.ts";
 import {
   connectionRequests,
   connections,
+  follows,
   contactImports,
   importedContacts,
   inviteTokens,
@@ -94,6 +95,43 @@ export function networkOnD1(db: Database): NetworkRepository {
     sql`case when ${connections.a} = ${attendeeId} then ${connections.b} else ${connections.a} end`;
   const importOf = (attendeeId: string) =>
     sql`(select ${contactImports.id} from ${contactImports} where ${contactImports.attendeeId} = ${attendeeId})`;
+
+  // The tie (ADR 0019), as SQL over an id or a column, so one statement can
+  // ask it of every member of a network.
+  const connectedTo = (one: string | SQLWrapper, other: string | SQLWrapper) =>
+    sql`exists (select 1 from ${connections} where (${connections.a} = ${one} and ${connections.b} = ${other}) or (${connections.a} = ${other} and ${connections.b} = ${one}))`;
+  /** `owner` follows `viewer`: from their import by attendee, or on GitHub by whichever account `viewer` has linked. */
+  const ownerFollows = (owner: string | SQLWrapper, viewer: string | SQLWrapper) =>
+    sql`exists (select 1 from ${follows} where ${follows.followerId} = ${owner} and (${follows.followeeId} = ${viewer} or ${follows.githubId} in (select ${identities.subject} from ${identities} where ${identities.provider} = 'github' and ${identities.attendeeId} = ${viewer})))`;
+  /**
+   * Attendees in `me`'s network: the other end of each connection, each
+   * attendee my import follows, and whoever has linked each GitHub account I
+   * follow (so a follow of someone not yet here reaches them when they link).
+   */
+  const inNetworkOf = (me: string) =>
+    and(
+      sql`${attendees.id} in (
+        select case when ${connections.a} = ${me} then ${connections.b} else ${connections.a} end from ${connections} where ${connections.a} = ${me} or ${connections.b} = ${me}
+        union select ${follows.followeeId} from ${follows} where ${follows.followerId} = ${me} and ${follows.source} = 'linkedin-import'
+        union select ${identities.attendeeId} from ${follows} inner join ${identities} on ${identities.provider} = 'github' and ${identities.subject} = ${follows.githubId} where ${follows.followerId} = ${me} and ${follows.source} = 'github'
+      )`,
+      sql`${attendees.id} <> ${me}`,
+    );
+  /** Everyone in my network, each with how I stand to them, in one statement. */
+  const memberTies = async (me: string) => {
+    const rows = await db
+      .select({
+        attendee: attendees,
+        connected: sql<boolean>`${connectedTo(attendees.id, me)}`.mapWith(Boolean),
+        followedByOwner: sql<boolean>`${ownerFollows(attendees.id, me)}`.mapWith(Boolean),
+      })
+      .from(attendees)
+      .where(inNetworkOf(me));
+    return rows.map(({ attendee, connected, followedByOwner }) => ({
+      attendee: toAttendee(attendee),
+      tie: { connected, followedByOwner } satisfies Tie,
+    }));
+  };
 
   return {
     async areConnected(one, other) {
@@ -309,26 +347,119 @@ export function networkOnD1(db: Database): NetworkRepository {
       return new Set([...connected, ...requested].map((row) => row.id as string));
     },
 
-    async connectionPlans(viewerId, eventId, scope) {
+    async tie(viewer, owner) {
+      const row = await db.get<{ connected: number; followedByOwner: number }>(
+        sql`select ${connectedTo(owner, viewer)} as connected, ${ownerFollows(owner, viewer)} as followedByOwner`,
+      );
+      return { connected: Boolean(row?.connected), followedByOwner: Boolean(row?.followedByOwner) };
+    },
+
+    async replaceGitHubFollows(attendeeId, gitHubIds, at) {
+      const ids = JSON.stringify([...new Set(gitHubIds)]);
+      await db.batch([
+        db
+          .delete(follows)
+          .where(
+            and(
+              eq(follows.followerId, attendeeId),
+              sql`${follows.source} = 'github'`,
+              sql`${follows.githubId} not in (select value from json_each(${ids}))`,
+            ),
+          ),
+        db
+          .insert(follows)
+          .select(sql`select ${attendeeId}, 'github', null, value, ${at} from json_each(${ids}) where true`)
+          .onConflictDoNothing(),
+      ]);
+    },
+
+    async replaceImportFollows(attendeeId, followeeIds, at) {
+      const ids = JSON.stringify([...new Set(followeeIds)]);
+      await db.batch([
+        db
+          .delete(follows)
+          .where(
+            and(
+              eq(follows.followerId, attendeeId),
+              sql`${follows.source} = 'linkedin-import'`,
+              sql`${follows.followeeId} not in (select value from json_each(${ids}))`,
+            ),
+          ),
+        db
+          .insert(follows)
+          .select(sql`select ${attendeeId}, 'linkedin-import', value, null, ${at} from json_each(${ids}) where true`)
+          .onConflictDoNothing(),
+      ]);
+    },
+
+    async networkOf(attendeeId) {
+      const [members, myConnections, myFollows] = await Promise.all([
+        memberTies(attendeeId),
+        db.select().from(connections).where(involves(attendeeId)),
+        db
+          .select({
+            id: sql<string | null>`coalesce(${follows.followeeId}, ${identities.attendeeId})`,
+            source: follows.source,
+            since: follows.since,
+          })
+          .from(follows)
+          .leftJoin(identities, and(sql`${identities.provider} = 'github'`, eq(identities.subject, follows.githubId)))
+          .where(eq(follows.followerId, attendeeId)),
+      ]);
+      return members.map(({ attendee, tie }) => {
+        const connection = myConnections.find((row) => row.a === attendee.id || row.b === attendee.id);
+        return {
+          other: attendee,
+          ...(connection && { connection: fromConnectionRow(connection) }),
+          follows: myFollows
+            .filter((row) => row.id === attendee.id)
+            .map(({ source, since }) => ({ source, since }))
+            .sort((a, b) => a.source.localeCompare(b.source)),
+          tie,
+        };
+      });
+    },
+
+    async gitHubFollowsNotOnHallway(attendeeId) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(follows)
+        .where(
+          and(
+            eq(follows.followerId, attendeeId),
+            sql`${follows.source} = 'github'`,
+            sql`${follows.githubId} not in (select ${identities.subject} from ${identities} where ${identities.provider} = 'github')`,
+          ),
+        );
+      return row?.count ?? 0;
+    },
+
+    async networkPlans(viewerId, eventId, scope) {
       const inScope: SQL | undefined =
         "sessionIds" in scope
           ? sql`${planEntries.sessionId} in ${jsonList(scope.sessionIds)}`
           : "startsFrom" in scope
             ? and(gte(sessions.startsAt, scope.startsFrom), lt(sessions.startsAt, scope.startsBefore))
             : undefined;
-      const rows = await db
-        .select({ attendee: attendees, entry: planEntries, session: sessions, hidden: isHidden })
-        .from(connections)
-        .innerJoin(attendees, eq(attendees.id, otherEnd(viewerId)))
-        .innerJoin(planEntries, and(eq(planEntries.attendeeId, attendees.id), eq(planEntries.eventId, eventId)))
-        .innerJoin(
-          sessions,
-          and(eq(sessions.eventId, planEntries.eventId), eq(sessions.sessionId, planEntries.sessionId)),
-        )
-        .leftJoin(hiddenSessions, hiddenJoin)
-        .where(and(involves(viewerId), inScope));
+      // Two reads: every entry in scope of everyone in my network, and how I
+      // stand to each of them, rather than a tie computed again for each row.
+      const [rows, members] = await Promise.all([
+        db
+          .select({ attendee: attendees, entry: planEntries, session: sessions, hidden: isHidden })
+          .from(attendees)
+          .innerJoin(planEntries, and(eq(planEntries.attendeeId, attendees.id), eq(planEntries.eventId, eventId)))
+          .innerJoin(
+            sessions,
+            and(eq(sessions.eventId, planEntries.eventId), eq(sessions.sessionId, planEntries.sessionId)),
+          )
+          .leftJoin(hiddenSessions, hiddenJoin)
+          .where(and(inNetworkOf(viewerId), inScope)),
+        memberTies(viewerId),
+      ]);
+      const ties = new Map(members.map(({ attendee, tie }) => [attendee.id, tie]));
       return rows.map((row) => ({
         owner: toAttendee(row.attendee),
+        tie: ties.get(row.attendee.id) ?? noTie,
         entry: fromEntryRow(row.entry, row.hidden),
         session: fromSessionRow(row.session),
       }));
