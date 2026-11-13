@@ -2,7 +2,7 @@
 // to re:Invent, and its place on my week. Never an abstract (ADR 0003): the
 // description is read on re:Invent, behind the one button. Anyone may open a
 // session; the "On your week" part is for someone signed in.
-import { goingFacesShown, type Person, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
+import { goingFacesShown, type GoingPerson, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useParams, useRevalidator } from "react-router";
 import { api, ApiFailure } from "../api/client.ts";
@@ -14,12 +14,12 @@ import { Empty } from "../shell/Empty.tsx";
 import { Foot, failureText } from "../shell/Foot.tsx";
 import { Icon, type IconName } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
-import { ifSignedIn } from "../shell/signed-in.ts";
+import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
 
 type Loaded =
   | { found: false }
-  | { found: true; session: SessionResource; signedIn: boolean; entry: PlanEntry | null; going: Person[] };
+  | { found: true; session: SessionResource; signedIn: boolean; entry: PlanEntry | null; going: GoingPerson[] };
 
 export async function sessionLoader({ params }: { params: { sessionId?: string } }): Promise<Loaded> {
   const sessionId = params.sessionId ?? "";
@@ -101,7 +101,7 @@ export function Session() {
         <section className="section">
           <ul className="group">
             <li>
-              <Link className="cell action lead" to="/sign-in">
+              <Link className="cell action lead" to={signInPath(`/sessions/${encodeURIComponent(session.sessionId)}`)}>
                 Sign in to add it to your week
               </Link>
             </li>
@@ -239,8 +239,8 @@ function OnMyWeek({ sessionId, entry }: { sessionId: string; entry: PlanEntry | 
   );
 }
 
-/** "Your connections going": a cell per person, linking to their week. */
-function ConnectionsGoing({ people }: { people: Person[] }) {
+/** "Your connections going": a cell per person, with their Reserved or Interested badge, linking to their week. */
+function ConnectionsGoing({ people }: { people: GoingPerson[] }) {
   return (
     <section className="section">
       <h2 className="ghead">
@@ -262,8 +262,7 @@ function ConnectionsGoing({ people }: { people: Person[] }) {
                   <span className="celltitle">{person.displayName}</span>
                   {person.headline && <span className="cellsub">{person.headline}</span>}
                 </div>
-                {/* TODO(#46): the design's Reserved or Interested badge per person needs their intent,
-                    which who-is-going does not carry. */}
+                <IntentBadge intent={person.intent} />
                 <Icon name="chev" className="chev" />
               </Link>
             </li>

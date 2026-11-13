@@ -209,7 +209,7 @@ describe("two agents sync from AWS and plan around each other", () => {
     expect(JSON.stringify(schedule)).not.toContain("ABSTRACT-TEXT");
   });
 
-  it("who_is_going names Ben on the sessions they share, and not on the hidden one", async () => {
+  it("who_is_going names Ben on the sessions they share, with his intent, and not on the hidden one", async () => {
     const going = await adaAgent.tool("who_is_going", {
       eventId,
       sessionIds: ["s-aim3315", "s-svs401", "s-cnt320", "s-dat302", "s-sec205"],
@@ -221,6 +221,23 @@ describe("two agents sync from AWS and plan around each other", () => {
       ["s-dat302", [ben.name]],
       ["s-sec205", []],
     ]);
+    const intents = going.sessions.flatMap((s: Structured) => s.people.map((p: Structured) => [s.sessionId, p.intent]));
+    expect(intents).toEqual([
+      ["s-aim3315", "reserved"],
+      ["s-svs401", "interested"],
+      ["s-dat302", "interested"],
+    ]);
+  });
+
+  it("list_my_connections counts Ben's sessions Ada may see, and those she shares, without the hidden one", async () => {
+    // Ben has seven; CNT320 is hidden, so six. Of those Ada also plans AIM3315, SVS401, DAT302
+    // and the Tuesday keynote.
+    const listed = await adaAgent.tool("list_my_connections", { eventId });
+    expect(listed.connections).toEqual([
+      expect.objectContaining({ person: expect.objectContaining({ handle: ben.handle }), sessions: 6, sharedWithMe: 4 }),
+    ]);
+    const plain = await adaAgent.tool("list_my_connections");
+    expect(plain.connections[0]).not.toHaveProperty("sessions");
   });
 
   it("network_agenda lists what Ben goes to on Tuesday morning, hidden session left out", async () => {

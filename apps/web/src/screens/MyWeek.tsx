@@ -3,11 +3,10 @@
 // (?day=2026-12-01) so a reload or a shared link keeps it.
 import type { Event, MySchedule, Person, PlanEntry } from "@hallway/contracts";
 import { useState } from "react";
-import { Link, redirect, useLoaderData, useSearchParams } from "react-router";
+import { Link, useLoaderData, useSearchParams } from "react-router";
 import { api } from "../api/client.ts";
 import { clashes, clashLabel } from "../clash.ts";
 import { EVENT_ID } from "../event.ts";
-import { takeReturnPath } from "../invite.ts";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { Going } from "../schedule/Going.tsx";
 import { whoIsGoing } from "../schedule/going.ts";
@@ -22,11 +21,6 @@ type GoingBySession = Map<string, Person[]>;
 
 export async function myWeekLoader(): Promise<{ event: Event; schedule: MySchedule; going: GoingBySession }> {
   const [event, schedule] = await Promise.all([api.getEvent(EVENT_ID), requireSignIn(api.mySchedule(EVENT_ID))]);
-  // Signed in, then. Signing in with LinkedIn comes back here, to /; a page
-  // that sent me to sign in (a person's, maybe with an invite) asked to be
-  // returned to.
-  const back = takeReturnPath();
-  if (back) throw redirect(back);
   const going: GoingBySession =
     schedule.entries.length > 0 ? await whoIsGoing(api, EVENT_ID, schedule.entries.map((entry) => entry.sessionId)) : new Map();
   return { event, schedule, going };

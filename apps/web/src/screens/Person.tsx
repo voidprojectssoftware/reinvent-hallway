@@ -15,7 +15,7 @@ import { Link, replace, useLoaderData, useNavigate, useRevalidator } from "react
 import { api, ApiFailure } from "../api/client.ts";
 import { EVENT_ID } from "../event.ts";
 import { handleFromSegment } from "../handle.ts";
-import { dropInvite, heldInvite, holdInviteFrom, returnAfterSignIn } from "../invite.ts";
+import { dropInvite, heldInvite, holdInviteFrom } from "../invite.ts";
 import { EntryCell } from "../schedule/EntryCell.tsx";
 import { firstName as firstWord } from "../schedule/going.ts";
 import { useMe } from "../shell/AppLayout.tsx";
@@ -24,7 +24,7 @@ import { Empty } from "../shell/Empty.tsx";
 import { Foot, failureText } from "../shell/Foot.tsx";
 import { Icon } from "../shell/Icon.tsx";
 import { Screen } from "../shell/Screen.tsx";
-import { ifSignedIn } from "../shell/signed-in.ts";
+import { ifSignedIn, signInPath } from "../shell/signed-in.ts";
 import { eventDate, formatDate, zoneAbbreviation } from "../time.ts";
 import { NotFound } from "./NotFound.tsx";
 
@@ -188,8 +188,8 @@ function Standing({ card, standing, children }: { card: AttendeeCard; standing: 
   }
 
   function signInFirst() {
-    returnAfterSignIn(`/@${card.handle}`);
-    void navigate("/sign-in");
+    // Back here once signed in (the sign-in's returnTo); the invite waits in this tab (invite.ts).
+    void navigate(signInPath(`/@${card.handle}`));
   }
 
   let actions: ReactNode;

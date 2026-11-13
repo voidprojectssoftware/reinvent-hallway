@@ -97,7 +97,8 @@ We store UTC instants and the event timezone, and render in the event timezone
   - `connections`: the attendee and their connections.
   - `private`: the attendee only.
   - A `hidden` plan entry is never shown to anyone but its owner, and never
-    counted in "who is going".
+    counted in "who is going" or in a connection's session counts, nor lends
+    its owner an intent there.
   - One function decides this (`canViewSchedule(viewer, owner, areConnected)`, with `visibleEntries` for the entries), and every read path
     (REST, MCP, calendar feed, share image, link preview) goes through it.
   - What leaves Hallway (calendar feed, share image, link preview) goes
@@ -142,6 +143,11 @@ We store UTC instants and the event timezone, and render in the event timezone
   the profile URL matches **and** the contact's name matches the attendee's
   `verifiedName` (accents, case and spacing ignored, nothing fuzzier), or the email hash matches the attendee's verified email. A
   claimed URL alone suggests no one: anyone can claim any URL.
+- **Sign-in comes back only to a path on this site.** LinkedIn sign-in takes
+  a `returnTo` and lands there afterwards, or on `/`. Only a relative path
+  starting with a single `/` is accepted (no other origin, `//`, backslash,
+  control character or encoded form of them), bound to the OAuth state
+  cookie (ADR 0015).
 - **Agent tokens act as their attendee**, for that attendee's data and that
   attendee's view of others. Never more: an agent token may not issue, list
   or revoke agent tokens, nor rotate or read the calendar feed or the invite (`forbidden`),
@@ -176,11 +182,11 @@ We store UTC instants and the event timezone, and render in the event timezone
 | `GetMySchedule(eventId)` | my entries with sessions, hidden ones included and marked, in start order, with the event's timezone to render them in, and `lastSync` (`syncedAt` and the counts; absent before my agent's first sync) |
 | `GetAttendee(handle)` | the attendee's public card, and whether I may see the schedule |
 | `GetAttendeeSchedule(handle, eventId)` | their visible entries, or "not visible to you" (`forbidden`). Only the owner sees hidden entries, marked |
-| `ListConnections` / `ListRequests` / `ListSuggestions` | my connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
+| `ListConnections(eventId?)` / `ListRequests` / `ListSuggestions` | my connections, and with `eventId` each one's `sessions` (their entries I may see there) and `sharedWithMe` (of those, the ones on my schedule, hidden ones of mine included), from two reads whatever the number of connections; my pending requests, incoming and outgoing; attendees my imported contacts suggest, leaving out me, my connections and anyone a request is pending with either way |
 | `SearchSessions(eventId, q?, day?, from?, to?)` | catalog sessions, with how many of my connections are going. Built so far: `q` (code, title or speaker, ignoring case), `day` (an event-local date; sessions starting on it) and `limit`; open to any caller, since sessions are facts about the event. To a signed-in caller each session carries `connectionsGoing` (count, and up to five people), from one read for the whole page. `from` and `to` are not built: `NetworkAgenda` answers windows |
 | `GetSession(eventId, sessionId)` | the session, and to a signed-in caller `connectionsGoing` as in search |
-| `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), up to 200 sessions in one read |
-| `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who |
+| `WhoIsGoing(eventId, sessionIds[])` | per session, my connections going (respecting visibility and hidden), each with their `intent` (`reserved` or `interested`), up to 200 sessions in one read. Session search and get carry the same people, intent included |
+| `NetworkAgenda(eventId, day, from?, to?)` | sessions starting in a window of one event-local day (`from`/`to` as `HH:MM`, default the whole day) that my connections plan to attend, with who and their intent |
 | `FindMeetingGaps(handle, day, from?, to?, minMinutes?)` | windows on a day, in event time (default 08:00 to 18:00, at least 30 minutes), when neither I (every entry, hidden ones too) nor that person (their visible entries) has a session; refused when their schedule is not visible to me. All-day sessions (the expo and the like) do not block a gap |
 | `ExportCalendar(feedToken)` | iCalendar of the owner's visible, non-hidden schedule (`GET /cal/{token}.ics`); a rotated token finds no one |
 | `ShareImage(handle, day?)` | a PNG of the schedule as the asker may see it, hidden entries left out, for posting (`GET /og/{handle}.png`, 1200 by 627) |
@@ -225,6 +231,41 @@ holds logic the other lacks. Both take and return the contract schemas in
 | `find_meeting_gaps` | `FindMeetingGaps` |
 | `search_sessions` | `SearchSessions` |
 | `add_to_plan` / `remove_from_plan` | `AddToPlan` / `RemoveFromPlan` |
+
+## Identities and follows (decided 2026-11-13, being built: #60, #61, #63)
+
+The owner, 2026-11-13: sign-in with Google, Microsoft, LinkedIn or GitHub, and
+"show them the schedule of people they follow on linkedin / in their network
+and the same for github". ADRs 0018 and 0019 hold the decisions. Until those
+issues land, the code is still the model above; this section is what it moves to.
+
+```mermaid
+erDiagram
+  ATTENDEE ||--|{ IDENTITY : "signs in with"
+  ATTENDEE ||--o{ FOLLOW : follows
+  FOLLOW }o--o| ATTENDEE : "points at (or a GitHub id not yet on Hallway)"
+```
+
+| Resource | What it is | Key fields |
+| --- | --- | --- |
+| **Identity** | One provider account an attendee signs in with | `provider` (`google` \| `microsoft` \| `linkedin` \| `github`), `subject` (the provider's stable id), `email`, `emailVerified`, `username` (GitHub login), `linkedAt`. Unique per provider and subject |
+| **Follow** | One-way: I follow someone | `follower`, `followee` (an attendee, or a GitHub user id not yet on Hallway), `source` (`github` \| `linkedin-import`), `since` |
+
+Rules:
+
+- **Linking is explicit, never by email.** A new provider is added from a
+  signed-in session. A sign-in whose verified email matches another account is
+  refused with directions, never merged.
+- **Visibility "connections" becomes "My network":** the attendee, their Hallway
+  connections, and **the people they follow**. Following someone never lets you
+  see their schedule; their following you does. (Owner to confirm: #64.)
+- **GitHub follows** are fetched with the user's token during a sign-in or link
+  round trip and the token is dropped. **LinkedIn follows** are two-fact matches
+  from the user's own `Connections.csv` import.
+
+Commands: `LinkIdentity`, `UnlinkIdentity`, `RefreshGitHubFollows`,
+`ImportContacts` (now also writes follows). Queries: `ListIdentities`,
+`ListFollowing`, and `ListMyNetwork` (connections plus follows, labelled).
 
 ## Out of scope for the MVP
 

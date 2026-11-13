@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { EventId } from "./event.ts";
 import { AttendeeCard, Handle, Person } from "./identity.ts";
-import { EventScope, Intent, Session, SessionId } from "./schedule.ts";
+import { EventScope, GoingPerson, Intent, Session, SessionId } from "./schedule.ts";
 
 const instant = z.iso.datetime().meta({ description: "UTC instant, ISO-8601." });
 
@@ -17,9 +17,25 @@ export const Connection = z
     person: Person,
     since: instant,
     via: z.enum(["request", "share-link"]).meta({ description: "How it formed: an accepted request, or a share link." }),
+    sessions: z.int().min(0).optional().meta({
+      description:
+        "With `eventId` asked: how many sessions of theirs I may see at that event. Hidden entries, and every entry of a private schedule, are not counted.",
+    }),
+    sharedWithMe: z.int().min(0).optional().meta({
+      description: "With `eventId` asked: how many of those sessions are also on my schedule.",
+    }),
   })
   .meta({ id: "Connection", description: "Someone I am connected to. Connections see each other's `connections` schedules." });
 export type Connection = z.infer<typeof Connection>;
+
+/** `GET /api/me/connections?eventId=` and `list_my_connections`: the event to count sessions at. */
+export const ListConnectionsInput = z.object({
+  eventId: EventId.optional().meta({
+    description: "Count each connection's sessions at this event (`sessions`, `sharedWithMe`). Without it, no counts.",
+    example: "reinvent2026",
+  }),
+});
+export type ListConnectionsInput = z.infer<typeof ListConnectionsInput>;
 
 export const ConnectionList = z
   .object({ connections: z.array(Connection) })
@@ -187,7 +203,9 @@ export type WhoIsGoingInput = z.infer<typeof WhoIsGoingInput>;
 
 export const SessionGoing = z.object({
   sessionId: SessionId,
-  people: z.array(Person).meta({ description: "Every connection of mine going whose schedule I may see, by display name." }),
+  people: z
+    .array(GoingPerson)
+    .meta({ description: "Every connection of mine going whose entry I may see, by display name, each with their intent." }),
 });
 
 export const WhoIsGoing = z
@@ -207,7 +225,7 @@ export type NetworkAgendaInput = z.infer<typeof NetworkAgendaInput>;
 
 export const AgendaItem = z.object({
   session: Session,
-  people: z.array(Person).meta({ description: "My connections going, by display name." }),
+  people: z.array(GoingPerson).meta({ description: "My connections going, by display name, each with their intent." }),
 });
 
 export const NetworkAgenda = z

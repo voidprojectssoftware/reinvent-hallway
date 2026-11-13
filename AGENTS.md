@@ -48,8 +48,8 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   `areConnected` from the one network repository wired in `apps/api/src/index.ts`;
   and `apps/api/src/network.test.ts` ("every read of someone else's schedule
   goes through the visibility rule"), which runs each REST and MCP read path
-  (person schedule, attendee card, who is going, network agenda, session
-  search and get, meeting gaps) against a private attendee, a non-connection
+  (person schedule, attendee card, who is going and its intents, network
+  agenda, session search and get, connection counts, meeting gaps) against a private attendee, a non-connection
   and a hidden entry. A new read path adds its case there. What leaves
   Hallway (calendar feed, share image, link preview) goes through
   `shareableEntries` with the same `areConnected`, held by

@@ -137,7 +137,13 @@ export function createApiClient(send: typeof fetch = (input, init) => fetch(inpu
     personSchedule: (handle: string, eventId: string) =>
       request("GET", `${attendeeOf(handle)}/schedule?eventId=${encodeURIComponent(eventId)}`, PersonSchedule),
 
-    connections: () => request("GET", "/api/me/connections", ConnectionList),
+    /** With an event, each connection carries `sessions` and `sharedWithMe` there. */
+    connections: (eventId?: string) =>
+      request(
+        "GET",
+        eventId === undefined ? "/api/me/connections" : `/api/me/connections?eventId=${encodeURIComponent(eventId)}`,
+        ConnectionList,
+      ),
     removeConnection: (handle: string) => request("DELETE", `/api/me/connections/${encodeURIComponent(handle)}`, Connection),
     requests: () => request("GET", "/api/me/connection-requests", RequestList),
     requestConnection: (handle: string) => request("POST", "/api/me/connection-requests", RequestResult, { handle }),
@@ -178,4 +184,6 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 export const api = createApiClient();
 
 /** A page navigation, not a fetch, because it redirects to LinkedIn and back with a cookie. */
-export const linkedInSignInHref = "/api/auth/linkedin";
+/** Sign In with LinkedIn, landing back on `returnTo` (a path the server checks again) or `/`. */
+export const linkedInSignInHref = (returnTo: string | null) =>
+  returnTo === null ? "/api/auth/linkedin" : `/api/auth/linkedin?returnTo=${encodeURIComponent(returnTo)}`;

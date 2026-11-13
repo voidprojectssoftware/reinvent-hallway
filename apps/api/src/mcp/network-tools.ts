@@ -6,6 +6,7 @@ import type { Actor } from "@hallway/application";
 import {
   ConnectionList,
   GetPersonScheduleInput,
+  ListConnectionsInput,
   MeetingGaps,
   MeetingGapsInput,
   NetworkAgenda,
@@ -23,6 +24,7 @@ export const networkToolDescriptions = {
   list_my_connections: [
     "The people the user is connected to on Hallway: the people whose re:Invent plans the user can see.",
     "Call it first when the user talks about meeting, finding or following someone, to turn a name into a `handle` for the other tools. Only connections and people with public schedules can be planned around.",
+    "Pass `eventId` (`reinvent2026`) to get, per connection, how many sessions of theirs the user can see (`sessions`) and how many of those are on the user's own schedule too (`sharedWithMe`): a quick way to tell who the user will keep running into.",
   ].join(" "),
   get_person_schedule: [
     "One person's re:Invent schedule (by `handle`), as much of it as their visibility lets the user see, in start order. Times are UTC; show them in the returned `timezone` (Las Vegas time).",
@@ -50,10 +52,11 @@ export function registerNetworkTools(server: McpServer, handlers: Handlers, acto
     {
       title: "List my connections",
       description: networkToolDescriptions.list_my_connections,
+      inputSchema: ListConnectionsInput,
       outputSchema: asToolOutput(ConnectionList),
       annotations: readOnly,
     },
-    async () => toolResult(await handlers.network.listConnections(actor)),
+    async (input) => toolResult(await handlers.network.listConnections(actor, input)),
   );
 
   server.registerTool(

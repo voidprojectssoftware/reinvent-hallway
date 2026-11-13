@@ -6,7 +6,9 @@ import type { ConnectionList, Person, RequestList, SuggestionList } from "@hallw
 import { useState, type ReactNode } from "react";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import { api } from "../api/client.ts";
+import { EVENT_ID } from "../event.ts";
 import { ContactsImport } from "../network/ContactsImport.tsx";
+import { sessionCounts } from "../network/counts.ts";
 import { Avatar } from "../shell/Avatar.tsx";
 import { Empty } from "../shell/Empty.tsx";
 import { Foot, failureText } from "../shell/Foot.tsx";
@@ -17,7 +19,7 @@ import { eventDate, formatDate } from "../time.ts";
 
 export async function networkLoader(): Promise<{ connections: ConnectionList; requests: RequestList; suggestions: SuggestionList }> {
   const [connections, requests, suggestions] = await Promise.all([
-    requireSignIn(api.connections()),
+    requireSignIn(api.connections(EVENT_ID)),
     requireSignIn(api.requests()),
     requireSignIn(api.suggestions()),
   ]);
@@ -185,15 +187,13 @@ export function Network() {
                   </div>
                 </li>
               ) : (
-                shown.map(({ person, via }) => (
-                  <li key={person.id}>
-                    <Link className="cell lead-av" to={personPath(person)}>
-                      <Avatar person={person} />
+                shown.map((connection) => (
+                  <li key={connection.person.id}>
+                    <Link className="cell lead-av" to={personPath(connection.person)}>
+                      <Avatar person={connection.person} />
                       <div className="cellmain">
-                        <span className="celltitle">{person.displayName}</span>
-                        {/* TODO(#46): the design's "9 sessions · 4 with you" needs per-connection counts, which
-                            Connection does not carry; the headline stands in. */}
-                        <span className="cellsub">{person.headline ?? (via === "share-link" ? "Connected by invite link" : `@${person.handle}`)}</span>
+                        <span className="celltitle">{connection.person.displayName}</span>
+                        <span className="cellsub">{sessionCounts(connection)}</span>
                       </div>
                       <Icon name="chev" className="chev" />
                     </Link>
