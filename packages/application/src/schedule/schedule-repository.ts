@@ -1,6 +1,10 @@
 import type { PlanEntry, Session, SessionReport, SyncedSession } from "@hallway/domain";
 
-/** A session as the catalog keeps it: the reporters' consensus, plus when an agent last sent it. */
+/**
+ * A session as the catalog serves it: the reporters' consensus, plus when an
+ * agent last sent it. Never its abstract, which only `abstracts` reads, so no
+ * read path can carry it by accident (ADR 0025).
+ */
 export interface CatalogSession extends Session {
   lastSeenAt: string;
 }
@@ -18,6 +22,12 @@ export interface SessionFilter {
   startsFrom?: string;
   /** Sessions starting before this instant (ISO, UTC). */
   startsBefore?: string;
+  /** Exact values: `type` and `level` equal, `topic`, `track` and `service` one of that list's items. */
+  type?: string;
+  level?: string;
+  topic?: string;
+  track?: string;
+  service?: string;
   limit: number;
 }
 
@@ -73,6 +83,13 @@ export interface ScheduleRepository {
   searchSessions(eventId: string, filter: SessionFilter): Promise<{ sessions: CatalogSession[]; total: number }>;
   /** The attendee's own reports of these sessions, those there are, in any order. */
   reports(attendeeId: string, eventId: string, sessionIds: readonly string[]): Promise<SessionReport[]>;
+  /** Whether any sync of the attendee's has kept a session of the event as their report. */
+  hasReported(attendeeId: string, eventId: string): Promise<boolean>;
+  /**
+   * The catalog's abstract of each of these sessions that has one, by id. The
+   * one read of the abstract: callers ask `canReadAbstract` first (ADR 0025).
+   */
+  abstracts(eventId: string, sessionIds: readonly string[]): Promise<Map<string, string>>;
 
   entry(attendeeId: string, eventId: string, sessionId: string): Promise<PlanEntry | undefined>;
   entries(attendeeId: string, eventId: string): Promise<PlanEntry[]>;

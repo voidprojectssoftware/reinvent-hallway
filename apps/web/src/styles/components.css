@@ -611,6 +611,15 @@ button.cell:active {
 .info-v {
   font: var(--t-callout);
 }
+/* A session's abstract: AWS's plain text, its own line breaks kept. */
+.cell.abstract {
+  display: block;
+  margin: 0;
+  padding-block: 12px;
+  font: var(--t-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 
 /* Search field. */
 .search {

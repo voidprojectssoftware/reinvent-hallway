@@ -1,7 +1,8 @@
 // The session catalog, its reports, plan entries and hidden sessions (Drizzle
-// models). There is no abstract column, and there must never be one (ADR
-// 0003): the abstract is AWS's content behind a login, and the session link
-// is how people read it.
+// models). The abstract is kept (ADR 0025, amending 0003) but it is AWS's
+// text behind a login: the repository reads it in exactly one place,
+// `abstracts`, which only a reader the domain's `canReadAbstract` allows
+// reaches. Every other read selects `catalogColumns`, which leave it out.
 //
 // Plan entries, reports and hidden sessions carry the attendee's id without a
 // foreign key: the attendees table belongs to the identity slice, which may
@@ -9,6 +10,8 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { events } from "./events.ts";
+
+const tagList = (name: string) => text(name, { mode: "json" }).$type<string[]>();
 
 /** What a session is, as the catalog row and each report hold it. */
 const sessionFields = () => ({
@@ -23,7 +26,21 @@ const sessionFields = () => ({
   endsAt: text("ends_at"),
   isAllDay: integer("is_all_day", { mode: "boolean" }),
   speakers: text("speakers", { mode: "json" }).$type<string[]>(),
-  topics: text("topics", { mode: "json" }).$type<string[]>(),
+  /** AWS's plain-text description (ADR 0025). */
+  abstract: text("abstract"),
+  // The descriptive lists, as JSON arrays, each voted on whole.
+  tracks: tagList("tracks"),
+  topics: tagList("topics"),
+  industries: tagList("industries"),
+  areasOfInterest: tagList("areas_of_interest"),
+  roles: tagList("roles"),
+  services: tagList("services"),
+  segments: tagList("segments"),
+  features: tagList("features"),
+  customerPersonas: tagList("customer_personas"),
+  experiences: tagList("experiences"),
+  additionalActivities: tagList("additional_activities"),
+  focusAreas: tagList("focus_areas"),
   // The code, title and speakers through the domain's `foldText`, written
   // with the session so search compares folded text on both sides in SQL
   // (SQLite's own lower() folds ASCII only).

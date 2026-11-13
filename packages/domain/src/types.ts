@@ -34,11 +34,31 @@ export interface Event {
 }
 
 /**
- * A catalog snapshot of one session. Every field but the two ids may be
- * absent, as in AWS's own shape. There is no abstract, by design (ADR 0003),
- * and no url: it is derived from `code` by `sessionUrl`.
+ * The descriptive lists AWS tags a session with, kept as AWS sends them
+ * (ADR 0025). Each is one value to the catalog's consensus: a list is voted
+ * on whole, never item by item. `sessionTags` in sessions.ts lists them.
  */
-export interface Session {
+export type SessionTag =
+  | "topics"
+  | "tracks"
+  | "services"
+  | "roles"
+  | "industries"
+  | "areasOfInterest"
+  | "segments"
+  | "features"
+  | "customerPersonas"
+  | "experiences"
+  | "additionalActivities"
+  | "focusAreas";
+
+/**
+ * One session as anyone who may see it sees it. Every field but the two ids
+ * may be absent, as in AWS's own shape. No url: it is derived from `code` by
+ * `sessionUrl`. No abstract: that is a `SessionSnapshot`'s, and leaves the
+ * catalog only to a reader `canReadAbstract` allows (ADR 0025).
+ */
+export interface Session extends Partial<Record<SessionTag, string[]>> {
   sessionId: string;
   eventId: string;
   code?: string;
@@ -52,7 +72,15 @@ export interface Session {
   endsAt?: string;
   isAllDay?: boolean;
   speakers?: string[];
-  topics?: string[];
+}
+
+/**
+ * Everything Hallway keeps of a session an agent sent: the session, and its
+ * abstract, AWS's plain-text description. Reports are snapshots and the
+ * catalog stores one; what the catalog serves is a `Session`.
+ */
+export interface SessionSnapshot extends Session {
+  abstract?: string;
 }
 
 export type Intent = "interested" | "reserved";

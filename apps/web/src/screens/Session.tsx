@@ -1,7 +1,9 @@
-// One session (docs/design/session.html): when, where, who speaks, the link
-// to re:Invent, and its place on my week. Never an abstract (ADR 0003): the
-// description is read on re:Invent, behind the one button. Anyone may open a
-// session; the "On your week" part is for someone signed in.
+// One session (docs/design/session.html): when, where, who speaks, what it
+// is about and who it is for, the link to re:Invent, and its place on my
+// week. The abstract comes only to an attendee whose own agent has synced
+// (ADR 0025), and is AWS's plain text, so it is rendered as text, never as
+// HTML. Anyone may open a session; the "On your week" part is for someone
+// signed in.
 import { goingFacesShown, type GoingPerson, type PlanEntry, type Session as SessionResource } from "@hallway/contracts";
 import { useState } from "react";
 import { Link, useLoaderData, useParams, useRevalidator } from "react-router";
@@ -20,7 +22,15 @@ import { formatDay, formatTime, zoneAbbreviation } from "../time.ts";
 
 type Loaded =
   | { found: false }
-  | { found: true; session: SessionResource; signedIn: boolean; entry: PlanEntry | null; going: GoingPerson[] };
+  | {
+      found: true;
+      session: SessionResource;
+      signedIn: boolean;
+      /** My agent has synced this event: abstracts come with sessions, when attendees sent them. */
+      synced: boolean;
+      entry: PlanEntry | null;
+      going: GoingPerson[];
+    };
 
 export async function sessionLoader({ params }: { params: { sessionId?: string } }): Promise<Loaded> {
   const sessionId = params.sessionId ?? "";
@@ -43,6 +53,7 @@ export async function sessionLoader({ params }: { params: { sessionId?: string }
     found: true,
     session,
     signedIn: schedule !== null,
+    synced: schedule?.lastSync !== undefined,
     entry: schedule?.entries.find((e) => e.sessionId === sessionId) ?? null,
     going,
   };
@@ -63,7 +74,7 @@ export function Session() {
       </Screen>
     );
   }
-  const { session, signedIn, entry, going } = loaded;
+  const { session, signedIn, synced, entry, going } = loaded;
   const sub = [session.code, session.type, session.level].filter(Boolean);
 
   return (
@@ -84,6 +95,17 @@ export function Session() {
     >
       <Details session={session} />
 
+      {session.abstract && (
+        <section className="section">
+          <h2 className="ghead">About this session</h2>
+          <div className="group">
+            <p className="cell abstract">{session.abstract}</p>
+          </div>
+        </section>
+      )}
+
+      <Tags session={session} />
+
       <section className="section">
         {session.url ? (
           <a className="btn block" href={session.url} target="_blank" rel="noopener">
@@ -91,9 +113,17 @@ export function Session() {
           </a>
         ) : null}
         <p className="gfoot">
-          {session.url
-            ? "The description, seats and reservations are on the re:Invent site."
-            : "This session has no code yet, so there is no re:Invent link for it."}
+          {!session.url
+            ? "This session has no code yet, so there is no re:Invent link for it."
+            : session.abstract
+              ? "Seats and reservations are on the re:Invent site."
+              : "The description, seats and reservations are on the re:Invent site."}
+          {signedIn && !synced && (
+            <>
+              {" "}
+              Once your agent syncs your schedule, descriptions show here too. <Link to="/connect">Connect your agent</Link>
+            </>
+          )}
         </p>
       </section>
 
@@ -124,7 +154,6 @@ function Details({ session }: { session: SessionResource }) {
   const place = [session.venue, session.room].filter(Boolean).join(", ");
   if (place) rows.push({ icon: "pin", label: "Where", value: place });
   if (session.speakers?.length) rows.push({ icon: "mic", label: "Speakers", value: session.speakers.join(", ") });
-  if (session.topics?.length) rows.push({ icon: "tag", label: "Topics", value: session.topics.join(", ") });
   if (rows.length === 0) return null;
 
   return (
@@ -136,6 +165,41 @@ function Details({ session }: { session: SessionResource }) {
               <span className="ico">
                 <Icon name={row.icon} />
               </span>
+              <div className="cellmain">
+                <span className="info-k">{row.label}</span>
+                <span className="info-v">{row.value}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The lists AWS tags a session with that tell a reader what it covers and who it is for (ADR 0025). */
+const shownTags = [
+  ["topics", "Topics"],
+  ["tracks", "Tracks"],
+  ["services", "AWS services"],
+  ["roles", "Roles"],
+  ["industries", "Industries"],
+  ["areasOfInterest", "Areas of interest"],
+] as const;
+
+function Tags({ session }: { session: SessionResource }) {
+  const rows = shownTags.flatMap(([key, label]) => {
+    const values = session[key];
+    return values?.length ? [{ label, value: values.join(", ") }] : [];
+  });
+  if (rows.length === 0) return null;
+  return (
+    <section className="section">
+      <h2 className="ghead">Topics and audience</h2>
+      <ul className="group">
+        {rows.map((row) => (
+          <li key={row.label}>
+            <div className="cell">
               <div className="cellmain">
                 <span className="info-k">{row.label}</span>
                 <span className="info-v">{row.value}</span>

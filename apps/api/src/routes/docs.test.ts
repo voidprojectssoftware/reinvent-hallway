@@ -13,6 +13,8 @@ describe("GET /api/docs", () => {
     expect(response.headers.get("content-type")).toMatch(/^text\/html/);
     const page = await response.text();
     expect(page).toContain('url: "/api/openapi.json"');
+    // The sidebar lists routes, not summary sentences (#79).
+    expect(page).toContain('operationTitleSource: "path"');
     // Pinned, with an integrity hash: never an unversioned CDN URL.
     expect(page).toMatch(/@scalar\/api-reference@\d+\.\d+\.\d+\/dist\/browser\/standalone\.js" integrity="sha384-/);
   });

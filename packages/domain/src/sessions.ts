@@ -1,12 +1,28 @@
 import { localToEpoch, parseLocalDate, parseLocalTime } from "./time";
-import type { Event, Session } from "./types";
+import type { Event, Session, SessionSnapshot, SessionTag } from "./types";
+
+/** Every descriptive list Hallway keeps, in the order AWS's spec gives them. */
+export const sessionTags: readonly SessionTag[] = [
+  "tracks",
+  "topics",
+  "industries",
+  "areasOfInterest",
+  "roles",
+  "services",
+  "segments",
+  "features",
+  "customerPersonas",
+  "experiences",
+  "additionalActivities",
+  "focusAreas",
+];
 
 /**
  * The parts of the AWS Events API `Session` (openapi-2026-11-13.json) that
- * Hallway reads. Everything else it sends, the abstract and the taxonomies
- * other than topics, is not read, so it cannot reach storage (ADR 0003).
+ * Hallway reads: all of it but `isReservable` and `seatAvailability`, which
+ * are AWS's live state and would show stale in a snapshot (ADR 0025).
  */
-export interface AwsSession {
+export interface AwsSession extends Partial<Record<SessionTag, string[]>> {
   sessionId: string;
   title?: string;
   abbreviation?: string;
@@ -23,7 +39,7 @@ export interface AwsSession {
     timezone?: string;
   };
   speakers?: { name?: string }[];
-  topics?: string[];
+  abstract?: string;
 }
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -78,15 +94,16 @@ export function unreadableTime(aws: AwsSession): UnreadableTime | undefined {
 }
 
 /**
- * A Hallway session snapshot from AWS's session. AWS gives a local date, time
+ * A Hallway session snapshot from AWS's session, its abstract included (who
+ * may read that is `canReadAbstract`'s to say). AWS gives a local date, time
  * and length in the event's zone; we keep UTC instants. The event's zone is
  * used even when `sessionTime.timezone` is present, because domain.md fixes
  * session times to the event's zone and AWS documents that field as optional
  * and free-form. A field AWS left out stays absent, so `mergeSnapshot` keeps
  * the old value.
  */
-export function toSession(aws: AwsSession, event: Pick<Event, "eventId" | "timezone">): Session {
-  const session: Session = { sessionId: aws.sessionId, eventId: event.eventId };
+export function toSession(aws: AwsSession, event: Pick<Event, "eventId" | "timezone">): SessionSnapshot {
+  const session: SessionSnapshot = { sessionId: aws.sessionId, eventId: event.eventId };
   if (aws.abbreviation !== undefined) session.code = aws.abbreviation;
   if (aws.title !== undefined) session.title = aws.title;
   if (aws.type !== undefined) session.type = aws.type;
@@ -98,7 +115,11 @@ export function toSession(aws: AwsSession, event: Pick<Event, "eventId" | "timez
   if (aws.speakers !== undefined) {
     session.speakers = aws.speakers.flatMap((s) => (s.name?.trim() ? [s.name.trim()] : []));
   }
-  if (aws.topics !== undefined) session.topics = [...aws.topics];
+  for (const tag of sessionTags) {
+    const values = aws[tag];
+    if (values !== undefined) session[tag] = [...values];
+  }
+  if (aws.abstract !== undefined) session.abstract = aws.abstract;
   return session;
 }
 
@@ -110,8 +131,8 @@ export function toSession(aws: AwsSession, event: Pick<Event, "eventId" | "timez
  * The one exception is the time: a start and an end are one fact, so a newer
  * start brings its own end, or none, rather than pairing with the old end.
  */
-export function mergeSnapshot(existing: Session, incoming: Session): Session {
-  const merged: Session = { ...existing };
+export function mergeSnapshot(existing: SessionSnapshot, incoming: SessionSnapshot): SessionSnapshot {
+  const merged: SessionSnapshot = { ...existing };
   for (const [key, value] of Object.entries(incoming)) {
     if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
   }
@@ -124,7 +145,7 @@ export function mergeSnapshot(existing: Session, incoming: Session): Session {
  * forward, and when the last one came. The catalog keeps one per reporter and
  * shows their `consensus`, so no single agent decides what a shared session is.
  */
-export interface SessionReport extends Session {
+export interface SessionReport extends SessionSnapshot {
   attendeeId: string;
   reportedAt: string;
 }
@@ -133,16 +154,17 @@ export interface SessionReport extends Session {
  * The parts of a session reporters vote on, each as one value. The start and
  * the end are one fact (as in `mergeSnapshot`): a report's time is its pair.
  */
-const ballot: readonly (readonly (keyof Session)[])[] = [
+const ballot: readonly (readonly (keyof SessionSnapshot)[])[] = [
   ["code"],
   ["title"],
+  ["abstract"],
   ["type"],
   ["level"],
   ["venue"],
   ["room"],
   ["isAllDay"],
   ["speakers"],
-  ["topics"],
+  ...sessionTags.map((tag) => [tag]),
   ["startsAt", "endsAt"],
 ];
 
@@ -157,9 +179,9 @@ const ballot: readonly (readonly (keyof Session)[])[] = [
  * The D1 repository computes the same thing in SQL inside the sync's batch;
  * schedule-repository.test.ts holds the two to the same answers.
  */
-export function consensus(reports: readonly SessionReport[]): Session {
+export function consensus(reports: readonly SessionReport[]): SessionSnapshot {
   const { sessionId, eventId } = reports[0]!;
-  const session: Session = { sessionId, eventId };
+  const session: SessionSnapshot = { sessionId, eventId };
   for (const fields of ballot) {
     const tally = new Map<string, { votes: number; latest: string; values: Partial<Session> }>();
     for (const report of reports) {
@@ -183,6 +205,34 @@ export function consensus(reports: readonly SessionReport[]): Session {
       }
     }
   }
+  return session;
+}
+
+/**
+ * Who asks for a session's abstract: an attendee, and whether their own agent
+ * has had at least one session of the event kept as their report. `null` is
+ * nobody signed in.
+ */
+export interface AbstractReader {
+  attendeeId: string;
+  hasReportedSessions: boolean;
+}
+
+/**
+ * The abstract rule (ADR 0025). The abstract is AWS's text, and AWS shows it
+ * only to a signed-in attendee registered for the event. A sync that kept one
+ * of their own sessions is Hallway's proof that AWS let this person read the
+ * catalog, so only an attendee whose agent has reported a session may read
+ * abstracts here. Everyone else, signed out included, and everything that
+ * leaves Hallway (a link preview, the share image, the calendar feed) gets
+ * none.
+ */
+export function canReadAbstract(reader: AbstractReader | null): boolean {
+  return reader !== null && reader.hasReportedSessions;
+}
+
+/** A snapshot without its abstract: the session anyone who may see it sees. */
+export function withoutAbstract({ abstract: _abstract, ...session }: SessionSnapshot): Session {
   return session;
 }
 

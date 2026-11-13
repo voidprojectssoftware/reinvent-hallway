@@ -8,10 +8,11 @@ import type { Me, ShareLinks } from "@hallway/contracts";
 import { reinvent2026 } from "@hallway/infrastructure";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.ts";
+import { personPage } from "./person-page.ts";
 import { escapeText, foldLine } from "./sharing/ical.ts";
 import { fallbacksFor, fallbackSubsets } from "./sharing/fallback-fonts.ts";
 import { cardRenderer } from "./sharing/png.ts";
-import { cardTexts, shareCard } from "./sharing/share-card.ts";
+import { cardTexts, shareCard, type CardNode } from "./sharing/share-card.ts";
 import { inMemoryHandlers } from "./testing/in-memory-handlers.ts";
 
 const require = createRequire(import.meta.url);
@@ -50,10 +51,20 @@ const fixture = JSON.parse(
 const bindings = { DEV_SIGN_IN: "1" };
 const origin = "http://127.0.0.1:8787";
 let call: (path: string, init?: RequestInit & { as?: string }) => Promise<Response>;
+let handlers: ReturnType<typeof inMemoryHandlers>["handlers"];
+/** Every card the share image route drew, as the renderer was handed it. */
+let drawn: CardNode[];
 
 beforeEach(() => {
-  const { handlers } = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") });
-  const app = createApp<typeof bindings>({ handlers: () => handlers, renderPng: renderer.png });
+  handlers = inMemoryHandlers({ now: () => new Date("2026-11-13T12:00:00.000Z") }).handlers;
+  drawn = [];
+  const app = createApp<typeof bindings>({
+    handlers: () => handlers,
+    renderPng: async (card) => {
+      drawn.push(card);
+      return renderer.png(card);
+    },
+  });
   call = async (path, { as, ...init } = {}) => {
     const headers = new Headers(init.headers);
     headers.set("content-type", "application/json");
@@ -346,6 +357,36 @@ describe("the share card's fonts", () => {
     for (const subset of fallbackSubsets) {
       for (const weight of subset.weights) expect(() => require.resolve(`${subset.pkg}/files/${subset.file(weight)}`)).not.toThrow();
     }
+  });
+});
+
+describe("what leaves Hallway never carries an abstract (ADR 0025)", () => {
+  it("not the link preview nor the share card of a verified owner, whoever asks", async () => {
+    // Sam's agent synced the fixture, abstracts included: Sam may read them on Hallway.
+    const me = await attendee("Sam Okafor", "public");
+    const session = await call("/api/events/reinvent2026/sessions/s-aim3315", { as: me.id });
+    expect(await session.text()).toContain("ABSTRACT-TEXT-AIM3315");
+
+    for (const as of [undefined, me.id]) {
+      const card = await call(`/og/${me.handle}.png`, as ? { as } : {});
+      expect(card.status).toBe(200);
+    }
+    expect(drawn).toHaveLength(2);
+    for (const card of drawn) {
+      const texts = cardTexts(card).join("\n");
+      expect(texts).toContain("Monday Night Live");
+      expect(texts).not.toContain("ABSTRACT-TEXT");
+    }
+
+    const shell = "<!doctype html><html><head><title>Hallway</title></head><body></body></html>";
+    const page = await personPage(
+      new URL(`${origin}/@${me.handle}`),
+      { fetch: async () => new Response(shell, { headers: { "content-type": "text/html" } }) },
+      handlers.sharing.getSharedSchedule,
+    );
+    const html = await page.text();
+    expect(html).toContain(me.displayName);
+    expect(html).not.toContain("ABSTRACT-TEXT");
   });
 });
 

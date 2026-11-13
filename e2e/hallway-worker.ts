@@ -8,7 +8,7 @@
 // alone can leave workerd holding the port. Teardown runs when the tests fail
 // too, and the `exit` hook covers a run that dies before teardown.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -72,8 +72,14 @@ async function waitUntilServing(url: string, child: ChildProcess, log: () => str
 
 export default async function setup(project: TestProject) {
   const state = mkdtempSync(join(tmpdir(), "hallway-e2e-"));
-  // wrangler refuses a missing assets directory; the suite needs no web app.
-  mkdirSync(join(root, "apps/web/dist"), { recursive: true });
+  // wrangler refuses a missing assets directory; the suite needs no web app,
+  // only a shell for the link preview to put its tags in (person-page.ts). A
+  // real build's index.html is left alone.
+  const dist = join(root, "apps/web/dist");
+  mkdirSync(dist, { recursive: true });
+  if (!existsSync(join(dist, "index.html"))) {
+    writeFileSync(join(dist, "index.html"), "<!doctype html>\n<html><head><title>Hallway</title></head><body></body></html>\n");
+  }
 
   const migrated = spawnSync(
     process.execPath,

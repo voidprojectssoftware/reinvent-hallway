@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  canReadAbstract,
   consensus,
   foldText,
   mergeSnapshot,
+  sessionTags,
   sessionUrl,
   toSession,
   unreadableTime,
+  withoutAbstract,
   type AwsSession,
   type SessionReport,
 } from "./sessions";
 import { toLocal } from "./time";
-import type { Session } from "./types";
+import type { Session, SessionSnapshot } from "./types";
 
 const reinvent = { eventId: "reinvent2026", timezone: "America/Los_Angeles" };
 
@@ -106,9 +109,17 @@ describe("toSession: what is kept", () => {
     industries: ["Retail"],
     services: ["Amazon Bedrock"],
     areasOfInterest: ["Generative AI"],
+    roles: ["Developer"],
+    segments: ["Enterprise"],
+    features: ["Interactive"],
+    customerPersonas: ["Architect"],
+    experiences: ["Executive Summit"],
+    additionalActivities: ["Hands-on"],
+    focusAreas: ["Agents"],
+    seatAvailability: "limited",
   };
 
-  it("keeps identity and placement, speakers as names, and topics", () => {
+  it("keeps every field AWS describes a session with, speakers as names, the abstract included (ADR 0025)", () => {
     expect(toSession(full, reinvent)).toEqual({
       sessionId: "abc",
       eventId: "reinvent2026",
@@ -120,16 +131,44 @@ describe("toSession: what is kept", () => {
       room: "Level 3, Murano 3201",
       isAllDay: false,
       speakers: ["Priya Rao", "Sam Lee"],
+      abstract: "AWS's content, behind a login",
       topics: ["Artificial Intelligence"],
+      tracks: ["AI"],
+      industries: ["Retail"],
+      services: ["Amazon Bedrock"],
+      areasOfInterest: ["Generative AI"],
+      roles: ["Developer"],
+      segments: ["Enterprise"],
+      features: ["Interactive"],
+      customerPersonas: ["Architect"],
+      experiences: ["Executive Summit"],
+      additionalActivities: ["Hands-on"],
+      focusAreas: ["Agents"],
     });
   });
 
-  it("never carries the abstract or the other taxonomies (ADR 0003)", () => {
-    const keys = Object.keys(toSession(full, reinvent));
-    for (const dropped of ["abstract", "tracks", "industries", "services", "areasOfInterest", "isReservable"]) {
-      expect(keys).not.toContain(dropped);
-    }
-    expect(JSON.stringify(toSession(full, reinvent))).not.toContain("behind a login");
+  it("leaves out AWS's live state, which a snapshot would show stale", () => {
+    const keys = Object.keys(toSession(full as AwsSession, reinvent));
+    expect(keys).not.toContain("isReservable");
+    expect(keys).not.toContain("seatAvailability");
+  });
+
+  it("withoutAbstract is the same session with nothing of the abstract", () => {
+    const shown = withoutAbstract(toSession(full, reinvent));
+    expect(Object.keys(shown)).not.toContain("abstract");
+    expect(JSON.stringify(shown)).not.toContain("behind a login");
+    expect(shown.services).toEqual(["Amazon Bedrock"]);
+  });
+});
+
+describe("canReadAbstract (ADR 0025)", () => {
+  it("lets an attendee whose agent has reported a session read abstracts", () => {
+    expect(canReadAbstract({ attendeeId: "a", hasReportedSessions: true })).toBe(true);
+  });
+
+  it("refuses an attendee who never had a session reported, and anyone signed out", () => {
+    expect(canReadAbstract({ attendeeId: "a", hasReportedSessions: false })).toBe(false);
+    expect(canReadAbstract(null)).toBe(false);
   });
 });
 
@@ -181,7 +220,7 @@ describe("sessionUrl", () => {
 });
 
 describe("consensus", () => {
-  const report = (attendeeId: string, reportedAt: string, fields: Partial<Session>): SessionReport => ({
+  const report = (attendeeId: string, reportedAt: string, fields: Partial<SessionSnapshot>): SessionReport => ({
     sessionId: "s",
     eventId: "e",
     attendeeId,
@@ -241,6 +280,23 @@ describe("consensus", () => {
         report("c", "t3", { speakers: ["Ada"] }),
       ]).speakers,
     ).toEqual(["Ada", "Ben"]);
+  });
+
+  it("votes on the abstract and every descriptive list, each list whole (ADR 0025)", () => {
+    for (const tag of sessionTags) {
+      const voted = consensus([
+        report("a", "t1", { [tag]: ["X", "Y"] }),
+        report("b", "t2", { [tag]: ["X", "Y"] }),
+        report("c", "t3", { [tag]: ["Y", "X"] }),
+      ]);
+      expect(voted[tag], tag).toEqual(["X", "Y"]);
+    }
+    const abstract = consensus([
+      report("a", "t1", { abstract: "AWS's text" }),
+      report("b", "t2", { abstract: "AWS's text" }),
+      report("c", "t3", { abstract: "Buy my course" }),
+    ]).abstract;
+    expect(abstract).toBe("AWS's text");
   });
 });
 
