@@ -119,6 +119,9 @@ the Worker; these are the choices it left open.
 
 ## The share card follows the asker
 
+_Superseded by ADR 0026 (#70): `/og/{handle}.png` is now always the
+anonymous card, and the owner's picture is `/api/me/share-image.png`._
+
 `/og/{handle}.png` resolves the actor like `/api`: a fetcher is anonymous and
 gets the public view; the owner signed in gets their own week to download and
 post as a picture. Hidden entries stay out even for the owner

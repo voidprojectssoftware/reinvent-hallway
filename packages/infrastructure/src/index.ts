@@ -18,12 +18,20 @@ export {
 export type { OAuthClientConfig } from "./identity/oauth-client.ts";
 export { googleEndpoints, googleOidc } from "./identity/google-oidc.ts";
 export { microsoftEndpoints, microsoftOidc, personalAccountsTenant } from "./identity/microsoft-oidc.ts";
-export { linkedInEndpoints, linkedInOidc } from "./identity/linkedin-oidc.ts";
+export { linkedInEndpoints, linkedInEndpointsAt, linkedInOidc, type LinkedInEndpoints } from "./identity/linkedin-oidc.ts";
+export { linkedInApiVersion, linkedInPoster, linkedInPostScope, littleText } from "./identity/linkedin-posts.ts";
+export { postDraftsInMemory, postDraftsOnD1 } from "./sharing/post-drafts.ts";
 export { gitHubEndpoints, gitHubOAuth, maxFollowingPages } from "./identity/github-oauth.ts";
 export type { FakeProvider } from "./identity/fake-oauth-server.ts";
 export { fakeGoogle, type FakeGoogle, type FakeGoogleUser } from "./identity/fake-google.ts";
 export { fakeMicrosoft, type FakeMicrosoft, type FakeMicrosoftUser } from "./identity/fake-microsoft.ts";
-export { fakeLinkedIn, type FakeLinkedIn, type FakeLinkedInUser } from "./identity/fake-linkedin.ts";
+export {
+  fakeLinkedIn,
+  type FakeLinkedIn,
+  type FakeLinkedInImage,
+  type FakeLinkedInPost,
+  type FakeLinkedInUser,
+} from "./identity/fake-linkedin.ts";
 export { fakeGitHub, type FakeGitHub, type FakeGitHubUser } from "./identity/fake-github.ts";
 export { scheduleOnD1 } from "./schedule/d1-schedule-repository.ts";
 export { scheduleInMemory } from "./schedule/in-memory-schedule-repository.ts";

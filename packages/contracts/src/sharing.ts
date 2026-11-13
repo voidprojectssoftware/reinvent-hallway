@@ -7,9 +7,17 @@ export const ShareLinks = z
     pageUrl: z.url().meta({ description: "My `/@handle` page. Its link preview shows what an anonymous visitor may see.", example: "https://hallway.example/@jane-doe" }),
     imageUrl: z.url().meta({
       description:
-        "The share card PNG, 1200 by 627. Its `v` changes whenever what it shows changes, so LinkedIn fetches it again.",
+        "The link preview's card, 1200 by 627, exactly as anyone who opens my link sees it: always the anonymous view, whoever fetches it, so a cache can never hand my own week to someone else (#70). Its `v` changes whenever what it shows changes, so LinkedIn fetches it again.",
       example: "https://hallway.example/og/jane-doe.png?v=3f9a1c0e5b7d2a64",
     }),
+    myImageUrl: z
+      .url()
+      .optional()
+      .meta({
+        description:
+          "My own week as a picture to save and post, hidden sessions left out (`GET /api/me/share-image.png`). Its own address, never cached, and only for me signed in as a person: absent for an agent token.",
+        example: "https://hallway.example/api/me/share-image.png",
+      }),
     calendarUrl: z
       .url()
       .optional()
