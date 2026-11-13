@@ -316,3 +316,300 @@ body.loading main {
 .ico.brand.github {
   color: #1f2328;
 }
+
+/* List or Calendar on a week (#91): the design's segmented control, at the
+   top of the week, as wide as the day chips under it. */
+.seg.week-view {
+  margin-block: var(--sp-1) var(--sp-2);
+}
+/* "On from 9:30 to 10 AM": the list a calendar's "+N more" opened. */
+.slot-note {
+  margin-bottom: var(--sp-2);
+}
+
+/* The calendar view of a week (#91). A grouped cell holding the hour axis
+   and one column per day; every 30 minutes is a gridline, 48 px apart, so a
+   "+N more" slot is a full tap target. Blocks are placed from calendar.ts's
+   numbers: --top and --len in minutes, --lane of --lanes across the day. */
+.cal {
+  --ppm: 1.6px; /* pixels per minute: 48 px a slot */
+  --axis: 44px;
+  background: var(--cell);
+  border-radius: var(--r-cell);
+  /* clip, not hidden: hidden would make this the sticky header's scroller. */
+  overflow: clip;
+}
+.cal-row {
+  display: grid;
+  grid-template-columns: var(--axis) repeat(var(--days), minmax(0, 1fr));
+}
+.cal-head {
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 3;
+  background: var(--cell);
+  border-bottom: 0.5px solid var(--sep);
+}
+.cal-dayhead {
+  padding: var(--sp-2) var(--sp-1);
+  text-align: center;
+  font: var(--t-footnote);
+  color: var(--label2);
+}
+.cal-dayhead b {
+  font: 600 17px/1.2 var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+.cal-dayhead.today b {
+  color: var(--tint);
+}
+.cal-allday {
+  border-bottom: 0.5px solid var(--sep);
+}
+.cal-axis-label {
+  padding: var(--sp-2) var(--sp-1);
+  font: var(--t-caption);
+  color: var(--label2);
+}
+.cal-allday-day {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  border-left: 0.5px solid var(--sep);
+}
+.cal-allday-day .cal-block {
+  position: relative;
+  inset: auto;
+  height: var(--tap);
+}
+.cal-body {
+  height: calc(var(--slots) * 30 * var(--ppm));
+}
+.cal-axis {
+  position: relative;
+}
+.cal-axis span {
+  position: absolute;
+  top: calc(var(--at) * 30 * var(--ppm) + 2px);
+  right: 6px;
+  font: var(--t-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--label2);
+  white-space: nowrap;
+}
+/* The gridlines: an hour line in the separator color, a half-hour line
+   fainter between them. */
+.cal-day {
+  position: relative;
+  border-left: 0.5px solid var(--sep);
+  background-image:
+    linear-gradient(to bottom, var(--sep) 0.5px, transparent 0.5px),
+    linear-gradient(to bottom, var(--fill) 0.5px, transparent 0.5px);
+  background-size:
+    100% calc(60 * var(--ppm)),
+    100% calc(30 * var(--ppm));
+}
+.cal-day ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cal-slot {
+  position: absolute;
+  top: calc(var(--top) * var(--ppm));
+  height: max(calc(var(--len) * var(--ppm)), 24px);
+  left: calc(var(--lane) / var(--lanes) * 100%);
+  width: calc(100% / var(--lanes));
+}
+
+/* A session's block. Reserved and interested differ as in the list: in
+   words (the name says which, and reserved carries the check), on the
+   badges' own colors, made opaque so gridlines do not run through text.
+   Measured (light / dark): --label2 on the interested fill 5.15 / 4.99,
+   on the reserved green 5.22 / 4.74; green on it 4.78 / 5.94; the clash
+   orange on the fill 4.58 / 6.25; the tint on "+N more" 4.78 / 5.03. */
+.cal-block {
+  container-type: size;
+  position: absolute;
+  inset: 1px 2px 1px 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  padding: 3px 5px 3px 8px;
+  border-radius: 6px;
+  background: linear-gradient(var(--fill), var(--fill)), var(--cell);
+  color: var(--label);
+  font: var(--t-caption);
+  box-shadow: inset 3px 0 0 var(--label3);
+}
+.cal-block.reserved {
+  background: linear-gradient(var(--green-bg), var(--green-bg)), var(--cell);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+/* A hidden entry, its owner's only: a dashed edge, the title in the
+   secondary label, and "Hidden from others" in words, as in the list. */
+.cal-block.hidden-entry {
+  background: var(--cell);
+  outline: 1px dashed var(--label2);
+  outline-offset: -1px;
+}
+.cal-block.hidden-entry .cal-b-title {
+  color: var(--label2);
+}
+/* Past midnight: the bottom edge is cut and dashed, as the session goes on. */
+.cal-block.past-midnight {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 2px dashed var(--label2);
+}
+.cal-block:active {
+  filter: brightness(0.95);
+}
+.cal-block:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: 0;
+  z-index: 2;
+}
+.cal-b-top {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  white-space: nowrap;
+  color: var(--label2);
+}
+.cal-b-top .code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-block.reserved .cal-b-top {
+  color: var(--green);
+}
+.cal-b-top svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+.cal-b-going {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 2px;
+  color: var(--label2);
+}
+.cal-b-title {
+  font: 600 13px/1.25 var(--font);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+/* A long word in a narrow block is hyphenated rather than cut anywhere; a
+   wider block wraps at spaces only ("to-kens" read badly at 190 px). */
+@container (max-width: 120px) {
+  .cal-b-title {
+    hyphens: auto;
+  }
+}
+.cal-b-place,
+.cal-b-flag {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--label2);
+}
+.cal-b-flag.clash {
+  font-weight: 600;
+  color: var(--orange);
+}
+/* What fits: a shorter block drops the place, then the flags, then lines
+   of title; the full name is always the block's accessible name. */
+@container (max-height: 90px) {
+  .cal-b-title {
+    -webkit-line-clamp: 2;
+  }
+  .cal-b-place {
+    display: none;
+  }
+}
+@container (max-height: 52px) {
+  .cal-b-title {
+    -webkit-line-clamp: 1;
+  }
+  .cal-b-flag {
+    display: none;
+  }
+}
+@container (max-height: 30px) {
+  .cal-b-title {
+    display: none;
+  }
+}
+/* A narrow block says "Clash" rather than a cut-off "Same time as…"; the
+   blocks beside it and its accessible name say with what. */
+.cal-b-flag.narrow-only {
+  display: none;
+}
+@container (max-width: 150px) {
+  .cal-b-flag.wide-only {
+    display: none;
+  }
+  .cal-b-flag.narrow-only {
+    display: block;
+  }
+}
+@container (max-width: 80px) {
+  .cal-b-going {
+    display: none;
+  }
+}
+
+/* "+N more": the sessions a crowded slot could not fit, opening the list at
+   that half hour. The slot's full 48 px height is the tap target. */
+.cal-more {
+  position: absolute;
+  inset: 1px 2px 1px 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--tint-bg);
+  color: var(--tint);
+  font: 600 12px/1.1 var(--font);
+  text-align: center;
+}
+
+/* The time now, during the event: a red line with a dot at its start, as
+   Calendar draws it. */
+.cal-now {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: calc(var(--top) * var(--ppm));
+  border-top: 2px solid var(--red);
+  pointer-events: none;
+}
+.cal-now::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+/* Side by side, the week takes the room a wide screen has, up to 1040 px,
+   rather than the 720 px reading column. */
+main:has(.cal.week),
+body:has(.cal.week) .nav-row {
+  max-width: 1040px;
+}
