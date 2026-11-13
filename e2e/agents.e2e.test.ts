@@ -188,10 +188,10 @@ describe("two agents sync from AWS and plan around each other", () => {
     const invite = await rest<{ token: string }>("GET", "/api/me/invite", ben.cookie);
     await rest("POST", `/api/attendees/${ben.handle}/connect`, ada.cookie, { invite: invite.token });
 
-    expect(names((await adaAgent.tool("list_my_connections")).connections.map((c: Structured) => c.person))).toEqual([
+    expect(names((await adaAgent.tool("list_my_network")).people.map((p: Structured) => p.person))).toEqual([
       ben.name,
     ]);
-    expect(names((await benAgent.tool("list_my_connections")).connections.map((c: Structured) => c.person))).toEqual([
+    expect(names((await benAgent.tool("list_my_connections")).people.map((p: Structured) => p.person))).toEqual([
       ada.name,
     ]);
   });
@@ -229,15 +229,15 @@ describe("two agents sync from AWS and plan around each other", () => {
     ]);
   });
 
-  it("list_my_connections counts Ben's sessions Ada may see, and those she shares, without the hidden one", async () => {
+  it("list_my_network counts Ben's sessions Ada may see, and those she shares, without the hidden one", async () => {
     // Ben has seven; CNT320 is hidden, so six. Of those Ada also plans AIM3315, SVS401, DAT302
     // and the Tuesday keynote.
-    const listed = await adaAgent.tool("list_my_connections", { eventId });
-    expect(listed.connections).toEqual([
+    const listed = await adaAgent.tool("list_my_network", { eventId });
+    expect(listed.people).toEqual([
       expect.objectContaining({ person: expect.objectContaining({ handle: ben.handle }), sessions: 6, sharedWithMe: 4 }),
     ]);
-    const plain = await adaAgent.tool("list_my_connections");
-    expect(plain.connections[0]).not.toHaveProperty("sessions");
+    const plain = await adaAgent.tool("list_my_network");
+    expect(plain.people[0]).not.toHaveProperty("sessions");
   });
 
   it("network_agenda lists what Ben goes to on Tuesday morning, hidden session left out", async () => {
@@ -393,5 +393,98 @@ describe("two agents sync from AWS and plan around each other", () => {
       body: JSON.stringify({ label: "escalation" }),
     });
     expect(response.status).toBe(403);
+  });
+});
+
+// Issue #63: follows (ADR 0019). GitHub is linked through the dev-only
+// `/api/dev/github`, which ends the same link path a GitHub round trip does,
+// since the suite runs offline. The issue's three cases, each through agents:
+//   A. Fay follows Gus on GitHub; Gus is network-only, so Fay cannot see his week.
+//   B. Gus follows Fay back, so she can.
+//   C. Fay's LinkedIn import matches Hal, so Hal sees Fay's network-only week.
+describe("follows from GitHub and LinkedIn let the follower's week be seen, never the followed one's", () => {
+  let fay: Person;
+  let gus: Person;
+  let hal: Person;
+  let fayAgent: Agent;
+  let gusAgent: Agent;
+  let halAgent: Agent;
+  const linkGitHub = (person: Person, id: number, following: number[]) =>
+    rest("POST", "/api/dev/github", person.cookie, {
+      id,
+      login: person.handle,
+      following: following.map((followed) => ({ id: followed, login: `user${followed}` })),
+    });
+
+  beforeAll(async () => {
+    [fay, gus, hal] = [await signIn("Fay Wong"), await signIn("Gus Moreno"), await signIn("Hal Novak")];
+    fayAgent = await Agent.start("fay", await issueAgentToken(fay), adaAws);
+    gusAgent = await Agent.start("gus", await issueAgentToken(gus), benAws);
+    halAgent = await Agent.start("hal", await issueAgentToken(hal), benAws);
+    for (const agent of [fayAgent, gusAgent, halAgent]) await agent.syncFromAws();
+  });
+
+  afterAll(async () => {
+    await Promise.all([fayAgent?.close(), gusAgent?.close(), halAgent?.close()]);
+  });
+
+  it("everyone starts on My network visibility", async () => {
+    expect((await fayAgent.tool("whoami")).visibility).toBe("network");
+  });
+
+  it("A: Fay follows Gus on GitHub and still cannot see his network-only week", async () => {
+    await linkGitHub(gus, 7001, []);
+    await linkGitHub(fay, 7002, [7001, 9999]);
+
+    await expect(fayAgent.tool("get_person_schedule", { handle: gus.handle, eventId })).rejects.toThrow(
+      /Following them does not change that/,
+    );
+    const listed = await fayAgent.tool("list_my_network", { eventId });
+    expect(listed.people.map((p: Structured) => [p.person.handle, p.how, p.scheduleVisible, p.sessions])).toEqual([
+      [gus.handle, ["github"], false, 0],
+    ]);
+    const going = await fayAgent.tool("who_is_going", { eventId, sessionIds: ["s-aim3315"] });
+    expect(going.sessions[0].people).toEqual([]);
+    const following = await rest<Structured>("GET", "/api/me/following", fay.cookie);
+    expect(following.github).toMatchObject({ linked: true, notOnHallway: 1 });
+
+    // Fay following Gus is her consent: his agent can see her week.
+    const hers = await gusAgent.tool("get_person_schedule", { handle: fay.handle, eventId });
+    expect(hers.entries.length).toBe(15);
+  });
+
+  it("B: Gus follows Fay back, and her agent plans around him", async () => {
+    await linkGitHub(gus, 7001, [7002]);
+
+    const his = await fayAgent.tool("get_person_schedule", { handle: gus.handle, eventId });
+    expect(his.entries.map((e: Structured) => e.session.code)).toContain("AIM3315");
+    const going = await fayAgent.tool("who_is_going", { eventId, sessionIds: ["s-aim3315"] });
+    expect(names(going.sessions[0].people)).toEqual([gus.name]);
+    const agenda = await fayAgent.tool("network_agenda", { eventId, day: tuesday, from: "08:00", to: "10:00" });
+    expect(agenda.items.flatMap((item: Structured) => names(item.people))).toContain(gus.name);
+    const gaps = await fayAgent.tool("find_meeting_gaps", { eventId, handle: gus.handle, day: tuesday });
+    expect(gaps.with.handle).toBe(gus.handle);
+    const listed = await fayAgent.tool("list_my_network", { eventId });
+    expect(listed.people[0]).toMatchObject({ how: ["github"], scheduleVisible: true, sessions: 7 });
+  });
+
+  it("C: Fay's LinkedIn import matches Hal, so Hal sees Fay's week and Fay still does not see Hal's", async () => {
+    await rest("PATCH", "/api/me", hal.cookie, { linkedinProfileUrl: "https://www.linkedin.com/in/hal-novak" });
+    await expect(halAgent.tool("get_person_schedule", { handle: fay.handle, eventId })).rejects.toThrow(/forbidden/);
+
+    const csv = ["First Name,Last Name,URL,Email Address,Company,Position,Connected On", "Hal,Novak,https://www.linkedin.com/in/hal-novak,,,,"];
+    const uploaded = await fetch(`${hallway}/api/me/contacts`, {
+      method: "POST",
+      headers: { cookie: fay.cookie, "content-type": "text/csv" },
+      body: csv.join("\n"),
+    });
+    expect(uploaded.status).toBe(200);
+
+    expect((await halAgent.tool("get_person_schedule", { handle: fay.handle, eventId })).entries.length).toBe(15);
+    await expect(fayAgent.tool("get_person_schedule", { handle: hal.handle, eventId })).rejects.toThrow(/forbidden/);
+    const following = await rest<Structured>("GET", "/api/me/following", fay.cookie);
+    expect(following.linkedinImport.people.map((p: Structured) => [p.person.handle, p.scheduleVisible])).toEqual([
+      [hal.handle, false],
+    ]);
   });
 });
