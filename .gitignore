@@ -1,9 +1,0 @@
-node_modules/
-.wrangler/
-dist/
-.bodies/
-.dev.vars
-*.log
-.claude/worktrees/
-.aspire/
-.state/

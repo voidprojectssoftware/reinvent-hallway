@@ -1,1 +1,0 @@
-ALTER TABLE `attendees` ADD `handle_placeholder` integer DEFAULT false NOT NULL;
