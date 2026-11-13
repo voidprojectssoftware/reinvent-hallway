@@ -43,7 +43,11 @@ Each says what holds it. "Nothing yet" means review is the only thing holding it
   (dependency-cruiser, `.dependency-cruiser.mjs`) in `npm run verify`;
   `scripts/boundaries.test.mjs` proves each rule fails on a violation.
 - **One visibility rule for every read path (domain.md).** _Held by:_ nothing yet.
-- **No session abstract is stored or served (ADR 0003).** _Held by:_ nothing yet.
+- **No session abstract is stored or served (ADR 0003).** _Held by:_ the
+  sessions table has no column for it and `toSession` never reads it;
+  `schedule-repository.test.ts` fails on an abstract-like column, and
+  `apps/api/src/schedule.test.ts` fails when any REST or MCP response carries
+  the fixture's abstract text.
 
 ## Enforcement layers
 

@@ -3,14 +3,16 @@
 // tools both reach the same handlers through `c.var.handlers` (ADR 0002).
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Actor, GetEvent } from "@hallway/application";
+import type { ScheduleHandlers } from "@hallway/application";
 import type { ApiError } from "@hallway/contracts";
 import { resolveDevActor, type DevSignInBindings } from "./auth/dev-actor.ts";
 import { registerMcp } from "./mcp/server.ts";
 import { httpStatus } from "./outcome-http.ts";
 import { registerEventRoutes } from "./routes/events.ts";
+import { registerScheduleRoutes } from "./routes/schedule.ts";
 
 /** Every handler the interfaces may call, built per request from the bindings. */
-export interface Handlers {
+export interface Handlers extends ScheduleHandlers {
   getEvent: GetEvent;
 }
 
@@ -49,6 +51,7 @@ export function createApp<Bindings extends DevSignInBindings>(
   });
 
   registerEventRoutes(app);
+  registerScheduleRoutes(app);
   registerMcp(app);
 
   app.doc31("/api/openapi.json", {

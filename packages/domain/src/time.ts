@@ -101,3 +101,16 @@ export function toLocal(instant: string | number, timezone: string): { date: str
     time: `${pad(w.hour)}:${pad(w.minute)}`,
   };
 }
+
+/**
+ * The UTC instants a local day in `timezone` runs between: `from` is local
+ * midnight, `to` the next local midnight (exclusive), as ISO strings like the
+ * ones `toSession` writes, so they compare as text. Undefined if the date is
+ * not real. A session is "on" a day when its start falls in it.
+ */
+export function dayBounds(date: string, timezone: string): { from: string; to: string } | undefined {
+  const from = localToEpoch(date, 0, timezone);
+  const to = localToEpoch(date, 24 * 60, timezone);
+  if (from === undefined || to === undefined) return undefined;
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+}

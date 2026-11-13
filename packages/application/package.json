@@ -5,6 +5,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "@hallway/contracts": "*"
+    "@hallway/contracts": "*",
+    "@hallway/domain": "*"
   }
 }
