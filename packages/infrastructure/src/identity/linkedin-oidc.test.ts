@@ -51,7 +51,7 @@ describe("linkedInOidc", () => {
       client_id: linkedIn.clientId,
       client_secret: linkedIn.clientSecret,
     });
-    expect(userinfo?.authorization).toMatch(/^Bearer access-/);
+    expect(userinfo?.authorization).toMatch(/^Bearer linkedin-access-/);
   });
 
   it("reports an email LinkedIn did not verify as unverified", async () => {

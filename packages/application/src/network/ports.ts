@@ -1,6 +1,13 @@
 // What the network handlers need from storage. packages/infrastructure
 // implements it on D1 and in memory; apps/api picks one in its composition root.
-import type { Connection, ConnectionRequest, ImportedContact, PlanEntry, RequestStatus } from "@hallway/domain";
+import type {
+  Connection,
+  ConnectionRequest,
+  ImportedContact,
+  PlanEntry,
+  RequestStatus,
+  SuggestionCandidate,
+} from "@hallway/domain";
 import type { AttendeeRecord } from "../identity/ports.ts";
 import type { CatalogSession } from "../schedule/schedule-repository.ts";
 
@@ -69,11 +76,11 @@ export interface NetworkRepository {
   replaceContacts(contactImport: ContactImportRecord, contacts: readonly ImportedContact[]): Promise<void>;
   contactImport(attendeeId: string): Promise<ContactImportRecord | undefined>;
   /**
-   * The attendees one of my contacts could point at (by verified email hash,
-   * or by claimed profile URL), and those contacts. A narrowing only: the
+   * The attendees one of my contacts could point at (by a verified identity email hash,
+   * or by claimed profile URL), each with its matching hashes, and those contacts. A narrowing only: the
    * domain's `suggestions` decides who is suggested.
    */
-  contactMatches(attendeeId: string): Promise<{ contacts: ImportedContact[]; candidates: AttendeeRecord[] }>;
+  contactMatches(attendeeId: string): Promise<{ contacts: ImportedContact[]; candidates: SuggestionCandidate[] }>;
   /** Everyone I am connected to or have a pending request with, either direction. */
   linkedTo(attendeeId: string): Promise<Set<string>>;
 

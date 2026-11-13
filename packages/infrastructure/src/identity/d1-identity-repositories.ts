@@ -7,11 +7,12 @@ import type {
   AttendeeRecord,
   AttendeeRepository,
   CalendarFeedRepository,
+  IdentityRecord,
   WebSessionRepository,
 } from "@hallway/application";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, type SQL } from "drizzle-orm";
 import type { Database } from "../persistence/d1/database.ts";
-import { agentTokens, attendees, calendarFeeds, webSessions } from "../persistence/d1/entities/identity.ts";
+import { agentTokens, attendees, calendarFeeds, identities, webSessions } from "../persistence/d1/entities/identity.ts";
 
 type WithoutNulls<T> = { [K in keyof T as null extends T[K] ? never : K]: T[K] } & {
   [K in keyof T as null extends T[K] ? K : never]?: Exclude<T[K], null>;
@@ -32,11 +33,22 @@ function attendeeRow(attendee: AttendeeRecord): typeof attendees.$inferInsert {
     avatarUrl: attendee.avatarUrl ?? null,
     linkedinProfileUrl: attendee.linkedinProfileUrl ?? null,
     visibility: attendee.visibility,
-    linkedinSub: attendee.linkedinSub,
     verifiedName: attendee.verifiedName ?? null,
     email: attendee.email ?? null,
-    verifiedEmailSha256: attendee.verifiedEmailSha256 ?? null,
     createdAt: attendee.createdAt,
+  };
+}
+
+function identityRow(identity: IdentityRecord): typeof identities.$inferInsert {
+  return {
+    provider: identity.provider,
+    subject: identity.subject,
+    attendeeId: identity.attendeeId,
+    email: identity.email ?? null,
+    emailVerified: identity.emailVerified,
+    verifiedEmailSha256: identity.verifiedEmailSha256 ?? null,
+    username: identity.username ?? null,
+    linkedAt: identity.linkedAt,
   };
 }
 
@@ -45,16 +57,45 @@ export function attendeesOnD1(db: Database): AttendeeRepository {
     const [row] = await db.select().from(attendees).where(where).limit(1);
     return row && compact(row);
   };
+  const oneIdentity = async (where: SQL): Promise<IdentityRecord | undefined> => {
+    const [row] = await db.select().from(identities).where(where).limit(1);
+    return row && compact(row);
+  };
+  // `and` is undefined only when given no conditions; these are two.
+  const thisIdentity = (provider: IdentityRecord["provider"], subject: string): SQL =>
+    and(eq(identities.provider, provider), eq(identities.subject, subject)) as SQL;
   return {
     byId: (id) => one(eq(attendees.id, id)),
     byHandle: (handle) => one(eq(attendees.handle, handle)),
-    byLinkedinSub: (sub) => one(eq(attendees.linkedinSub, sub)),
-    async create(attendee) {
-      await db.insert(attendees).values(attendeeRow(attendee));
+    identity: (provider, subject) => oneIdentity(thisIdentity(provider, subject)),
+    async identitiesOf(attendeeId) {
+      const rows = await db
+        .select()
+        .from(identities)
+        .where(eq(identities.attendeeId, attendeeId))
+        .orderBy(asc(identities.linkedAt), asc(identities.provider));
+      return rows.map((row) => compact(row));
+    },
+    identityWithVerifiedEmail: (hash) => oneIdentity(eq(identities.verifiedEmailSha256, hash)),
+    async create(attendee, firstIdentity) {
+      await db.batch([
+        db.insert(attendees).values(attendeeRow(attendee)),
+        db.insert(identities).values(identityRow(firstIdentity)),
+      ]);
     },
     async save(attendee) {
       const { id, ...columns } = attendeeRow(attendee);
       await db.update(attendees).set(columns).where(eq(attendees.id, id));
+    },
+    async link(identity) {
+      await db.insert(identities).values(identityRow(identity));
+    },
+    async saveIdentity(identity) {
+      const { provider, subject, ...columns } = identityRow(identity);
+      await db.update(identities).set(columns).where(thisIdentity(provider, subject));
+    },
+    async unlink(attendeeId, provider) {
+      await db.delete(identities).where(and(eq(identities.attendeeId, attendeeId), eq(identities.provider, provider)));
     },
   };
 }

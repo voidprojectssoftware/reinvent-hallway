@@ -22,7 +22,7 @@ import { and, desc, eq, gte, lt, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { compact } from "../identity/d1-identity-repositories.ts";
 import type { Database } from "../persistence/d1/database.ts";
-import { attendees } from "../persistence/d1/entities/identity.ts";
+import { attendees, identities } from "../persistence/d1/entities/identity.ts";
 import {
   connectionRequests,
   connections,
@@ -250,16 +250,22 @@ export function networkOnD1(db: Database): NetworkRepository {
     async contactMatches(attendeeId) {
       const mine = importOf(attendeeId);
       const claimed = sql`${claimedProfileUrlPrefix} || ${importedContacts.profileUrl}`;
-      const [candidates, contacts] = await Promise.all([
+      const myEmails = sql`select ${importedContacts.emailSha256} from ${importedContacts} where ${importedContacts.importId} = ${mine}`;
+      // Any of an attendee's verified identity emails matches (ADR 0018).
+      const [candidates, hashes, contacts] = await Promise.all([
         db
           .select()
           .from(attendees)
           .where(
             or(
-              sql`${attendees.verifiedEmailSha256} in (select ${importedContacts.emailSha256} from ${importedContacts} where ${importedContacts.importId} = ${mine})`,
+              sql`${attendees.id} in (select ${identities.attendeeId} from ${identities} where ${identities.verifiedEmailSha256} in (${myEmails}))`,
               sql`${attendees.linkedinProfileUrl} in (select ${claimed} from ${importedContacts} where ${importedContacts.importId} = ${mine})`,
             ),
           ),
+        db
+          .select({ attendeeId: identities.attendeeId, hash: identities.verifiedEmailSha256 })
+          .from(identities)
+          .where(sql`${identities.verifiedEmailSha256} in (${myEmails})`),
         db
           .select()
           .from(importedContacts)
@@ -267,14 +273,15 @@ export function networkOnD1(db: Database): NetworkRepository {
             and(
               sql`${importedContacts.importId} = ${mine}`,
               or(
-                sql`${importedContacts.emailSha256} in (select ${attendees.verifiedEmailSha256} from ${attendees})`,
+                sql`${importedContacts.emailSha256} in (select ${identities.verifiedEmailSha256} from ${identities})`,
                 sql`${claimed} in (select ${attendees.linkedinProfileUrl} from ${attendees})`,
               ),
             ),
           ),
       ]);
+      const hashesOf = (id: string) => hashes.flatMap((row) => (row.attendeeId === id && row.hash !== null ? [row.hash] : []));
       return {
-        candidates: candidates.map(toAttendee),
+        candidates: candidates.map((row) => ({ attendee: toAttendee(row), verifiedEmailSha256s: hashesOf(row.id) })),
         contacts: contacts.map((row) => {
           const contact: ImportedContact = { name: row.name };
           if (row.profileUrl !== null) contact.profileUrl = row.profileUrl;

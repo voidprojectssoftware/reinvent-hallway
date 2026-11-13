@@ -17,11 +17,10 @@ export interface Attendee {
   /** Typed by the attendee. Unverified: anyone can claim any URL. */
   linkedinProfileUrl?: string;
   visibility: Visibility;
-  // Private fields, from Sign In with LinkedIn.
-  linkedinSub: string;
-  /** The name LinkedIn verified at sign-in. Unlike displayName, not editable. */
+  // Private fields, from the first identity the attendee signed in with (ADR 0018).
+  /** The name that provider gave. Unlike displayName, not editable. */
   verifiedName?: string;
-  /** Present only when LinkedIn reported it verified. */
+  /** Present only when that provider reported it verified. */
   email?: string;
 }
 
